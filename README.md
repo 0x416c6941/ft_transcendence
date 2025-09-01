@@ -6,13 +6,13 @@
 
 The app is supposed to be **dockerized**, but this step can easily be done last. All you need is Node.js installed on your system; it is already installed at school.
 
-If you want the work with the `SQLite` DB outside of Node, you also need to install the database on your system. It's tiny.
+If you want the work with the `SQLite` DB outside of `Node`, you also need to install the database on your system. It's tiny.
 
 ### Database - SQLite
 
 If the [documentation](https://sqlite.org/) doesn't help, be sure to check out the first video's first few minutes, which illustrate how to install the DB on a number of systems. It is not necessary, you can simply start working with `SQLite` as an `npm` **package**. Most of them already come up with the binary, so as long as you're in `Node.js`, the package will suffice.
 
-You don't have to become an SQL expert, but you should be fine with the basics of the **language**, `SQL (Structured Query Language)`. Simply go through the second course; even just the online notes might suffice. You should be able to CRUD (create/read/update/delete) data in the database (tables/rows/columns), and SQL is a must here. We are **not allowed** to use any `ORM (Object-Relational Mapper)`.
+You don't have to become an SQL expert, but you should be fine with the basics of the **language**, `SQL (Structured Query Language)`. Simply go through the second course; even just the online notes might suffice. You should be able to `CRUD (create/read/update/delete)` data in the database (tables/rows/columns), and SQL is a must here. We are **not allowed** to use any `ORM (Object-Relational Mapper)`.
 
 ### Backend - Node/Fastify
 
@@ -34,7 +34,7 @@ The frontend mustn't use any frameworks or libraries. No problem. It's called `V
 
 ### Socket.IO
 
-There are different strategies to keeping track of multiple things happening at the same time, say a _bunch of people playing a game of **Pong**_, or those same people _chatting in an online group **chat**_ service. Before we get a serious headache, I would suggest starting with the [tried-and-true Socket.IO](https://socket.io/). Socket.IO is straightforward, and yet incredibly robust library of spinng this or that service on the backend, letter clients register to it from the frontend, and use the one service collectively as a group. In the documentation, you will even find a ready-made example of setting up a group chat service. Be sure to check it out.
+There are different strategies to keeping track of multiple things happening at the same time, say a _bunch of people playing a game of **Pong**_, or those same people _chatting in an online group **chat**_ service. Before we get a serious headache, I would suggest starting with the [tried-and-true Socket.IO](https://socket.io/). Socket.IO is straightforward, and yet incredibly robust library of spinng this or that service on the backend, letting clients register to it from the frontend, and use the one service collectively as a group. In the documentation, you will even find a ready-made example of setting up a group chat service. Be sure to check it out.
 
 > [!NOTE]
-> And...we're close to or around **7 major modules**, yielding us a **100% mark**. Onwards and upwards(?/!) There are slight modifications, such as adding more players, allowing player setup options, adding an AI opponent, adding support for multiple languages, add accessibility features, 3D modelling features, observability tooling, etc.
+> And...we're close to or around **7 major modules**, yielding us a **100% mark**. Onwards and upwards(?/!) There are slight modifications and substantial modifications waiting ahead, such as adding more players, allowing player setup options, adding an AI opponent, adding support for multiple languages, add accessibility features, 3D modelling features, observability tooling, etc.
