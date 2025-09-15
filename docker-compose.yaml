@@ -1,0 +1,5 @@
+services:
+  nginx:
+    build: ./nginx/
+    ports:
+      - "1337:80"
