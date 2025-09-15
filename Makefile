@@ -2,7 +2,7 @@
 DC_CMD := docker compose -f ./compose.yaml
 
 .PHONY: all
-all: up
+all: down up
 
 .PHONY: up
 up:
