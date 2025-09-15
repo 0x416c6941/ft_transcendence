@@ -1,5 +1,25 @@
 services:
   nginx:
-    build: ./nginx/
+    build:
+      context: .
+      dockerfile: ./docker/nginx.Dockerfile
+    networks:
+      - network
+    env_file: ./.env
+    secrets:
+      - ft_transcendence.crt
+      - ft_transcendence.key
     ports:
-      - "1337:80"
+      - "1337:443"
+    restart: unless-stopped
+
+# Explicitly specifying a Docker network for containers to communicate on.
+networks:
+  network:
+    driver: bridge
+
+secrets:
+  ft_transcendence.crt:
+    file: ./secrets/ft_transcendence.crt
+  ft_transcendence.key:
+    file: ./secrets/ft_transcendence.key
