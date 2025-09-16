@@ -7,6 +7,11 @@
 		"strict": true
 	},
 	"files": [
-		"src/main.ts"
+		"src/main.ts",
+		"src/router/router.ts",
+		"src/router/views/AbstractView.ts",
+		"src/router/views/css.config.ts",
+		"src/router/views/NotFound.ts",
+		"src/router/views/Home.ts"
 	]
 }
