@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"target": "ES6",
+		"module": "ESNext",
+		"strict": true
+	},
+	"files": [
+		"src/main.ts"
+	]
+}

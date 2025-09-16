@@ -1,0 +1,29 @@
+{
+	"name": "ft_transcendence",
+	"version": "1.0.0",
+	"author": "František Maxian <fmaxian@student.42prague.com (https://github.com/gittwenstein>",
+	"contributors": [
+		{
+			"name": "Anastassiya Krasheninnikova",
+			"email": "anakrash@student.42prague.com",
+			"url": "https://github.com/nastkrash"
+		},
+		{
+			"name": "Hlib Lyshchuk",
+			"email": "hlyshchu@student.42prague.com",
+			"url": "https://github.com/hlib-lyshchuk"
+		},
+		{
+			"name": "Asset Sagymbayev",
+			"email": "asagymba@student.42prague.com",
+			"url": "https://github.com/0x416c6941"
+		}
+	],
+	"type": "module",
+	"scripts": {
+		"build:frontend": "tsc -p frontend"
+	},
+	"devDependencies": {
+		"typescript": "~5.9.2"
+	}
+}

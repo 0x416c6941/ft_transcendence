@@ -2,7 +2,7 @@ services:
   nginx:
     build:
       context: .
-      dockerfile: ./docker/nginx.Dockerfile
+      dockerfile: ./nginx/Dockerfile
     networks:
       - network
     env_file: ./.env

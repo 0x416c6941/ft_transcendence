@@ -1,8 +1,8 @@
 # Docker Compose command.
-DC_CMD := docker compose -f ./compose.yaml
+DC_CMD := docker compose -f ./docker-compose.yaml
 
 .PHONY: all
-all: down up
+all: up
 
 .PHONY: up
 up:
