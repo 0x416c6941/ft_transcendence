@@ -4,9 +4,10 @@ import { CSS_HREFS } from "./css.config.js";
 /**
  * @class Home
  * @extends AbstractView
- * Represents the home page view of the application.
+ * A temporary view to test Regex named parameters.
+ * Send number as a URL parameter.
  */
-export default class Home extends AbstractView {
+export default class RegexTest extends AbstractView {
 	constructor(params: Record<string, string>) {
 		super(params);
 
@@ -19,12 +20,21 @@ export default class Home extends AbstractView {
 	}
 
 	async getHtml(): Promise<string> {
+		let content: string;
+
+		if (this.params["number"].match(/^\d+$/) === null) {
+			content = "Invalid number received!";
+		}
+		else {
+			content = `Number received: ${this.params["number"]}`;
+		}
+
 		return `
-			<h1>Welcome to ft_transcendence!</h1>
+			<h1>Regex Test</h1>
 			<br>
-			Try 404 SPA:
+			${content}
 			<br>
-			<a href="/notfound" data-link>404</a>
+			<a href="/" data-link>Back to main page</a>
 		`;
 	}
 }

@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		"outDir": "./dist",
 		"rootDir": "./src",
-		"target": "ES6",
+		"target": "ES2020",
 		"module": "ESNext",
 		"strict": true
 	},
@@ -12,6 +12,7 @@
 		"src/router/views/AbstractView.ts",
 		"src/router/views/css.config.ts",
 		"src/router/views/NotFound.ts",
-		"src/router/views/Home.ts"
+		"src/router/views/Home.ts",
+		"src/router/views/RegexTest.ts"
 	]
 }
