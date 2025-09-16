@@ -10,7 +10,7 @@ services:
       - ft_transcendence.crt
       - ft_transcendence.key
     ports:
-      - "1337:443"
+      - "443:443"
     restart: unless-stopped
 
 # Explicitly specifying a Docker network for containers to communicate on.
