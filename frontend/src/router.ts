@@ -42,11 +42,11 @@ export class Router {
 	private _root: HTMLElement;
 
 	/**
-	 * @property {Map<string, AbstractViewConstructor>} _routes
+	 * @property {PathToRegister[]} _routes
 	 * @private
-	 * Map where key is a path to a view and value is it's constructor.
+	 * Array of routes to handle.
 	 */
-	private _routes: Map<string, AbstractViewConstructor>;
+	private _routes: PathToRegister[];
 
 	/**
 	 * @property {AbstractView | null} _currentView
@@ -72,8 +72,7 @@ export class Router {
 		}
 		this._root = root;
 
-		this._routes = new Map();
-		routes.forEach((route) => this._routes.set(route.path, route.constructor));
+		this._routes = routes;
 
 		this._currentView = null;
 		this._render();
@@ -130,25 +129,26 @@ export class Router {
 		}
 
 		let newView: AbstractView | null = null;
-
-		// Finding a route that matches the path.
-		this._routes.forEach((routeViewConstructor, routePath) => {
-			const match: string[] | null = location.pathname.match(pathToRegex(routePath));
-
-			if (match !== null) {
-				/* Getting rid of the whole string
-				 * and leaving only the capture group. */
-				const keys = [...routePath.matchAll(/:(\w+)/g)].map((keys) => keys[1]);
-				// The same story.
-				const values = match.slice(1);
-
-				newView = new routeViewConstructor(mapPathParams(keys, values),
-						new URLSearchParams(window.location.search));
-			}
+		const matches: PathToRegister[] = this._routes.filter((route) => {
+			return location.pathname.match(pathToRegex(route.path)) !== null;
 		});
-		if (newView === null) {
+
+		if (matches.length != 0) {
+			/* Getting rid of the whole string
+			 * and leaving only the capture group. */
+			const keys = [...matches[0].path.matchAll(/:(\w+)/g)].map((keys) => keys[1]);
+			// The same story.
+			const values = location.pathname.match(pathToRegex(matches[0].path))!.slice(1);
+
+			newView = new matches[0].constructor(mapPathParams(keys, values),
+					new URLSearchParams(window.location.search));
+		}
+		else {
 			// TODO: Just get the 404.
 			newView = new AbstractView(new Map(), new URLSearchParams());
+		}
+		if (matches.length > 1) {
+			console.warn(`${location.pathname} meets more than one routing path.`);
 		}
 		this._root.innerHTML = await newView.getHtml();
 		newView.setDocumentTitle();
