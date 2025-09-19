@@ -6,6 +6,7 @@
  */
 
 import AbstractView from './views/AbstractView.js';
+import NotFound from './views/NotFound.js';
 
 // Alias to avoid redundant typing...
 type AbstractViewConstructor = new (pathParams: Map<string, string>, queryParams: URLSearchParams) => AbstractView;
@@ -144,8 +145,8 @@ export class Router {
 					new URLSearchParams(window.location.search));
 		}
 		else {
-			// TODO: Just get the 404.
-			newView = new AbstractView(new Map(), new URLSearchParams());
+			// 404 doesn't need any path or query parameters.
+			newView = new NotFound(new Map(), new URLSearchParams());
 		}
 		if (matches.length > 1) {
 			console.warn(`${location.pathname} meets more than one routing path.`);

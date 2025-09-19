@@ -8,7 +8,9 @@
 	},
 	"files": [
 		"src/main.ts",
+		"src/app.config.ts",
 		"src/router.ts",
-		"src/views/AbstractView.ts"
+		"src/views/AbstractView.ts",
+		"src/views/NotFound.ts"
 	]
 }

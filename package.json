@@ -24,6 +24,8 @@
 		"build:frontend": "tsc -p frontend"
 	},
 	"devDependencies": {
-		"typescript": "~5.9.2"
+		"typescript": "~5.9.2",
+		"tailwindcss": "~4.1.13",
+		"@tailwindcss/cli": "~4.1.13"
 	}
 }
