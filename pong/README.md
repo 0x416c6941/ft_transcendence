@@ -1,8 +1,8 @@
 **Transcendence Pong**
 ```
 /server   — Fastify + Socket.IO 
-/client   — TypeScript + Canvas + plain CSS (not Tailwind yet)
-/dist     — compiled frontend code (from the client’s TypeScript build)
+/client   — TypeScript + Canvas + Tailwind
+/dist     — compiled frontend code
 ```
 All game physics runs on the server.  
 The client:  
@@ -16,13 +16,9 @@ Install dependencies:
 ```bash
 npm install
 ```
-Build the client:
+Build the client and server, and Tailwind styles:
 ```bash
-npm run build:client
-```
-Start the server:
-```bash
-npm run dev:server
+npm run dev
 ```
 Open in browser:
 ```bash
