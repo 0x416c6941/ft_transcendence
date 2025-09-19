@@ -4,7 +4,7 @@ const divId: string = "app";
 const pathsToRoute: PathToRegister[] = [
 ];
 
-let router: Router | null;
+let router: Router | null = null;
 
 document.addEventListener("DOMContentLoaded", (e) => {
 	router = new Router(divId, pathsToRoute);
