@@ -1,7 +1,7 @@
 {
 	"name": "ft_transcendence",
 	"version": "1.0.0",
-	"author": "František Maxian <fmaxian@student.42prague.com (https://github.com/gittwenstein>",
+	"author": "František Maxian <fmaxian@student.42prague.com> (https://github.com/gittwenstein)",
 	"contributors": [
 		{
 			"name": "Anastassiya Krasheninnikova",
@@ -21,11 +21,13 @@
 	],
 	"type": "module",
 	"scripts": {
-		"build:frontend": "tsc -p frontend"
+		"build:frontend": "npm run build:frontend:typescript && npm run build:frontend:tailwindcss",
+		"build:frontend:typescript": "tsc -p ./frontend/",
+		"build:frontend:tailwindcss": "npx @tailwindcss/cli -i ./frontend/src/tailwind.css -o ./frontend/public/styles.css"
 	},
 	"devDependencies": {
-		"typescript": "~5.9.2",
+		"@tailwindcss/cli": "~4.1.13",
 		"tailwindcss": "~4.1.13",
-		"@tailwindcss/cli": "~4.1.13"
+		"typescript": "~5.9.2"
 	}
 }

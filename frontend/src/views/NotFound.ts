@@ -10,8 +10,10 @@ export default class NotFound extends AbstractView {
 		super(pathParams, queryParams);
 	}
 
-	async GetHtml(): Promise<string> {
-		return '';
+	async getHtml(): Promise<string> {
+		return `
+			<h1>not found</h1>
+		`;
 	}
 
 	setDocumentTitle(): void {
