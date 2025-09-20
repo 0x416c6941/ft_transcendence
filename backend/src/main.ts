@@ -4,7 +4,7 @@ const fastify = Fastify({
 	logger: true
 });
 
-fastify.get('/api/v1/*', async (request, reply) => {
+fastify.get('/v1/*', async (request, reply) => {
 	return { hello: 'world' };
 });
 
