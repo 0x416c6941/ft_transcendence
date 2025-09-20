@@ -1,11 +1,8 @@
-import { PathToRegister, Router } from "./router.js";
-
-const divId: string = "app";
-const pathsToRoute: PathToRegister[] = [
-];
+import { DIV_ID, PATHS_TO_ROUTE } from './app.config.js';
+import { Router } from "./router.js";
 
 let router: Router | null = null;
 
 document.addEventListener("DOMContentLoaded", (e) => {
-	router = new Router(divId, pathsToRoute);
+	router = new Router(DIV_ID, PATHS_TO_ROUTE);
 });
