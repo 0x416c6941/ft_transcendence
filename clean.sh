@@ -7,14 +7,20 @@
 
 NAME_PREFIX="ft_transcendence-team-repo"
 
-IMAGE_IDS=$(docker images --filter reference="${NAME_PREFIX}-*"		\
+IMAGE_IDS=$(docker images --filter reference="${NAME_PREFIX}-*"			\
 	--format '{{.ID}}')
-NETWORK_IDS=$(docker network ls --filter name="${NAME_PREFIX}_*"	\
+BUILD_IMAGE_IDS=$(docker images --filter label="ft_transcendence.stage=build"	\
+	--format '{{.ID}}')
+NETWORK_IDS=$(docker network ls --filter name="${NAME_PREFIX}_*"		\
 	--format '{{.ID}}')
 
 # Images.
 if [ -n "${IMAGE_IDS}" ]; then
 	docker rmi ${IMAGE_IDS}
+fi
+# Build images.
+if [ -n "${BUILD_IMAGE_IDS}" ]; then
+	docker rmi ${BUILD_IMAGE_IDS}
 fi
 # Networks.
 if [ -n "${NETWORK_IDS}" ]; then
