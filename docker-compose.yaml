@@ -1,7 +1,7 @@
 services:
   nginx:
+    container_name: "${NGINX_SERVICE_NAME}"
     build:
-      context: .
       dockerfile: ./nginx/Dockerfile
     networks:
       - network
@@ -11,6 +11,17 @@ services:
       - ft_transcendence.key
     ports:
       - "443:443"
+    restart: unless-stopped
+  backend:
+    container_name: "${BACKEND_SERVICE_NAME}"
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    networks:
+      - network
+    env_file: ./.env
+    expose:
+      - "${BACKEND_FASTIFY_PORT}"
     restart: unless-stopped
 
 # Explicitly specifying a Docker network for containers to communicate on.

@@ -8,7 +8,7 @@ import { PathToRegister } from './router.js';
  * @var {string} DIV_ID
  * ID of `div` to draw our SPA on.
  */
-export const DIV_ID: string = "app";
+export const DIV_ID: string = 'app';
 
 /**
  * @var {readonly PathToRegister[]} PATHS_TO_ROUTE

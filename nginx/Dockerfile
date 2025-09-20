@@ -1,14 +1,15 @@
 # Building frontend.
 FROM node:24 AS build
+LABEL ft_transcendence.stage="build"
 
 WORKDIR /build
 
-COPY ./package.json .
-COPY ./frontend/ ./frontend
+COPY ./frontend/public/ ./public
+COPY ./frontend/package.json .
+COPY ./frontend/tsconfig.json .
+COPY ./frontend/src ./src
 
-# Running multiple commands in one "RUN" instruction
-# to avoid adding redundant layers.
-RUN npm install && npm run build:frontend
+RUN npm install && npm run build
 
 
 # NGINX image itself.
@@ -18,5 +19,5 @@ RUN rm -f /etc/nginx/default.conf		\
 	&& mkdir -p /etc/nginx/templates
 COPY ./nginx/server.conf /etc/nginx/templates/server.conf.template
 
-COPY --from=build /build/frontend/public/ /web
-COPY --from=build /build/frontend/dist/ /web/dist
+COPY --from=build /build/public/ /web
+COPY --from=build /build/dist/ /web/dist

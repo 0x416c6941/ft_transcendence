@@ -1,5 +1,5 @@
 # Docker Compose command.
-DC_CMD := docker compose -f ./docker-compose.yaml
+DC_CMD := docker compose -f ./docker-compose.yaml --env-file ./.env
 
 .PHONY: all
 all: up

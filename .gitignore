@@ -1,8 +1,14 @@
-node_modules
+# Node.js stuff.
+node_modules/
+package-lock.json
 *.log
+npm-debug.log*
 
 # SSL certificates, ...
 secrets/
 
 # TS compiled into JS.
 dist/
+
+# Tailwind generated CSS.
+frontend/public/styles.css
