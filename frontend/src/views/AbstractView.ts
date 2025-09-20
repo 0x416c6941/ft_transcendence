@@ -1,9 +1,21 @@
+import Router from '../router.js';
+
 /**
  * @class AbstractView
  * @brief An abstract view class.
  * @details "View" is basically a page in our SPA.
  */
 export default class AbstractView {
+	/**
+	 * @property {Router} router
+	 * @protected
+	 * @brief A link to router to be able to redirect one view to another view.
+	 * @details If you want to redirect a user to another view,
+	 * 		do so at the very end of `setup()` method by calling
+	 * 		`this.router.navigate(${VIEW_PATH_HERE})`.
+	 */
+	protected router: Router;
+
 	/**
 	 * @property {Record<string, string>} params
 	 * @protected
@@ -18,8 +30,9 @@ export default class AbstractView {
 	 */
 	protected queryParams: URLSearchParams;
 
-	constructor(pathParams: Map<string, string>, queryParams: URLSearchParams) {
-		// Shallow copy of both objects.
+	constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
+		// Shallow copy of all objects.
+		this.router = router;
 		this.pathParams = pathParams;
 		this.queryParams = queryParams;
 	}

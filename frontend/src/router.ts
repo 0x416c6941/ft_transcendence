@@ -9,7 +9,7 @@ import AbstractView from './views/AbstractView.js';
 import NotFound from './views/NotFound.js';
 
 // Alias to avoid redundant typing...
-type AbstractViewConstructor = new (pathParams: Map<string, string>, queryParams: URLSearchParams) => AbstractView;
+type AbstractViewConstructor = new (router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) => AbstractView;
 
 /**
  * @interface PathToRegister
@@ -33,7 +33,7 @@ export interface PathToRegister {
 /**
  * @class Router
  */
-export class Router {
+export default class Router {
 	/**
 	 * @property {HTMLElement} _root
 	 * @private
@@ -85,7 +85,7 @@ export class Router {
 			if (e.target instanceof HTMLElement &&
 			    e.target.matches('[data-link]')) {
 				e.preventDefault();
-				this._navigate((e.target as HTMLAnchorElement).href);
+				this.navigate((e.target as HTMLAnchorElement).href);
 			}
 		});
 		// Window navigation arrows.
@@ -99,7 +99,7 @@ export class Router {
 	 * @remarks `path` may contain a URL parameters, such as ":id".
 	 * @param {string} path	Path to a view.
 	 */
-	private _navigate(path: string): void {
+	navigate(path: string): void {
 		history.pushState({}, '', path);
 		this._render();
 	}
@@ -141,12 +141,12 @@ export class Router {
 			// The same story.
 			const values = location.pathname.match(pathToRegex(matches[0].path))!.slice(1);
 
-			newView = new matches[0].constructor(mapPathParams(keys, values),
-					new URLSearchParams(window.location.search));
+			newView = new matches[0].constructor(this,
+					mapPathParams(keys, values), new URLSearchParams(window.location.search));
 		}
 		else {
 			// 404 doesn't need any path or query parameters.
-			newView = new NotFound(new Map(), new URLSearchParams());
+			newView = new NotFound(this, new Map(), new URLSearchParams());
 		}
 		if (matches.length > 1) {
 			console.warn(`${location.pathname} meets more than one routing path.`);

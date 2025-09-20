@@ -1,4 +1,5 @@
 import AbstractView from './AbstractView.js';
+import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 
 /**
@@ -6,8 +7,8 @@ import { APP_NAME } from '../app.config.js';
  * 404 "Not Found" view.
  */
 export default class NotFound extends AbstractView {
-	constructor(pathParams: Map<string, string>, queryParams: URLSearchParams) {
-		super(pathParams, queryParams);
+	constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
+		super(router, pathParams, queryParams);
 	}
 
 	async getHtml(): Promise<string> {
