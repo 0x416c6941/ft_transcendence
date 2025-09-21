@@ -1,1 +1,9 @@
 @import "tailwindcss";
+
+@layer components {
+	/* A general class for text taking care of light / dark theme
+	 * and also providing some universal not bad looking font. */
+	.txt-light-dark-sans {
+		@apply text-neutral-900 dark:text-neutral-200 font-sans;
+	}
+}

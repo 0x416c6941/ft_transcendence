@@ -6,7 +6,7 @@
  */
 
 import AbstractView from './views/AbstractView.js';
-import NotFound from './views/NotFound.js';
+import NotFoundView from './views/NotFoundView.js';
 
 // Alias to avoid redundant typing...
 type AbstractViewConstructor = new (router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) => AbstractView;
@@ -96,7 +96,7 @@ export default class Router {
 	 * @method
 	 * @private
 	 * Open a view and add it to browser's history.
-	 * @remarks `path` may contain a URL parameters, such as ":id".
+	 * @remarks `path` may contain URL parameters, such as ":id".
 	 * @param {string} path	Path to a view.
 	 */
 	navigate(path: string): void {
@@ -146,7 +146,7 @@ export default class Router {
 		}
 		else {
 			// 404 doesn't need any path or query parameters.
-			newView = new NotFound(this, new Map(), new URLSearchParams());
+			newView = new NotFoundView(this, new Map(), new URLSearchParams());
 		}
 		if (matches.length > 1) {
 			console.warn(`${location.pathname} meets more than one routing path.`);
