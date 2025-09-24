@@ -40,7 +40,7 @@ export default class NotFoundView extends AbstractView {
 				<div class="flex flex-1 w-full justify-center items-center flex-col"></div>
 				<p class="txt-light-dark-sans text-4xl select-none">404 - Not Found</p>
 				<div class="flex flex-1 w-full justify-center items-center flex-col">
-					<div id="${NotFoundView._DIV_REDIRECT_HOME_ID}" class="select-none flex h-1/5 w-15/100 justify-center items-center rounded-4xl bg-sky-500 shadow-xl shadow-neutral-500/50">
+					<div id="${NotFoundView._DIV_REDIRECT_HOME_ID}" class="select-none flex h-1/5 w-1/5 justify-center items-center rounded-4xl bg-sky-500 shadow-xl shadow-neutral-500/50">
 						<p class="txt-light-dark-sans text-1xl">Return to Home Page</p>
 					</div>
 				</div>
