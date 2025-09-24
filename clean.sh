@@ -6,10 +6,11 @@
 # `docker system prune...`, therefore dangling images will not be removed.
 
 NAME_PREFIX="ft_transcendence-team-repo"
+LABEL_PREFIX="ft_transcendence"
 
 IMAGE_IDS=$(docker images --filter reference="${NAME_PREFIX}-*"			\
 	--format '{{.ID}}')
-BUILD_IMAGE_IDS=$(docker images --filter label="ft_transcendence.stage=build"	\
+BUILD_IMAGE_IDS=$(docker images --filter label="${LABEL_PREFIX}.stage=build"	\
 	--format '{{.ID}}')
 NETWORK_IDS=$(docker network ls --filter name="${NAME_PREFIX}_*"		\
 	--format '{{.ID}}')
