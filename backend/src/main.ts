@@ -1,7 +1,17 @@
-import Fastify from 'fastify';
+import Fastify, { FastifyInstance } from 'fastify';
+import fastifySqlite, { FastifySqliteOptions } from './fastifySqlite.js';
 
-const fastify = Fastify({
+const fastify: FastifyInstance = Fastify({
 	logger: true
+});
+
+const dbFile = process.env.SQLITE_DB_NAME;
+if (!dbFile) {
+	throw new Error("process.env.SQLITE_DB_NAME isn't a valid DB filename!");
+}
+
+fastify.register(fastifySqlite, {
+	dbFile: dbFile
 });
 
 fastify.get('/v1/*', async (request, reply) => {
