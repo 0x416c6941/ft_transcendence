@@ -1,4 +1,5 @@
 FROM node:24
+LABEL ft_transcendence.stage="run"
 
 WORKDIR /backend
 COPY ./backend/package.json .

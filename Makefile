@@ -24,7 +24,7 @@ kill:
 down:
 	@$(DC_CMD) down
 
-# Cleans all Docker images created in "up" recipe.
+# Cleans EVERTYTHING related to Docker, including images created in "up" recipe.
 .PHONY: clean
 clean: down
 	@./clean.sh

@@ -1,6 +1,6 @@
 services:
   nginx:
-    container_name: ${NGINX_SERVICE_NAME}
+    container_name: ${SERVICE_NAME_PREFIX}-${NGINX_SERVICE_NAME}
     build:
       dockerfile: ./nginx/Dockerfile
     networks:
@@ -15,7 +15,7 @@ services:
       - backend
     restart: unless-stopped
   backend:
-    container_name: ${BACKEND_SERVICE_NAME}
+    container_name: ${SERVICE_NAME_PREFIX}-${BACKEND_SERVICE_NAME}
     build:
       context: .
       dockerfile: ./backend/Dockerfile

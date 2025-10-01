@@ -14,6 +14,7 @@ RUN npm install && npm run build
 
 # NGINX image itself.
 FROM nginx:1.28
+LABEL ft_transcendence.stage="run"
 
 RUN rm -f /etc/nginx/default.conf		\
 	&& mkdir -p /etc/nginx/templates
