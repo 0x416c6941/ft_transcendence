@@ -5,13 +5,17 @@ const fastify: FastifyInstance = Fastify({
 	logger: true
 });
 
-const dbFile = process.env.SQLITE_DB_NAME;
+const dbVolPath = process.env.BACKEND_CONTAINER_DB_VOL_PATH;
+if (!dbVolPath) {
+	throw new Error("process.env.BACKEND_CONTAINER_DB_VOL_PATH isn't a valid path.");
+}
+const dbFile = process.env.BACKEND_SQLITE_DB_NAME;
 if (!dbFile) {
-	throw new Error("process.env.SQLITE_DB_NAME isn't a valid DB filename!");
+	throw new Error("process.env.BACKEND_SQLITE_DB_NAME isn't a valid DB filename.");
 }
 
 fastify.register(fastifySqlite, {
-	dbFile: dbFile
+	dbFile: dbVolPath.concat('/').concat(dbFile)
 });
 
 fastify.get('/v1/*', async (request, reply) => {
@@ -22,7 +26,7 @@ const start = async () => {
 	const port = Number(process.env.BACKEND_FASTIFY_PORT);
 
 	if (Number.isNaN(port)) {
-		throw new Error("process.env.BACKEND_FASTIFY_PORT isn't a number!");
+		throw new Error("process.env.BACKEND_FASTIFY_PORT isn't a number.");
 	}
 	try {
 		/* IPv4 only here.

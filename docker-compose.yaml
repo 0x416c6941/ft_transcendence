@@ -1,6 +1,6 @@
 services:
   nginx:
-    container_name: "${NGINX_SERVICE_NAME}"
+    container_name: ${NGINX_SERVICE_NAME}
     build:
       dockerfile: ./nginx/Dockerfile
     networks:
@@ -11,17 +11,21 @@ services:
       - ft_transcendence.key
     ports:
       - "443:443"
+    depends_on:
+      - backend
     restart: unless-stopped
   backend:
-    container_name: "${BACKEND_SERVICE_NAME}"
+    container_name: ${BACKEND_SERVICE_NAME}
     build:
       context: .
       dockerfile: ./backend/Dockerfile
     networks:
       - network
     env_file: ./.env
+    volumes:
+      - sqlite-db:${BACKEND_CONTAINER_DB_VOL_PATH}
     expose:
-      - "${BACKEND_FASTIFY_PORT}"
+      - ${BACKEND_FASTIFY_PORT}
     restart: unless-stopped
 
 # Explicitly specifying a Docker network for containers to communicate on.
@@ -34,3 +38,6 @@ secrets:
     file: ./secrets/ft_transcendence.crt
   ft_transcendence.key:
     file: ./secrets/ft_transcendence.key
+
+volumes:
+  sqlite-db:
