@@ -7,8 +7,9 @@ services:
       - network
     env_file: ./.env
     secrets:
-      - ft_transcendence.crt
-      - ft_transcendence.key
+      - backend-ca.crt
+      - nginx.crt
+      - nginx.key
     ports:
       - "443:443"
     depends_on:
@@ -23,8 +24,8 @@ services:
       - network
     env_file: ./.env
     secrets:
-      - ft_transcendence.key
-      - ft_transcendence.crt
+      - backend.key
+      - backend.crt
     volumes:
       - sqlite-db:${BACKEND_CONTAINER_DB_VOL_PATH}
     expose:
@@ -37,10 +38,16 @@ networks:
     driver: bridge
 
 secrets:
-  ft_transcendence.crt:
-    file: ./secrets/ft_transcendence.crt
-  ft_transcendence.key:
-    file: ./secrets/ft_transcendence.key
+  backend-ca.crt:
+    file: ${SECRETS_DIR}/${SECRET_BACKEND_CA_CRT_FILENAME}
+  nginx.crt:
+    file: ${SECRETS_DIR}/${SECRET_NGINX_CRT_FILENAME}
+  nginx.key:
+    file: ${SECRETS_DIR}/${SECRET_NGINX_KEY_FILENAME}
+  backend.key:
+    file: ${SECRETS_DIR}/${SECRET_BACKEND_KEY_FILENAME}
+  backend.crt:
+    file: ${SECRETS_DIR}/${SECRET_BACKEND_CRT_FILENAME}
 
 volumes:
   sqlite-db:
