@@ -22,6 +22,9 @@ services:
     networks:
       - network
     env_file: ./.env
+    secrets:
+      - ft_transcendence.key
+      - ft_transcendence.crt
     volumes:
       - sqlite-db:${BACKEND_CONTAINER_DB_VOL_PATH}
     expose:

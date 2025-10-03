@@ -1,8 +1,21 @@
 import Fastify, { FastifyInstance } from 'fastify';
+import fs from 'node:fs';
 import fastifySqlite, { FastifySqliteOptions } from './fastifySqlite.js';
 
+const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
+if (!sslKeyPath) {
+	throw new Error("process.env.BACKEND_FASTIFY_SSL_KEY_PATH isn't a valid SSL key.");
+}
+const sslCertPath = process.env.BACKEND_FASTIFY_SSL_CRT_PATH;
+if (!sslCertPath) {
+	throw new Error("process.env.BACKEND_FASTIFY_SSL_CRT_PATH isn't a valid SSL key.");
+}
 const fastify: FastifyInstance = Fastify({
-	logger: true
+	logger: true,
+	https: {
+		key: fs.readFileSync(sslKeyPath),
+		cert: fs.readFileSync(sslCertPath)
+	}
 });
 
 const dbVolPath = process.env.BACKEND_CONTAINER_DB_VOL_PATH;
