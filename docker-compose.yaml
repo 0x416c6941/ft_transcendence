@@ -7,9 +7,9 @@ services:
       - network
     env_file: ./.env
     secrets:
-      - backend-ca.crt
-      - nginx.crt
-      - nginx.key
+      - ${SECRET_NAME_BACKEND_CA_CRT}
+      - ${SECRET_NAME_NGINX_CRT}
+      - ${SECRET_NAME_NGINX_KEY}
     ports:
       - "443:443"
     depends_on:
@@ -24,8 +24,8 @@ services:
       - network
     env_file: ./.env
     secrets:
-      - backend.key
-      - backend.crt
+      - ${SECRET_NAME_BACKEND_KEY}
+      - ${SECRET_NAME_BACKEND_CRT}
     volumes:
       - sqlite-db:${BACKEND_CONTAINER_DB_VOL_PATH}
     expose:
@@ -39,14 +39,19 @@ networks:
 
 secrets:
   backend-ca.crt:
+    name: ${SECRET_NAME_BACKEND_CA_CRT}
     file: ${SECRETS_DIR}/${SECRET_BACKEND_CA_CRT_FILENAME}
   nginx.crt:
+    name: ${SECRET_NAME_NGINX_CRT}
     file: ${SECRETS_DIR}/${SECRET_NGINX_CRT_FILENAME}
   nginx.key:
+    name: ${SECRET_NAME_NGINX_KEY}
     file: ${SECRETS_DIR}/${SECRET_NGINX_KEY_FILENAME}
   backend.key:
+    name: ${SECRET_NAME_BACKEND_KEY}
     file: ${SECRETS_DIR}/${SECRET_BACKEND_KEY_FILENAME}
   backend.crt:
+    name: ${SECRET_NAME_BACKEND_CRT}
     file: ${SECRETS_DIR}/${SECRET_BACKEND_CRT_FILENAME}
 
 volumes:
