@@ -1,11 +1,19 @@
+# .env.
+ENV_FILE := ./.env
+include $(ENV_FILE)
+export
+
 # Docker Compose command.
-DC_CMD := docker compose -f ./docker-compose.yaml --env-file ./.env
+DC_CMD := docker compose -f ./docker-compose.yaml --env-file $(ENV_FILE)
 
 .PHONY: all
 all: up
 
+${SECRETS_DIR}:
+	@./prep_keys.sh
+
 .PHONY: up
-up:
+up: ${SECRETS_DIR}
 	@$(DC_CMD) up --build -d
 
 .PHONY: build
@@ -27,4 +35,5 @@ down:
 # Cleans EVERTYTHING related to Docker, including images created in "up" recipe.
 .PHONY: clean
 clean: down
-	@./clean.sh
+	@./docker_clean.sh
+	@rm -rf ${SECRETS_DIR}

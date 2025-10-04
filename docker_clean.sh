@@ -1,9 +1,6 @@
 #!/bin/sh
 #
-# Clean-up script to remove Docker images and networks.
-#
-# Please note that we go the conservative way without using
-# `docker system prune...`, therefore dangling images will not be removed.
+# Clean-up script to remove all created Docker images, volumes and networks.
 
 NAME_PREFIX="ft_transcendence-team-repo"
 LABEL_PREFIX="ft_transcendence"
