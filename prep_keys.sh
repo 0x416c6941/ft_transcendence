@@ -2,7 +2,7 @@
 #
 # Script to prepare keys for NGINX and Fastify HTTPS server.
 
-source ./.env
+. ./.env
 
 NGINX_CN="${SERVICE_NAME_PREFIX} ${NGINX_SERVICE_NAME}"
 BACKEND_CA_CN="${SERVICE_NAME_PREFIX} ${BACKEND_SERVICE_NAME} CA"
