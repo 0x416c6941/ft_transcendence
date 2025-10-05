@@ -36,7 +36,7 @@ export default class NotFoundView extends AbstractView {
 
 	async getHtml(): Promise<string> {
 		return `
-			<div class="h-screen flex justify-center items-center flex-col bg-neutral-200 dark:bg-neutral-900">
+			<main class="h-screen flex justify-center items-center flex-col bg-neutral-200 dark:bg-neutral-900">
 				<div class="flex flex-1 w-full justify-center items-center flex-col"></div>
 				<p class="txt-light-dark-sans text-4xl select-none">404 - Not Found</p>
 				<div class="flex flex-1 w-full justify-center items-center flex-col">
@@ -44,7 +44,7 @@ export default class NotFoundView extends AbstractView {
 						<p class="txt-light-dark-sans text-1xl">Return to Home Page</p>
 					</div>
 				</div>
-			</div>
+			</main>
 		`;
 	}
 
