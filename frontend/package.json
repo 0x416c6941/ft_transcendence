@@ -26,8 +26,8 @@
 		"build:tailwindcss": "npx @tailwindcss/cli -i ./src/tailwind.css -o ./public/styles.css"
 	},
 	"devDependencies": {
-		"typescript": "~5.9",
 		"@tailwindcss/cli": "~4.1",
-		"tailwindcss": "~4.1"
+		"tailwindcss": "~4.1",
+		"typescript": "~5.9"
 	}
 }

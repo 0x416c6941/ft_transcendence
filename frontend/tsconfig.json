@@ -11,6 +11,8 @@
 		"src/app.config.ts",
 		"src/router.ts",
 		"src/views/AbstractView.ts",
-		"src/views/NotFoundView.ts"
+		"src/views/NotFoundView.ts",
+		"src/views/HomeView.ts",
+		"src/views/LoginView.ts"
 	]
 }

@@ -3,6 +3,8 @@
  */
 
 import { PathToRegister } from './router.js';
+import HomeView from './views/HomeView.js';
+import LoginView from './views/LoginView.js';
 
 /**
  * @var {string} DIV_ID
@@ -15,6 +17,8 @@ export const DIV_ID: string = 'app';
  * Paths and their views' constructors to handle for our router to.
  */
 export const PATHS_TO_ROUTE: PathToRegister[] = [
+	{ path: '/', constructor: HomeView },
+	{ path: '/login', constructor: LoginView },
 ] as const;
 
 /**
