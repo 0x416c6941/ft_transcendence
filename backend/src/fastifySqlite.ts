@@ -16,7 +16,7 @@ export interface FastifySqliteOptions {
 
 const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: FastifyInstance, options: FastifySqliteOptions): Promise<void> => {
 	const db = await new Promise<sqlite3.Database>((resolve, reject) => {
-		const connection = new sqlite3.Database(options.dbFile, (err) => {
+		const connection = new sqlite3.Database(options.dbFile, (err: Error | null) => {
 			if (err) {
 				reject(err);
 			}
@@ -27,7 +27,14 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 	});
 
 	fastify.decorate('sqlite', db);
-	fastify.addHook('onClose', (fastify: FastifyInstance, done) => db.close());
+	fastify.addHook('onClose', (fastify: FastifyInstance, done) => {
+		db.close((err: Error | null) => {
+			if (err) {
+				fastify.log.error('Caught error on SQLite closing', err);
+			}
+		});
+		done();
+	});
 }
 
 export default fp(fastifySqlite, { name: 'fastify-sqlite' });
