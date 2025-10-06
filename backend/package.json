@@ -28,7 +28,8 @@
 		"fastify": "~5.6",
 		"@types/node": "~24.5",
 		"sqlite3": "~5.1",
-		"fastify-plugin": "~5.1"
+		"fastify-plugin": "~5.1",
+		"socket.io": "~4.8"
 	},
 	"devDependencies": {
 		"typescript": "~5.9"

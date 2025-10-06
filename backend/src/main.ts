@@ -1,7 +1,9 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import fs from 'node:fs';
 import fastifySqlite, { FastifySqliteOptions } from './fastifySqlite.js';
+import { Server } from "socket.io";
 
+// Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
 if (!sslKeyPath) {
 	throw new Error("process.env.BACKEND_FASTIFY_SSL_KEY_PATH isn't a valid SSL key.");
@@ -18,6 +20,7 @@ const fastify: FastifyInstance = Fastify({
 	}
 });
 
+// Connecting to DB.
 const dbVolPath = process.env.BACKEND_CONTAINER_DB_VOL_PATH;
 if (!dbVolPath) {
 	throw new Error("process.env.BACKEND_CONTAINER_DB_VOL_PATH isn't a valid path.");
@@ -27,6 +30,7 @@ if (!dbFile) {
 	throw new Error("process.env.BACKEND_SQLITE_DB_NAME isn't a valid DB filename.");
 }
 
+// Registering SQLite Fastify plugin.
 fastify.register(fastifySqlite, {
 	dbFile: dbVolPath.concat('/').concat(dbFile)
 });
@@ -42,6 +46,10 @@ const start = async () => {
 		throw new Error("process.env.BACKEND_FASTIFY_PORT isn't a number.");
 	}
 	try {
+		// Socket.IO initialization.
+		const io = new Server(fastify.server);
+
+		fastify.decorate('io', io);
 		/* IPv4 only here.
 		 * We don't need to take care of IPv6, since we'll either way
 		 * receive data from NGINX as a reverse proxy on IPv4. */

@@ -8,13 +8,8 @@
 	</head>
 	<body>
 		<div id="app">
-			<!--
-				TODO: Once NGINX is set up to redirect
-				requests for Fastify and once
-				Socket.IO is set up, uncomment this
-				(Fastify will serve it on port ${BACKEND_FASTIFY_PORT}):
-				<script src="/socket.io/socket.io.js"></script>
-				-->
+			<!-- Fastify will serve this thing on port ${BACKEND_FASTIFY_PORT}. -->
+			<script src="/api/socket.io/socket.io.js"></script>
 			<script type="module" src="/dist/main.js"></script>
 		</div>
 	</body>
