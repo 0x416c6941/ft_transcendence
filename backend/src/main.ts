@@ -1,4 +1,4 @@
-import Fastify, { FastifyInstance } from 'fastify';
+import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import fs from 'node:fs';
 import fastifySqlite, { FastifySqliteOptions } from './fastifySqlite.js';
 import { Server } from "socket.io";
@@ -35,7 +35,7 @@ fastify.register(fastifySqlite, {
 	dbFile: dbVolPath.concat('/').concat(dbFile)
 });
 
-fastify.get('/v1/*', async (request, reply) => {
+fastify.get('/v1/*', async (request: FastifyRequest, reply: FastifyReply) => {
 	return { hello: 'world' };
 });
 
