@@ -30,7 +30,7 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 	fastify.addHook('onClose', (fastify: FastifyInstance, done) => {
 		db.close((err: Error | null) => {
 			if (err) {
-				fastify.log.error('Caught error on SQLite closing', err);
+				fastify.log.error('Caught error on SQLite closing: ${err}');
 			}
 		});
 		done();
