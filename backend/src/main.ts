@@ -35,7 +35,7 @@ fastify.register(fastifySqlite, {
 	dbFile: dbVolPath.concat('/').concat(dbFile)
 });
 
-fastify.get('/v1/*', async (request: FastifyRequest, reply: FastifyReply) => {
+fastify.get('/test', async (request: FastifyRequest, reply: FastifyReply) => {
 	return { hello: 'world' };
 });
 
@@ -47,9 +47,18 @@ const start = async () => {
 	}
 	try {
 		// Socket.IO initialization.
-		const io = new Server(fastify.server);
+		const io = new Server(fastify.server, {
+			path: '/api/socket.io/'
+		});
 
 		fastify.decorate('io', io);
+		io.on('connection', (socket) => {
+			fastify.log.info(`New sock: ${socket.id}`);
+
+			socket.on('disconnect', () => {
+				fastify.log.info(`Sock disconnect: ${socket.id}`);
+			})
+		})
 		/* IPv4 only here.
 		 * We don't need to take care of IPv6, since we'll either way
 		 * receive data from NGINX as a reverse proxy on IPv4. */
