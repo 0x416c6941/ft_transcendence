@@ -7,6 +7,9 @@
 		"strict": true,
 		"moduleResolution": "node16"
 	},
+	"include": [
+		"src/types/fastify.d.ts"
+	],
 	"files": [
 		"src/main.ts",
 		"src/fastifySqlite.ts"
