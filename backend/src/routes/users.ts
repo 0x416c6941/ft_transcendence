@@ -45,13 +45,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		async (request: FastifyRequest<{ Body: CreateUserBody }>, reply: FastifyReply) => {
 			const { username, password, email, display_name } = request.body;
 
-			// Validate required fields
-			if (!username || !password || !email || !display_name) {
-				return reply.code(400).send({
-					error: 'Missing required fields: username, password, email, display_name'
-				});
-			}
-
 			try {
 				// Hash the password
 				const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
@@ -93,12 +86,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		{ schema: loginUserSchema },
 		async (request: FastifyRequest<{ Body: LoginBody }>, reply: FastifyReply) => {
 			const { username, password } = request.body;
-
-			if (!username || !password) {
-				return reply.code(400).send({
-					error: 'Missing required fields: username, password'
-				});
-			}
 
 			try {
 				// Get user from database
@@ -160,12 +147,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		{ schema: refreshTokenSchema },
 		async (request: FastifyRequest<{ Body: { refreshToken: string } }>, reply: FastifyReply) => {
 			const { refreshToken } = request.body;
-
-			if (!refreshToken) {
-				return reply.code(401).send({
-					error: 'Refresh token required'
-				});
-			}
 
 			try {
 				// Verify the refresh token
