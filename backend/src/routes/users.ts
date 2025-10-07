@@ -308,16 +308,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		schema: {
 			description: 'Get current authenticated user information',
 			tags: ['users', 'auth'],
-			headers: {
-				type: 'object',
-				properties: {
-					Authorization: {
-						type: 'string',
-						description: 'Bearer token'
-					}
-				},
-				required: ['Authorization']
-			},
+			security: [{ bearerAuth: [] }],
 			response: {
 				200: {
 					description: 'Current user details',
@@ -449,16 +440,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			schema: {
 				description: 'Update user information (authentication required, can only update own profile)',
 				tags: ['users'],
-				headers: {
-					type: 'object',
-					properties: {
-						Authorization: {
-							type: 'string',
-							description: 'Bearer token'
-						}
-					},
-					required: ['Authorization']
-				},
+				security: [{ bearerAuth: [] }],
 				params: {
 					type: 'object',
 					properties: {
@@ -591,16 +573,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
 						id: { type: 'integer', description: 'User ID' }
 					},
 					required: ['id']
-				},
-				headers: {
-					type: 'object',
-					properties: {
-						authorization: {
-							type: 'string',
-							description: 'Bearer token for authentication'
-						}
-					},
-					required: ['authorization']
 				},
 				response: {
 					200: {

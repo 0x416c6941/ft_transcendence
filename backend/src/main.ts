@@ -132,8 +132,8 @@ fastify.register(swagger, {
 		},
 		servers: [
 			{
-				url: 'https://localhost:3000',
-				description: 'Development server'
+				url: 'https://localhost',
+				description: 'Development server (via nginx)'
 			}
 		],
 		tags: [
