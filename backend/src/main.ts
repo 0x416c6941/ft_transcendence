@@ -38,6 +38,89 @@ fastify.register(fastifySqlite, {
 	dbFile: dbVolPath.concat('/').concat(dbFile)
 });
 
+// Add shared schemas for validation (must be before routes)
+fastify.addSchema({
+	$id: 'User',
+	type: 'object',
+	properties: {
+		id: { type: 'integer', description: 'User ID' },
+		username: { type: 'string', description: 'Unique username' },
+		email: { type: 'string', format: 'email', description: 'User email address' },
+		display_name: { type: 'string', description: 'Display name' },
+		created_at: { type: 'string', format: 'date-time', description: 'Account creation timestamp' }
+	}
+});
+
+fastify.addSchema({
+	$id: 'CreateUserRequest',
+	type: 'object',
+	required: ['username', 'password', 'email', 'display_name'],
+	properties: {
+		username: { type: 'string', description: 'Unique username' },
+		password: { type: 'string', format: 'password', description: 'User password (will be hashed)' },
+		email: { type: 'string', format: 'email', description: 'User email address' },
+		display_name: { type: 'string', description: 'Display name' }
+	}
+});
+
+fastify.addSchema({
+	$id: 'UpdateUserRequest',
+	type: 'object',
+	properties: {
+		username: { type: 'string', description: 'Unique username' },
+		password: { type: 'string', format: 'password', description: 'User password (will be hashed)' },
+		email: { type: 'string', format: 'email', description: 'User email address' },
+		display_name: { type: 'string', description: 'Display name' }
+	}
+});
+
+fastify.addSchema({
+	$id: 'LoginRequest',
+	type: 'object',
+	required: ['username', 'password'],
+	properties: {
+		username: { type: 'string', description: 'Username' },
+		password: { type: 'string', format: 'password', description: 'User password' }
+	}
+});
+
+fastify.addSchema({
+	$id: 'LoginResponse',
+	type: 'object',
+	properties: {
+		message: { type: 'string', description: 'Success message' },
+		accessToken: { type: 'string', description: 'JWT access token (expires in 24 hours)' },
+		refreshToken: { type: 'string', description: 'JWT refresh token (expires in 7 days)' },
+		user: { $ref: 'User#' }
+	}
+});
+
+fastify.addSchema({
+	$id: 'RefreshTokenRequest',
+	type: 'object',
+	required: ['refreshToken'],
+	properties: {
+		refreshToken: { type: 'string', description: 'Refresh token to exchange for new tokens' }
+	}
+});
+
+fastify.addSchema({
+	$id: 'RefreshTokenResponse',
+	type: 'object',
+	properties: {
+		accessToken: { type: 'string', description: 'New JWT access token' },
+		refreshToken: { type: 'string', description: 'New JWT refresh token' }
+	}
+});
+
+fastify.addSchema({
+	$id: 'Error',
+	type: 'object',
+	properties: {
+		error: { type: 'string', description: 'Error message' }
+	}
+});
+
 // Register Swagger
 fastify.register(swagger, {
 	openapi: {
@@ -64,74 +147,6 @@ fastify.register(swagger, {
 					scheme: 'bearer',
 					bearerFormat: 'JWT',
 					description: 'Enter your JWT token in the format: Bearer <token>'
-				}
-			},
-			schemas: {
-				User: {
-					type: 'object',
-					properties: {
-						id: { type: 'integer', description: 'User ID' },
-						username: { type: 'string', description: 'Unique username' },
-						email: { type: 'string', format: 'email', description: 'User email address' },
-						display_name: { type: 'string', description: 'Display name' },
-						created_at: { type: 'string', format: 'date-time', description: 'Account creation timestamp' }
-					}
-				},
-				CreateUserRequest: {
-					type: 'object',
-					required: ['username', 'password', 'email', 'display_name'],
-					properties: {
-						username: { type: 'string', description: 'Unique username' },
-						password: { type: 'string', format: 'password', description: 'User password (will be hashed)' },
-						email: { type: 'string', format: 'email', description: 'User email address' },
-						display_name: { type: 'string', description: 'Display name' }
-					}
-				},
-				UpdateUserRequest: {
-					type: 'object',
-					properties: {
-						username: { type: 'string', description: 'Unique username' },
-						password: { type: 'string', format: 'password', description: 'User password (will be hashed)' },
-						email: { type: 'string', format: 'email', description: 'User email address' },
-						display_name: { type: 'string', description: 'Display name' }
-					}
-				},
-				LoginRequest: {
-					type: 'object',
-					required: ['username', 'password'],
-					properties: {
-						username: { type: 'string', description: 'Username' },
-						password: { type: 'string', format: 'password', description: 'User password' }
-					}
-				},
-				LoginResponse: {
-					type: 'object',
-					properties: {
-						message: { type: 'string', description: 'Success message' },
-						accessToken: { type: 'string', description: 'JWT access token (expires in 24 hours)' },
-						refreshToken: { type: 'string', description: 'JWT refresh token (expires in 7 days)' },
-						user: { $ref: '#/components/schemas/User' }
-					}
-				},
-				RefreshTokenRequest: {
-					type: 'object',
-					required: ['refreshToken'],
-					properties: {
-						refreshToken: { type: 'string', description: 'Refresh token to exchange for new tokens' }
-					}
-				},
-				RefreshTokenResponse: {
-					type: 'object',
-					properties: {
-						accessToken: { type: 'string', description: 'New JWT access token' },
-						refreshToken: { type: 'string', description: 'New JWT refresh token' }
-					}
-				},
-				Error: {
-					type: 'object',
-					properties: {
-						error: { type: 'string', description: 'Error message' }
-					}
 				}
 			}
 		}

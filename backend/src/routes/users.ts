@@ -37,7 +37,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				description: 'Register a new user account',
 				tags: ['users', 'auth'],
 				body: {
-					$ref: '#/components/schemas/CreateUserRequest'
+					$ref: 'CreateUserRequest#'
 				},
 				response: {
 					201: {
@@ -50,15 +50,15 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					},
 					400: {
 						description: 'Bad request - missing required fields',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					409: {
 						description: 'Conflict - username or email already exists',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					500: {
 						description: 'Internal server error',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					}
 				}
 			}
@@ -116,24 +116,24 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				description: 'Authenticate user with username and password',
 				tags: ['auth'],
 				body: {
-					$ref: '#/components/schemas/LoginRequest'
+					$ref: 'LoginRequest#'
 				},
 				response: {
 					200: {
 						description: 'Login successful',
-						$ref: '#/components/schemas/LoginResponse'
+						$ref: 'LoginResponse#'
 					},
 					400: {
 						description: 'Bad request - missing required fields',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					401: {
 						description: 'Unauthorized - invalid credentials',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					500: {
 						description: 'Internal server error',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					}
 				}
 			}
@@ -209,28 +209,20 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				description: 'Refresh access token using refresh token',
 				tags: ['auth'],
 				body: {
-					type: 'object',
-					required: ['refreshToken'],
-					properties: {
-						refreshToken: { type: 'string', description: 'Refresh token' }
-					}
+					$ref: 'RefreshTokenRequest#'
 				},
 				response: {
 					200: {
 						description: 'New access token generated',
-						type: 'object',
-						properties: {
-							accessToken: { type: 'string' },
-							refreshToken: { type: 'string' }
-						}
+						$ref: 'RefreshTokenResponse#'
+					},
+					400: {
+						description: 'Missing refresh token',
+						$ref: 'Error#'
 					},
 					401: {
-						description: 'Missing refresh token',
-						$ref: '#/components/schemas/Error'
-					},
-					403: {
 						description: 'Invalid or expired refresh token',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					}
 				}
 			}
@@ -277,13 +269,13 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					properties: {
 						users: {
 							type: 'array',
-							items: { $ref: '#/components/schemas/User' }
+							items: { $ref: 'User#' }
 						}
 					}
 				},
 				500: {
 					description: 'Internal server error',
-					$ref: '#/components/schemas/Error'
+					$ref: 'Error#'
 				}
 			}
 		}
@@ -331,24 +323,24 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					description: 'Current user details',
 					type: 'object',
 					properties: {
-						user: { $ref: '#/components/schemas/User' }
+						user: { $ref: 'User#' }
 					}
 				},
 				401: {
 					description: 'Access token required',
-					$ref: '#/components/schemas/Error'
+					$ref: 'Error#'
 				},
 				403: {
 					description: 'Invalid or expired token',
-					$ref: '#/components/schemas/Error'
+					$ref: 'Error#'
 				},
 				404: {
 					description: 'User not found',
-					$ref: '#/components/schemas/Error'
+					$ref: 'Error#'
 				},
 				500: {
 					description: 'Internal server error',
-					$ref: '#/components/schemas/Error'
+					$ref: 'Error#'
 				}
 			}
 		}
@@ -405,16 +397,16 @@ export default async function userRoutes(fastify: FastifyInstance) {
 						description: 'User details',
 						type: 'object',
 						properties: {
-							user: { $ref: '#/components/schemas/User' }
+							user: { $ref: 'User#' }
 						}
 					},
 					404: {
 						description: 'User not found',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					500: {
 						description: 'Internal server error',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					}
 				}
 			}
@@ -475,7 +467,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					required: ['id']
 				},
 				body: {
-					$ref: '#/components/schemas/UpdateUserRequest'
+					$ref: 'UpdateUserRequest#'
 				},
 				response: {
 					200: {
@@ -487,27 +479,27 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					},
 					400: {
 						description: 'Bad request - no fields to update',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					401: {
 						description: 'Unauthorized',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					403: {
 						description: 'Forbidden - can only update own profile',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					404: {
 						description: 'User not found',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					409: {
 						description: 'Conflict - username or email already exists',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					500: {
 						description: 'Internal server error',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					}
 				}
 			}
@@ -620,19 +612,19 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					},
 					401: {
 						description: 'Unauthorized - missing or invalid token',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					403: {
 						description: 'Forbidden - cannot delete other users',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					404: {
 						description: 'User not found',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					},
 					500: {
 						description: 'Internal server error',
-						$ref: '#/components/schemas/Error'
+						$ref: 'Error#'
 					}
 				}
 			}
