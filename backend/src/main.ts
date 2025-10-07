@@ -2,6 +2,7 @@ import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import fs from 'node:fs';
 import fastifySqlite, { FastifySqliteOptions } from './fastifySqlite.js';
 import { Server } from "socket.io";
+import userRoutes from './routes/users.js';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -34,6 +35,9 @@ if (!dbFile) {
 fastify.register(fastifySqlite, {
 	dbFile: dbVolPath.concat('/').concat(dbFile)
 });
+
+// Register user routes
+fastify.register(userRoutes, { prefix: '/api' });
 
 fastify.get('/test', async (request: FastifyRequest, reply: FastifyReply) => {
 	return { hello: 'world' };

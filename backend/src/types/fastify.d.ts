@@ -14,9 +14,9 @@ declare module 'fastify' {
 		io: Server;
 
 		/**
-		 * @property {sqlite3.Database} db
+		 * @property {sqlite3.Database} sqlite
 		 * SQLite database to work with.
 		 */
-		db: sqlite3.Database;
+		sqlite: sqlite3.Database;
 	}
 }
