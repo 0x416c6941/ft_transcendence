@@ -1,7 +1,6 @@
 {
 	"name": "ft_transcendence_backend",
 	"version": "0.0.1",
-	"author": "František Maxian <fmaxian@student.42prague.com> (https://github.com/gittwenstein)",
 	"contributors": [
 		{
 			"name": "Anastassiya Krasheninnikova",
@@ -12,6 +11,11 @@
 			"name": "Hlib Lyshchuk",
 			"email": "hlyshchu@student.42prague.com",
 			"url": "https://github.com/hlib-lyshchuk"
+		},
+		{
+			"name": "František Maxian",
+			"email": "fmaxian@student.42prague.com",
+			"url": "https://github.com/gittwenstein"
 		},
 		{
 			"name": "Asset Sagymbayev",
