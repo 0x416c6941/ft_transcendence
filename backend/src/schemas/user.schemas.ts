@@ -90,7 +90,7 @@ export const userSchemas = [
 
 export const registerUserSchema = {
 	description: 'Register a new user account',
-	tags: ['users', 'auth'],
+	tags: ['users'],
 	security: [],
 	body: {
 		$ref: 'CreateUserRequest#'
