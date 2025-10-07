@@ -1,5 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import bcrypt from 'bcrypt';
+import { generateAccessToken, generateRefreshToken } from '../utils/jwt.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const SALT_ROUNDS = 10;
 
@@ -176,9 +178,15 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					});
 				}
 
-				// Return user data (without password)
+				// Generate JWT tokens
+				const accessToken = generateAccessToken(user.id, user.username);
+				const refreshToken = generateRefreshToken(user.id, user.username);
+
+				// Return tokens and user data (without password)
 				return reply.code(200).send({
 					message: 'Login successful',
+					accessToken,
+					refreshToken,
 					user: {
 						id: user.id,
 						username: user.username,
@@ -189,6 +197,70 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			} catch (err: any) {
 				fastify.log.error(err);
 				return reply.code(500).send({ error: 'Failed to login' });
+			}
+		}
+	);
+
+	// Refresh token endpoint
+	fastify.post<{ Body: { refreshToken: string } }>(
+		'/users/refresh',
+		{
+			schema: {
+				description: 'Refresh access token using refresh token',
+				tags: ['auth'],
+				body: {
+					type: 'object',
+					required: ['refreshToken'],
+					properties: {
+						refreshToken: { type: 'string', description: 'Refresh token' }
+					}
+				},
+				response: {
+					200: {
+						description: 'New access token generated',
+						type: 'object',
+						properties: {
+							accessToken: { type: 'string' },
+							refreshToken: { type: 'string' }
+						}
+					},
+					401: {
+						description: 'Missing refresh token',
+						$ref: '#/components/schemas/Error'
+					},
+					403: {
+						description: 'Invalid or expired refresh token',
+						$ref: '#/components/schemas/Error'
+					}
+				}
+			}
+		},
+		async (request: FastifyRequest<{ Body: { refreshToken: string } }>, reply: FastifyReply) => {
+			const { refreshToken } = request.body;
+
+			if (!refreshToken) {
+				return reply.code(401).send({
+					error: 'Refresh token required'
+				});
+			}
+
+			try {
+				// Verify the refresh token
+				const { verifyToken } = await import('../utils/jwt.js');
+				const decoded = verifyToken(refreshToken);
+
+				// Generate new tokens
+				const newAccessToken = generateAccessToken(decoded.userId, decoded.username);
+				const newRefreshToken = generateRefreshToken(decoded.userId, decoded.username);
+
+				return reply.code(200).send({
+					accessToken: newAccessToken,
+					refreshToken: newRefreshToken
+				});
+			} catch (error) {
+				return reply.code(403).send({
+					error: 'Invalid or expired refresh token'
+				});
 			}
 		}
 	);
@@ -235,6 +307,82 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		} catch (err: any) {
 			fastify.log.error(err);
 			return reply.code(500).send({ error: 'Failed to retrieve users' });
+		}
+	});
+
+	// Get current user info (protected route)
+	fastify.get('/users/me', {
+		preHandler: authenticateToken,
+		schema: {
+			description: 'Get current authenticated user information',
+			tags: ['users', 'auth'],
+			headers: {
+				type: 'object',
+				properties: {
+					Authorization: {
+						type: 'string',
+						description: 'Bearer token'
+					}
+				},
+				required: ['Authorization']
+			},
+			response: {
+				200: {
+					description: 'Current user details',
+					type: 'object',
+					properties: {
+						user: { $ref: '#/components/schemas/User' }
+					}
+				},
+				401: {
+					description: 'Access token required',
+					$ref: '#/components/schemas/Error'
+				},
+				403: {
+					description: 'Invalid or expired token',
+					$ref: '#/components/schemas/Error'
+				},
+				404: {
+					description: 'User not found',
+					$ref: '#/components/schemas/Error'
+				},
+				500: {
+					description: 'Internal server error',
+					$ref: '#/components/schemas/Error'
+				}
+			}
+		}
+	}, async (request: FastifyRequest, reply: FastifyReply) => {
+		try {
+			// User info is added by authenticateToken middleware
+			const userId = request.user?.userId;
+
+			if (!userId) {
+				return reply.code(401).send({ error: 'Unauthorized' });
+			}
+
+			const user = await new Promise<any>((resolve, reject) => {
+				fastify.sqlite.get(
+					`SELECT id, username, email, display_name, created_at FROM users WHERE id = ?`,
+					[userId],
+					(err: Error | null, row: any) => {
+						if (err) {
+							reject(err);
+						} else {
+							resolve(row);
+						}
+					}
+				);
+			});
+
+			if (!user) {
+				return reply.code(404).send({ error: 'User not found' });
+			}
+
+			return reply.code(200).send({ user });
+		} catch (err: any) {
+			fastify.log.error(err);
+			return reply.code(500).send({ error: 'Failed to retrieve user' });
 		}
 	});
 
@@ -301,13 +449,24 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
-	// Update a user by ID
+	// Update a user by ID (protected - must be the same user or admin)
 	fastify.put<{ Params: UserParams; Body: UpdateUserBody }>(
 		'/users/:id',
 		{
+			preHandler: authenticateToken,
 			schema: {
-				description: 'Update user information (all fields optional)',
+				description: 'Update user information (authentication required, can only update own profile)',
 				tags: ['users'],
+				headers: {
+					type: 'object',
+					properties: {
+						Authorization: {
+							type: 'string',
+							description: 'Bearer token'
+						}
+					},
+					required: ['Authorization']
+				},
 				params: {
 					type: 'object',
 					properties: {
@@ -328,6 +487,14 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					},
 					400: {
 						description: 'Bad request - no fields to update',
+						$ref: '#/components/schemas/Error'
+					},
+					401: {
+						description: 'Unauthorized',
+						$ref: '#/components/schemas/Error'
+					},
+					403: {
+						description: 'Forbidden - can only update own profile',
 						$ref: '#/components/schemas/Error'
 					},
 					404: {
@@ -351,6 +518,11 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		) => {
 			const { id } = request.params;
 			const { username, password, email, display_name } = request.body;
+
+			// Authorization check: users can only update their own profile
+			if (request.user?.userId !== parseInt(id)) {
+				return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
+			}
 
 			// Build dynamic update query
 			const updates: string[] = [];
@@ -416,15 +588,27 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	fastify.delete<{ Params: UserParams }>(
 		'/users/:id',
 		{
+			preHandler: authenticateToken,
 			schema: {
 				description: 'Delete a user by ID',
 				tags: ['users'],
+				security: [{ bearerAuth: [] }],
 				params: {
 					type: 'object',
 					properties: {
 						id: { type: 'integer', description: 'User ID' }
 					},
 					required: ['id']
+				},
+				headers: {
+					type: 'object',
+					properties: {
+						authorization: {
+							type: 'string',
+							description: 'Bearer token for authentication'
+						}
+					},
+					required: ['authorization']
 				},
 				response: {
 					200: {
@@ -433,6 +617,14 @@ export default async function userRoutes(fastify: FastifyInstance) {
 						properties: {
 							message: { type: 'string' }
 						}
+					},
+					401: {
+						description: 'Unauthorized - missing or invalid token',
+						$ref: '#/components/schemas/Error'
+					},
+					403: {
+						description: 'Forbidden - cannot delete other users',
+						$ref: '#/components/schemas/Error'
 					},
 					404: {
 						description: 'User not found',
@@ -447,6 +639,11 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		},
 		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
 			const { id } = request.params;
+
+			// Authorization check: users can only delete their own profile
+			if (request.user?.userId !== parseInt(id)) {
+				return reply.code(403).send({ error: 'Forbidden: You can only delete your own profile' });
+			}
 
 			try {
 				const result = await new Promise<any>((resolve, reject) => {

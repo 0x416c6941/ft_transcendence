@@ -356,6 +356,7 @@ describe('User API - Get User by ID', () => {
 describe('User API - Update User', () => {
 	let app: FastifyInstance;
 	let userId: number;
+	let accessToken: string;
 
 	beforeEach(async () => {
 		app = await buildTestApp();
@@ -372,13 +373,18 @@ describe('User API - Update User', () => {
 			}
 		});
 
-		// Get the user ID
-		const usersResponse = await app.inject({
-			method: 'GET',
-			url: '/api/users'
+		// Login to get access token
+		const loginResponse = await app.inject({
+			method: 'POST',
+			url: '/api/users/login',
+			payload: {
+				username: 'testuser',
+				password: 'SecurePass123'
+			}
 		});
-		const users = JSON.parse(usersResponse.body).users;
-		userId = users[0].id;
+		const loginBody = JSON.parse(loginResponse.body);
+		accessToken = loginBody.accessToken;
+		userId = loginBody.user.id;
 	});
 
 	afterEach(async () => {
@@ -389,6 +395,9 @@ describe('User API - Update User', () => {
 		const response = await app.inject({
 			method: 'PUT',
 			url: `/api/users/${userId}`,
+			headers: {
+				authorization: `Bearer ${accessToken}`
+			},
 			payload: {
 				display_name: 'Updated Name'
 			}
@@ -396,7 +405,7 @@ describe('User API - Update User', () => {
 
 		expect(response.statusCode).toBe(200);
 		const body = JSON.parse(response.body);
-		expect(body.message).toBe('User updated successfully');
+		expect(body).toHaveProperty('display_name', 'Updated Name');
 
 		// Verify the update
 		const getResponse = await app.inject({
@@ -413,6 +422,9 @@ describe('User API - Update User', () => {
 		const response = await app.inject({
 			method: 'PUT',
 			url: `/api/users/${userId}`,
+			headers: {
+				authorization: `Bearer ${accessToken}`
+			},
 			payload: {
 				password: newPassword
 			}
@@ -437,6 +449,9 @@ describe('User API - Update User', () => {
 		const response = await app.inject({
 			method: 'PUT',
 			url: `/api/users/${userId}`,
+			headers: {
+				authorization: `Bearer ${accessToken}`
+			},
 			payload: {
 				username: 'updateduser',
 				email: 'updated@example.com',
@@ -447,20 +462,19 @@ describe('User API - Update User', () => {
 		expect(response.statusCode).toBe(200);
 
 		// Verify all updates
-		const getResponse = await app.inject({
-			method: 'GET',
-			url: `/api/users/${userId}`
-		});
-		const user = JSON.parse(getResponse.body).user;
-		expect(user.username).toBe('updateduser');
-		expect(user.email).toBe('updated@example.com');
-		expect(user.display_name).toBe('Updated User');
+		const body = JSON.parse(response.body);
+		expect(body.username).toBe('updateduser');
+		expect(body.email).toBe('updated@example.com');
+		expect(body.display_name).toBe('Updated User');
 	});
 
 	it('should fail update with no fields provided', async () => {
 		const response = await app.inject({
 			method: 'PUT',
 			url: `/api/users/${userId}`,
+			headers: {
+				authorization: `Bearer ${accessToken}`
+			},
 			payload: {}
 		});
 
@@ -470,17 +484,22 @@ describe('User API - Update User', () => {
 	});
 
 	it('should fail update for non-existent user', async () => {
+		// Try to update a non-existent user with current user's token
+		// This should return 403 Forbidden because userId doesn't match the token's userId
 		const response = await app.inject({
 			method: 'PUT',
 			url: '/api/users/999999',
+			headers: {
+				authorization: `Bearer ${accessToken}`
+			},
 			payload: {
 				display_name: 'Updated Name'
 			}
 		});
 
-		expect(response.statusCode).toBe(404);
+		expect(response.statusCode).toBe(403);
 		const body = JSON.parse(response.body);
-		expect(body.error).toContain('User not found');
+		expect(body.error).toContain('Forbidden');
 	});
 
 	it('should fail update with duplicate username', async () => {
@@ -500,6 +519,9 @@ describe('User API - Update User', () => {
 		const response = await app.inject({
 			method: 'PUT',
 			url: `/api/users/${userId}`,
+			headers: {
+				authorization: `Bearer ${accessToken}`
+			},
 			payload: {
 				username: 'user2'
 			}
@@ -514,6 +536,7 @@ describe('User API - Update User', () => {
 describe('User API - Delete User', () => {
 	let app: FastifyInstance;
 	let userId: number;
+	let accessToken: string;
 
 	beforeEach(async () => {
 		app = await buildTestApp();
@@ -530,13 +553,18 @@ describe('User API - Delete User', () => {
 			}
 		});
 
-		// Get the user ID
-		const usersResponse = await app.inject({
-			method: 'GET',
-			url: '/api/users'
+		// Login to get access token
+		const loginResponse = await app.inject({
+			method: 'POST',
+			url: '/api/users/login',
+			payload: {
+				username: 'testuser',
+				password: 'SecurePass123'
+			}
 		});
-		const users = JSON.parse(usersResponse.body).users;
-		userId = users[0].id;
+		const loginBody = JSON.parse(loginResponse.body);
+		accessToken = loginBody.accessToken;
+		userId = loginBody.user.id;
 	});
 
 	afterEach(async () => {
@@ -546,7 +574,10 @@ describe('User API - Delete User', () => {
 	it('should delete user successfully', async () => {
 		const response = await app.inject({
 			method: 'DELETE',
-			url: `/api/users/${userId}`
+			url: `/api/users/${userId}`,
+			headers: {
+				authorization: `Bearer ${accessToken}`
+			}
 		});
 
 		expect(response.statusCode).toBe(200);
@@ -562,21 +593,28 @@ describe('User API - Delete User', () => {
 	});
 
 	it('should fail to delete non-existent user', async () => {
+		// Try to delete a non-existent user - will fail with 403 because ID doesn't match token
 		const response = await app.inject({
 			method: 'DELETE',
-			url: '/api/users/999999'
+			url: '/api/users/999999',
+			headers: {
+				authorization: `Bearer ${accessToken}`
+			}
 		});
 
-		expect(response.statusCode).toBe(404);
+		expect(response.statusCode).toBe(403);
 		const body = JSON.parse(response.body);
-		expect(body.error).toContain('User not found');
+		expect(body.error).toContain('Forbidden');
 	});
 
 	it('should not be able to login after deletion', async () => {
 		// Delete the user
 		await app.inject({
 			method: 'DELETE',
-			url: `/api/users/${userId}`
+			url: `/api/users/${userId}`,
+			headers: {
+				authorization: `Bearer ${accessToken}`
+			}
 		});
 
 		// Try to login

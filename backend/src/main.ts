@@ -58,6 +58,14 @@ fastify.register(swagger, {
 			{ name: 'auth', description: 'Authentication endpoints' }
 		],
 		components: {
+			securitySchemes: {
+				bearerAuth: {
+					type: 'http',
+					scheme: 'bearer',
+					bearerFormat: 'JWT',
+					description: 'Enter your JWT token in the format: Bearer <token>'
+				}
+			},
 			schemas: {
 				User: {
 					type: 'object',
@@ -99,8 +107,24 @@ fastify.register(swagger, {
 				LoginResponse: {
 					type: 'object',
 					properties: {
-						message: { type: 'string' },
+						message: { type: 'string', description: 'Success message' },
+						accessToken: { type: 'string', description: 'JWT access token (expires in 24 hours)' },
+						refreshToken: { type: 'string', description: 'JWT refresh token (expires in 7 days)' },
 						user: { $ref: '#/components/schemas/User' }
+					}
+				},
+				RefreshTokenRequest: {
+					type: 'object',
+					required: ['refreshToken'],
+					properties: {
+						refreshToken: { type: 'string', description: 'Refresh token to exchange for new tokens' }
+					}
+				},
+				RefreshTokenResponse: {
+					type: 'object',
+					properties: {
+						accessToken: { type: 'string', description: 'New JWT access token' },
+						refreshToken: { type: 'string', description: 'New JWT refresh token' }
 					}
 				},
 				Error: {
