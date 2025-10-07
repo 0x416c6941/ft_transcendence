@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import fastifySqlite, { FastifySqliteOptions } from './fastifySqlite.js';
 import { Server } from "socket.io";
 import userRoutes from './routes/users.js';
+import swagger from '@fastify/swagger';
+import swaggerUI from '@fastify/swagger-ui';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -34,6 +36,92 @@ if (!dbFile) {
 // Registering SQLite Fastify plugin.
 fastify.register(fastifySqlite, {
 	dbFile: dbVolPath.concat('/').concat(dbFile)
+});
+
+// Register Swagger
+fastify.register(swagger, {
+	openapi: {
+		openapi: '3.0.0',
+		info: {
+			title: 'ft_transcendence User API',
+			description: 'API documentation for user management with secure authentication',
+			version: '0.0.1'
+		},
+		servers: [
+			{
+				url: 'https://localhost:3000',
+				description: 'Development server'
+			}
+		],
+		tags: [
+			{ name: 'users', description: 'User management endpoints' },
+			{ name: 'auth', description: 'Authentication endpoints' }
+		],
+		components: {
+			schemas: {
+				User: {
+					type: 'object',
+					properties: {
+						id: { type: 'integer', description: 'User ID' },
+						username: { type: 'string', description: 'Unique username' },
+						email: { type: 'string', format: 'email', description: 'User email address' },
+						display_name: { type: 'string', description: 'Display name' },
+						created_at: { type: 'string', format: 'date-time', description: 'Account creation timestamp' }
+					}
+				},
+				CreateUserRequest: {
+					type: 'object',
+					required: ['username', 'password', 'email', 'display_name'],
+					properties: {
+						username: { type: 'string', description: 'Unique username' },
+						password: { type: 'string', format: 'password', description: 'User password (will be hashed)' },
+						email: { type: 'string', format: 'email', description: 'User email address' },
+						display_name: { type: 'string', description: 'Display name' }
+					}
+				},
+				UpdateUserRequest: {
+					type: 'object',
+					properties: {
+						username: { type: 'string', description: 'Unique username' },
+						password: { type: 'string', format: 'password', description: 'User password (will be hashed)' },
+						email: { type: 'string', format: 'email', description: 'User email address' },
+						display_name: { type: 'string', description: 'Display name' }
+					}
+				},
+				LoginRequest: {
+					type: 'object',
+					required: ['username', 'password'],
+					properties: {
+						username: { type: 'string', description: 'Username' },
+						password: { type: 'string', format: 'password', description: 'User password' }
+					}
+				},
+				LoginResponse: {
+					type: 'object',
+					properties: {
+						message: { type: 'string' },
+						user: { $ref: '#/components/schemas/User' }
+					}
+				},
+				Error: {
+					type: 'object',
+					properties: {
+						error: { type: 'string', description: 'Error message' }
+					}
+				}
+			}
+		}
+	}
+});
+
+fastify.register(swaggerUI, {
+	routePrefix: '/api/documentation',
+	uiConfig: {
+		docExpansion: 'list',
+		deepLinking: false
+	},
+	staticCSP: true,
+	transformStaticCSP: (header) => header
 });
 
 // Register user routes

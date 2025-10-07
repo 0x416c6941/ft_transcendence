@@ -30,6 +30,37 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	// Create a new user (Register)
 	fastify.post<{ Body: CreateUserBody }>(
 		'/users',
+		{
+			schema: {
+				description: 'Register a new user account',
+				tags: ['users', 'auth'],
+				body: {
+					$ref: '#/components/schemas/CreateUserRequest'
+				},
+				response: {
+					201: {
+						description: 'User created successfully',
+						type: 'object',
+						properties: {
+							message: { type: 'string' },
+							username: { type: 'string' }
+						}
+					},
+					400: {
+						description: 'Bad request - missing required fields',
+						$ref: '#/components/schemas/Error'
+					},
+					409: {
+						description: 'Conflict - username or email already exists',
+						$ref: '#/components/schemas/Error'
+					},
+					500: {
+						description: 'Internal server error',
+						$ref: '#/components/schemas/Error'
+					}
+				}
+			}
+		},
 		async (request: FastifyRequest<{ Body: CreateUserBody }>, reply: FastifyReply) => {
 			const { username, password, email, display_name } = request.body;
 
@@ -78,6 +109,33 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	// Login endpoint
 	fastify.post<{ Body: LoginBody }>(
 		'/users/login',
+		{
+			schema: {
+				description: 'Authenticate user with username and password',
+				tags: ['auth'],
+				body: {
+					$ref: '#/components/schemas/LoginRequest'
+				},
+				response: {
+					200: {
+						description: 'Login successful',
+						$ref: '#/components/schemas/LoginResponse'
+					},
+					400: {
+						description: 'Bad request - missing required fields',
+						$ref: '#/components/schemas/Error'
+					},
+					401: {
+						description: 'Unauthorized - invalid credentials',
+						$ref: '#/components/schemas/Error'
+					},
+					500: {
+						description: 'Internal server error',
+						$ref: '#/components/schemas/Error'
+					}
+				}
+			}
+		},
 		async (request: FastifyRequest<{ Body: LoginBody }>, reply: FastifyReply) => {
 			const { username, password } = request.body;
 
@@ -136,7 +194,28 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	);
 
 	// Get all users
-	fastify.get('/users', async (request: FastifyRequest, reply: FastifyReply) => {
+	fastify.get('/users', {
+		schema: {
+			description: 'Retrieve all users (passwords excluded)',
+			tags: ['users'],
+			response: {
+				200: {
+					description: 'List of users',
+					type: 'object',
+					properties: {
+						users: {
+							type: 'array',
+							items: { $ref: '#/components/schemas/User' }
+						}
+					}
+				},
+				500: {
+					description: 'Internal server error',
+					$ref: '#/components/schemas/Error'
+				}
+			}
+		}
+	}, async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const users = await new Promise<any[]>((resolve, reject) => {
 				fastify.sqlite.all(
@@ -162,6 +241,36 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	// Get a specific user by ID
 	fastify.get<{ Params: UserParams }>(
 		'/users/:id',
+		{
+			schema: {
+				description: 'Retrieve a specific user by ID (password excluded)',
+				tags: ['users'],
+				params: {
+					type: 'object',
+					properties: {
+						id: { type: 'integer', description: 'User ID' }
+					},
+					required: ['id']
+				},
+				response: {
+					200: {
+						description: 'User details',
+						type: 'object',
+						properties: {
+							user: { $ref: '#/components/schemas/User' }
+						}
+					},
+					404: {
+						description: 'User not found',
+						$ref: '#/components/schemas/Error'
+					},
+					500: {
+						description: 'Internal server error',
+						$ref: '#/components/schemas/Error'
+					}
+				}
+			}
+		},
 		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
 			const { id } = request.params;
 
@@ -195,6 +304,47 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	// Update a user by ID
 	fastify.put<{ Params: UserParams; Body: UpdateUserBody }>(
 		'/users/:id',
+		{
+			schema: {
+				description: 'Update user information (all fields optional)',
+				tags: ['users'],
+				params: {
+					type: 'object',
+					properties: {
+						id: { type: 'integer', description: 'User ID' }
+					},
+					required: ['id']
+				},
+				body: {
+					$ref: '#/components/schemas/UpdateUserRequest'
+				},
+				response: {
+					200: {
+						description: 'User updated successfully',
+						type: 'object',
+						properties: {
+							message: { type: 'string' }
+						}
+					},
+					400: {
+						description: 'Bad request - no fields to update',
+						$ref: '#/components/schemas/Error'
+					},
+					404: {
+						description: 'User not found',
+						$ref: '#/components/schemas/Error'
+					},
+					409: {
+						description: 'Conflict - username or email already exists',
+						$ref: '#/components/schemas/Error'
+					},
+					500: {
+						description: 'Internal server error',
+						$ref: '#/components/schemas/Error'
+					}
+				}
+			}
+		},
 		async (
 			request: FastifyRequest<{ Params: UserParams; Body: UpdateUserBody }>,
 			reply: FastifyReply
@@ -265,6 +415,36 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	// Delete a user by ID
 	fastify.delete<{ Params: UserParams }>(
 		'/users/:id',
+		{
+			schema: {
+				description: 'Delete a user by ID',
+				tags: ['users'],
+				params: {
+					type: 'object',
+					properties: {
+						id: { type: 'integer', description: 'User ID' }
+					},
+					required: ['id']
+				},
+				response: {
+					200: {
+						description: 'User deleted successfully',
+						type: 'object',
+						properties: {
+							message: { type: 'string' }
+						}
+					},
+					404: {
+						description: 'User not found',
+						$ref: '#/components/schemas/Error'
+					},
+					500: {
+						description: 'Internal server error',
+						$ref: '#/components/schemas/Error'
+					}
+				}
+			}
+		},
 		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
 			const { id } = request.params;
 

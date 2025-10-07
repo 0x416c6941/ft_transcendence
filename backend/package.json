@@ -25,6 +25,8 @@
 		"start": "node ./dist/main.js"
 	},
 	"dependencies": {
+		"@fastify/swagger": "^9.5.2",
+		"@fastify/swagger-ui": "^5.2.3",
 		"@types/bcrypt": "^6.0.0",
 		"@types/node": "~24.5",
 		"bcrypt": "^6.0.0",
