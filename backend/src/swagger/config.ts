@@ -38,7 +38,7 @@ export const swaggerConfig = {
 };
 
 export const swaggerUIConfig = {
-	routePrefix: '/api/documentation',
+	routePrefix: '/api/docs',
 	uiConfig: {
 		docExpansion: 'list' as const,
 		deepLinking: false
