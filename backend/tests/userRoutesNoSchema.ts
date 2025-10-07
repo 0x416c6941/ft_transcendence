@@ -182,44 +182,6 @@ export default async function userRoutesNoSchema(fastify: FastifyInstance) {
 		}
 	);
 
-	// Get current user (authenticated)
-	fastify.get(
-		'/users/me',
-		{ preHandler: authenticateToken },
-		async (request: FastifyRequest, reply: FastifyReply) => {
-			const userId = request.user?.userId;
-
-			if (!userId) {
-				return reply.code(401).send({ error: 'Unauthorized' });
-			}
-
-			try {
-				const user = await new Promise<any>((resolve, reject) => {
-					(fastify as any).sqlite.get(
-						`SELECT id, username, email, display_name, created_at FROM users WHERE id = ?`,
-						[userId],
-						(err: Error | null, row: any) => {
-							if (err) {
-								reject(err);
-							} else {
-								resolve(row);
-							}
-						}
-					);
-				});
-
-				if (!user) {
-					return reply.code(404).send({ error: 'User not found' });
-				}
-
-				return reply.code(200).send(user);
-			} catch (err: any) {
-				fastify.log.error(err);
-				return reply.code(500).send({ error: 'Failed to retrieve user' });
-			}
-		}
-	);
-
 	// Get all users
 	fastify.get('/users', async (request: FastifyRequest, reply: FastifyReply) => {
 		try {

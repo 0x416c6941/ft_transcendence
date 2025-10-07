@@ -108,64 +108,6 @@ describe('JWT Authentication', () => {
 		});
 	});
 
-	describe('Protected Endpoint - /users/me', () => {
-		it('should return current user data with valid token', async () => {
-			const response = await app.inject({
-				method: 'GET',
-				url: '/api/users/me',
-				headers: {
-					authorization: `Bearer ${accessToken}`
-				}
-			});
-
-			expect(response.statusCode).toBe(200);
-			const body = JSON.parse(response.body);
-			expect(body).toHaveProperty('id', userId);
-			expect(body).toHaveProperty('username', 'jwttest');
-			expect(body).toHaveProperty('email', 'jwt@example.com');
-			expect(body).not.toHaveProperty('password'); // Password should not be returned
-		});
-
-		it('should reject request without token', async () => {
-			const response = await app.inject({
-				method: 'GET',
-				url: '/api/users/me'
-			});
-
-			expect(response.statusCode).toBe(401);
-			const body = JSON.parse(response.body);
-			expect(body.error).toContain('Access token required');
-		});
-
-		it('should reject request with invalid token', async () => {
-			const response = await app.inject({
-				method: 'GET',
-				url: '/api/users/me',
-				headers: {
-					authorization: 'Bearer invalid-token'
-				}
-			});
-
-			expect(response.statusCode).toBe(403);
-			const body = JSON.parse(response.body);
-			expect(body.error).toContain('Invalid or expired token');
-		});
-
-		it('should reject request with malformed authorization header', async () => {
-			const response = await app.inject({
-				method: 'GET',
-				url: '/api/users/me',
-				headers: {
-					authorization: 'InvalidFormat token123'
-				}
-			});
-
-			expect(response.statusCode).toBe(401);
-			const body = JSON.parse(response.body);
-			expect(body.error).toContain('Access token required');
-		});
-	});
-
 	describe('Protected Endpoint - PUT /users/:id', () => {
 		it('should allow user to update their own profile with valid token', async () => {
 			const response = await app.inject({
