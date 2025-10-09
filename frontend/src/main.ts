@@ -1,8 +1,11 @@
 import { DIV_ID, PATHS_TO_ROUTE } from './app.config.js';
 import Router from "./router.js";
+/* Execute all code in './socket.js'.
+ * To use sockets in other files, use this:
+ * "import { io } from './socket.js';" */
+import './socket.js';
 
 let router: Router | null = null;
-let io: any = null;
 
 document.addEventListener("DOMContentLoaded", (e) => {
 	// "/index.html" => "/".
@@ -10,7 +13,4 @@ document.addEventListener("DOMContentLoaded", (e) => {
 		history.replaceState(null, '', '/');
 	}
 	router = new Router(DIV_ID, PATHS_TO_ROUTE);
-	io = (window as any).io(window.location.origin, {
-		path: '/api/socket.io/'
-	});
 });

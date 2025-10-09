@@ -10,6 +10,7 @@
 		"src/main.ts",
 		"src/app.config.ts",
 		"src/router.ts",
+		"src/socket.ts",
 		"src/views/AbstractView.ts",
 		"src/views/NotFoundView.ts",
 		"src/views/HomeView.ts",

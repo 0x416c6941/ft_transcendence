@@ -7,7 +7,7 @@ import HomeView from './views/HomeView.js';
 import LoginView from './views/LoginView.js';
 
 /**
- * @var {string} DIV_ID
+ * @var {readonly string} DIV_ID
  * ID of `div` to draw our SPA on.
  */
 export const DIV_ID: string = 'app';
@@ -22,8 +22,14 @@ export const PATHS_TO_ROUTE: PathToRegister[] = [
 ] as const;
 
 /**
- * @var {string} APP_NAME
+ * @var {readonly string} APP_NAME
  * @brief Application name.
  * @details Used primarily in setting the document's title in views (pages).
  */
 export const APP_NAME: string = 'ft_transcendence';
+
+/**
+ * @var {readonly string} SOCKET_IO_PATH
+ * On which path to send the connection request on Socket.IO.
+ */
+export const SOCKET_IO_PATH: string = '/api/socket.io/';
