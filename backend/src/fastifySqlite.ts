@@ -26,6 +26,26 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 		})
 	});
 
+	// Create users table if it doesn't exist
+	await new Promise<void>((resolve, reject) => {
+		db.run(`
+			CREATE TABLE IF NOT EXISTS users (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				username TEXT NOT NULL UNIQUE,
+				password TEXT NOT NULL,
+				email TEXT NOT NULL UNIQUE,
+				display_name TEXT NOT NULL,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`, (err: Error | null) => {
+			if (err) {
+				reject(err);
+			} else {
+				resolve();
+			}
+		});
+	});
+
 	fastify.decorate('sqlite', db);
 	fastify.addHook('onClose', (fastify: FastifyInstance, done) => {
 		db.close((err: Error | null) => {

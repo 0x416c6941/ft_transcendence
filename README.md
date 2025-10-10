@@ -1,3 +1,32 @@
+# Users API
+
+Swagger documentation for the API endpoints is at
+```
+https://localhost/api/docs
+```
+If you're unfimiliar with JWT Authentication, spend 10 minutes and read up on it online, e.g.
+```
+https://www.jwt.io/introduction#what-is-json-web-token
+```
+
+On the client side, any authorized request must carry the token with it (can be saved into a cookie, but be careful to avoid security issues...read up!). Logging user **out** then means simply deleting the token cookie and/or any record of the token from the client side.
+
+Things I've left intentionally `unfinished`:
+- **making friends** is not implemented, not even on the DB level; needs new joining table
+- **avatar (image)** is not implemented; needs a new field in the USERS table
+	1. you can save it as a BLOB in the DB direcly
+	2. OR you can just save the image as a uniquely named file, somewhere on the backend, and have just a link to that file as a simple plain STRING field in the DB;
+	
+	Either way, don't forget that while user input is optional in this case, there should always be a DEFAULT image from the get go, even if user does not upload any avatar image.
+- better refer to the specs of USER MGMT. in the subject to make sure all requirements are met
+- **2FA** has not been implemented (requirement for the JWT Authentication module!)
+- and of course the frontend **views** are missing
+
+The included `tests` are purely as a suggestion. I like adding them since it's they're much more useful than just commenting existing code (comments can lie, tests (='comments' that actually test functionality) do not...they can just be badly written). You can run them from the /backend directory:
+```js
+.../backend/npm test
+```
+
 # ft_transcendence-team-repo
 
 ## ROADMAP
