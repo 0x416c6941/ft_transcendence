@@ -1,6 +1,7 @@
 import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
+import { io } from '../socket.js';
 
 /**
  * @class PongView
@@ -105,7 +106,7 @@ export default class PongView extends AbstractView {
       this.router.navigate('/');
     });
     
-    this.socket = (window as any).io;
+    this.socket = io;
     
     // Set up status display
     const statusEl = document.getElementById('status') as HTMLElement;

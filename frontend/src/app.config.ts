@@ -34,4 +34,4 @@ export const APP_NAME: string = 'ft_transcendence';
  * @var {readonly string} SOCKET_IO_PATH
  * On which path to send the connection request on Socket.IO.
  */
-export const SOCKET_IO_PATH: string = '/api/socket.io/';
+// export const SOCKET_IO_PATH: string = '/api/socket.io/';
