@@ -2,6 +2,7 @@ import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import fs from 'node:fs';
 import fastifySqlite, { FastifySqliteOptions } from './fastifySqlite.js';
 import { Server } from "socket.io";
+import { setupPongGame } from './pongGame.js';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -59,6 +60,9 @@ const start = async () => {
 				fastify.log.info(`Sock disconnect: ${socket.id}`);
 			})
 		})
+		
+		// Set up Pong game server
+		setupPongGame(fastify, io);
 		/* IPv4 only here.
 		 * We don't need to take care of IPv6, since we'll either way
 		 * receive data from NGINX as a reverse proxy on IPv4. */

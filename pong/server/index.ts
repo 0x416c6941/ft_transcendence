@@ -101,7 +101,7 @@ function clamp(val: number, min: number, max: number) {
 function resetBall(direction: 1 | -1) {
   state.ball.x = WIDTH / 2;
   state.ball.y = HEIGHT / 2;
-  state.ball.vx = 4 * direction; // ball goes toward the player who missed
+  state.ball.vx = 4 * direction;
   state.ball.vy = (Math.random() * 2 + 2) * (Math.random() < 0.5 ? -1 : 1);
 }
 
