@@ -49,10 +49,6 @@ registerSwagger(fastify);
 // Register user routes
 fastify.register(userRoutes, { prefix: '/api' });
 
-fastify.get('/test', async (request: FastifyRequest, reply: FastifyReply) => {
-	return { hello: 'world' };
-});
-
 const start = async () => {
 	const port = Number(process.env.BACKEND_FASTIFY_PORT);
 

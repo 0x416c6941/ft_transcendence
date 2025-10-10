@@ -12,6 +12,8 @@ import {
 	deleteUserSchema
 } from '../schemas/user.schemas.js';
 
+/* Higher number => more Bcrypt hashing rounds
+   => more time is necessary and more difficult is brute-forcing. */
 const SALT_ROUNDS = 10;
 
 interface CreateUserBody {
@@ -291,6 +293,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					);
 				});
 
+				// May happen if user doesn't exist anymore.
 				if (result.changes === 0) {
 					return reply.code(404).send({ error: 'User not found' });
 				}

@@ -1,0 +1,7 @@
+1. Bcrypt - allowed for hashing?
+2. User table - add 42 UUID / username NULLable field
+3. backend/utils/jwt.ts: process.env.JWT_SECRET - use Docker Secrets instead.
+4. backend/routes/users.ts: line 234 and 248 - but only admin check is done for now?
+5. JWT - what if user account is deleted? Does JWT still work?
+	"auth.ts - authenticateToken":
+		Perhaps add here fastify.sqlite check if yes?
