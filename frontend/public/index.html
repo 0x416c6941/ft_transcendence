@@ -1,30 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="ft_transcendence" content="width=device-width, initial-scale=1.0">
-		<title>ft_transcendence</title>
-		<link rel="stylesheet" href="/styles.css">
-	</head>
-	<body>
-		<header>
-			<nav>
-				<ul>
-					<li><a href="/" data-link>Home</a></li>
-					<li><a href="/profile" data-link>Profile</a></li>
-					<li><a href="/game" data-link>Game</a></li>
-					<li><a href="/login" data-link>Login</a></li>
-					<li><a href="/register" data-link>Register</a></li>
-				</ul>
-			</nav>
-		</header>
-		<div id="app">
-			<!-- Fastify will serve this thing on port ${BACKEND_FASTIFY_PORT}. -->
-			<script src="/api/socket.io/socket.io.js"></script>
-			<script type="module" src="/dist/main.js"></script>
-		</div>
-		<!-- <footer>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="ft_transcendence"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>ft_transcendence</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="min-h-screen flex flex-col m-0">
+    <header class="sticky top-0 z-50 bg-[var(--primaryColor)]">
+      <nav>
+        <ul class="flex list-none gap-6 p-4">
+          <li><a href="/" data-link>Home</a></li>
+          <li><a href="/profile" data-link>Profile</a></li>
+          <li><a href="/game" data-link>Game</a></li>
+          <li><a href="/login" data-link>Login</a></li>
+          <li><a href="/register" data-link>Register</a></li>
+        </ul>
+      </nav>
+    </header>
+    <div id="app" class="flex-1 flex flex-col">
+      <!-- Fastify will serve this thing on port ${BACKEND_FASTIFY_PORT}. -->
+      <script src="/api/socket.io/socket.io.js"></script>
+      <script type="module" src="/dist/main.js"></script>
+    </div>
+    <!-- <footer>
       		<p>ft_transcendence Team project</p>
     	</footer> -->
-	</body>
+  </body>
 </html>
