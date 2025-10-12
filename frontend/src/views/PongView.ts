@@ -71,8 +71,7 @@ export default class PongView extends AbstractView {
             <canvas id="pong" width="800" height="480" class="w-full aspect-[5/3] rounded"></canvas>
           </div>
           
-          <div class="w-full bg-neutral-800 rounded-lg p-4 flex justify-between items-center border border-neutral-700">
-            <div id="status" class="text-neutral-300">Not connected</div>
+          <div class="w-full bg-neutral-800 rounded-lg p-4 flex justify-center items-center border border-neutral-700">
             <div id="score" class="text-3xl font-bold text-white">0 : 0</div>
           </div>
           
@@ -108,17 +107,7 @@ export default class PongView extends AbstractView {
 
         this.socket = io;
 
-        // Set up status display
-        const statusEl = document.getElementById('status') as HTMLElement;
-
         // Socket.IO event handlers
-        this.socket.on('connect', () => {
-            statusEl.textContent = `Connected: ${this.socket.id}`;
-        });
-
-        this.socket.on('disconnect', (reason: string) => {
-            statusEl.textContent = `Disconnected: ${reason}`;
-        });
 
         this.socket.on('role', (data: { side: 'left' | 'right' | 'spectator' }) => {
             this.mySide = data.side;
