@@ -1,9 +1,13 @@
-import AbstractView from './AbstractView.js';
-import Router from '../router.js';
-import { APP_NAME } from '../app.config.js';
+import AbstractView from "./AbstractView.js";
+import Router from "../router.js";
+import { APP_NAME } from "../app.config.js";
 
 export default class LoginView extends AbstractView {
-  constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
+  constructor(
+    router: Router,
+    pathParams: Map<string, string>,
+    queryParams: URLSearchParams
+  ) {
     super(router, pathParams, queryParams);
   }
 
@@ -31,12 +35,22 @@ export default class LoginView extends AbstractView {
   }
 
   setup(): void {
-    const form = document.getElementById('login-form') as HTMLFormElement | null;
-    const usernameInput = document.getElementById('username') as HTMLInputElement | null;
-    const passwordInput = document.getElementById('password') as HTMLInputElement | null;
-    const errorMsg = document.getElementById('error-msg') as HTMLElement | null;
+    const form = document.getElementById(
+      "login-form"
+    ) as HTMLFormElement | null;
+    const usernameInput = document.getElementById(
+      "username"
+    ) as HTMLInputElement | null;
+    const passwordInput = document.getElementById(
+      "password"
+    ) as HTMLInputElement | null;
+    const errorMsg = document.getElementById("error-msg") as HTMLElement | null;
 
-    if (!form || !usernameInput || !passwordInput || !errorMsg) return;
+    if (!form || !usernameInput || !passwordInput || !errorMsg) {
+      // to add proper error handling later
+      console.error("Login form elements are missing");
+      return;
+    }
 
     const onSubmit = (e: Event) => {
       e.preventDefault();
@@ -45,25 +59,35 @@ export default class LoginView extends AbstractView {
       const password = passwordInput.value.trim();
 
       if (!username || !password) {
-        errorMsg.hidden = false; // show
+        errorMsg.textContent = "Please enter both username and password.";
+        errorMsg.hidden = false;
         return;
       }
 
-      errorMsg.hidden = true; // hide
-      alert(`Welcome, ${username}!`);
-      // TODO: call backend API
+      // try {
+      //   errorMsg.hidden = true;
+      //   const res = await login({ username, password });
+      //   // e.g., show user or redirect
+      //   // alert(`Welcome, ${res.user?.username || username}!`);
+      //   this.router.navigate("/"); // or wherever your app lands after login
+      // } catch (err: any) {
+      //   errorMsg.textContent = err?.message || "Login failed.";
+      //   errorMsg.hidden = false;
+      // }
     };
 
-    form.addEventListener('submit', onSubmit);
+    form.addEventListener("submit", onSubmit);
 
     // store handler so we can remove it later
     (form as any)._onSubmit = onSubmit;
   }
 
   cleanup(): void {
-    const form = document.getElementById('login-form') as (HTMLFormElement & { _onSubmit?: (e: Event) => void }) | null;
+    const form = document.getElementById("login-form") as
+      | (HTMLFormElement & { _onSubmit?: (e: Event) => void })
+      | null;
     if (form && form._onSubmit) {
-      form.removeEventListener('submit', form._onSubmit);
+      form.removeEventListener("submit", form._onSubmit);
       delete form._onSubmit;
     }
   }

@@ -7,10 +7,24 @@
 		<link rel="stylesheet" href="/styles.css">
 	</head>
 	<body>
+		<header>
+			<nav>
+				<ul>
+					<li><a href="/" data-link>Home</a></li>
+					<li><a href="/profile" data-link>Profile</a></li>
+					<li><a href="/game" data-link>Game</a></li>
+					<li><a href="/login" data-link>Login</a></li>
+					<li><a href="/register" data-link>Register</a></li>
+				</ul>
+			</nav>
+		</header>
 		<div id="app">
 			<!-- Fastify will serve this thing on port ${BACKEND_FASTIFY_PORT}. -->
 			<script src="/api/socket.io/socket.io.js"></script>
 			<script type="module" src="/dist/main.js"></script>
 		</div>
+		<!-- <footer>
+      		<p>ft_transcendence Team project</p>
+    	</footer> -->
 	</body>
 </html>

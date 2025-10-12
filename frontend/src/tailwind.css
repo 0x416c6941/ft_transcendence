@@ -1,9 +1,75 @@
 @import "tailwindcss";
 
 @layer components {
-	/* A general class for text taking care of light / dark theme
+  /* A general class for text taking care of light / dark theme
 	 * and also providing some universal not bad looking font. */
-	.txt-light-dark-sans {
-		@apply text-neutral-900 dark:text-neutral-200 font-sans;
-	}
+  .txt-light-dark-sans {
+    @apply text-neutral-900 font-sans;
+    @variant dark {
+      @apply text-neutral-200;
+    }
+  }
+}
+
+:root {
+  --background-surface: #171d1a;
+  --primaryColor: #232926;
+  --secondaryColor: #838981;
+  --textColor: #e1e1e1;
+  --highlightColor: #56bce8;
+  --color5: #ddb892;
+  --color6: #0ac189;
+  --highlight2: #fbf2c6;
+}
+
+/* Header */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: var(--primaryColor);
+}
+
+header p {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--highlightColor);
+}
+
+nav ul {
+  display: flex;
+  list-style: none;
+  gap: 1.5rem;
+}
+
+nav a {
+  color: var(--secondaryColor);
+  text-decoration: none;
+  font-size: 1rem;
+}
+
+nav a:hover {
+  color: var(--highlightColor);
+}
+
+header div {
+  display: flex;
+  gap: 1rem;
+}
+
+/* Footer */
+footer {
+  padding: 2rem;
+  background-color: var(--primaryColor);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+footer p {
+  font-size: 0.9rem;
+  color: var(--highlightColor);
+  align-self: flex-end;
 }

@@ -8,7 +8,6 @@ import './socket.js';
 let router: Router | null = null;
 
 document.addEventListener("DOMContentLoaded", (e) => {
-	// "/index.html" => "/".
 	if (location.pathname === '/index.html') {
 		history.replaceState(null, '', '/');
 	}
