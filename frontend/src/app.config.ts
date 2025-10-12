@@ -5,6 +5,7 @@
 import { PathToRegister } from './router.js';
 import HomeView from './views/HomeView.js';
 import LoginView from './views/LoginView.js';
+import PongView from './views/PongView.js';
 
 /**
  * @var {readonly string} DIV_ID
@@ -19,6 +20,7 @@ export const DIV_ID: string = 'app';
 export const PATHS_TO_ROUTE: PathToRegister[] = [
 	{ path: '/', constructor: HomeView },
 	{ path: '/login', constructor: LoginView },
+	{ path: '/pong', constructor: PongView },
 ] as const;
 
 /**
@@ -32,4 +34,4 @@ export const APP_NAME: string = 'ft_transcendence';
  * @var {readonly string} SOCKET_IO_PATH
  * On which path to send the connection request on Socket.IO.
  */
-export const SOCKET_IO_PATH: string = '/api/socket.io/';
+// export const SOCKET_IO_PATH: string = '/api/socket.io/';
