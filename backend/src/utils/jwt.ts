@@ -1,7 +1,12 @@
+import fs from 'node:fs';
 import jwt from 'jsonwebtoken';
 
 // JWT secret key - should be loaded from environment variable
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+const jwtSecretPath = process.env.BACKEND_JWT_KEY_PATH;
+if (!jwtSecretPath) {
+	throw new Error("process.env.BACKEND_JWT_KEY_PATH isn't a valid path to JWT Secret Key.");
+}
+const JWT_SECRET = fs.readFileSync(jwtSecretPath);
 const JWT_EXPIRES_IN = '24h'; // Token expires in 24 hours
 const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Refresh token expires in 7 days
 

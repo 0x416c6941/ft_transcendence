@@ -9,11 +9,11 @@ import { registerSwagger } from './swagger/config.js';
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
 if (!sslKeyPath) {
-	throw new Error("process.env.BACKEND_FASTIFY_SSL_KEY_PATH isn't a valid SSL key.");
+	throw new Error("process.env.BACKEND_FASTIFY_SSL_KEY_PATH isn't a valid path to SSL key.");
 }
 const sslCertPath = process.env.BACKEND_FASTIFY_SSL_CRT_PATH;
 if (!sslCertPath) {
-	throw new Error("process.env.BACKEND_FASTIFY_SSL_CRT_PATH isn't a valid SSL key.");
+	throw new Error("process.env.BACKEND_FASTIFY_SSL_CRT_PATH isn't a valid path to SSL key.");
 }
 const fastify: FastifyInstance = Fastify({
 	logger: true,

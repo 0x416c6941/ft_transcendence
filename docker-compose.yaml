@@ -26,6 +26,7 @@ services:
     secrets:
       - ${SECRET_NAME_BACKEND_KEY}
       - ${SECRET_NAME_BACKEND_CRT}
+      - ${SECRET_NAME_BACKEND_JWT_KEY}
     volumes:
       - sqlite-db:${BACKEND_CONTAINER_DB_VOL_PATH}
     expose:
@@ -53,6 +54,9 @@ secrets:
   backend.crt:
     name: ${SECRET_NAME_BACKEND_CRT}
     file: ${SECRETS_DIR}/${SECRET_BACKEND_CRT_FILENAME}
+  jwt_secret.txt:
+    name: ${SECRET_NAME_BACKEND_JWT_KEY}
+    file: ${SECRETS_DIR}/${SECRET_BACKEND_JWT_KEY_FILENAME}
 
 volumes:
   sqlite-db:
