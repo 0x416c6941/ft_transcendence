@@ -11,11 +11,13 @@
 		"src/app.config.ts",
 		"src/router.ts",
 		"src/socket.ts",
+		"src/api/users.ts",
 		"src/utils/validators.ts",
+		"src/utils/sanitize.ts",
 		"src/views/AbstractView.ts",
 		"src/views/NotFoundView.ts",
 		"src/views/HomeView.ts",
 		"src/views/LoginView.ts",
-		"src/views/RegisterView.ts",
+		"src/views/RegisterView.ts"
 	]
 }
