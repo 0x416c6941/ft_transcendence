@@ -509,7 +509,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				// Checking if `username` is admin.
 				const isAdminCheck = await new Promise<any>((resolve, reject) => {
 					fastify.sqlite.get(`
-							SELECT 1337 FROM admins WHERE user_id = ?
+							SELECT user_id FROM admins WHERE user_id = ?
 						`, [idToUnmakeAdmin], (err: Error | null, row: any) => {
 							if (err) {
 								reject(err);
@@ -523,7 +523,9 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				if (!isAdminCheck) {
 					return reply.code(409).send({ error: "Provided username isn't an admin" });
 				}
-				// Yes, it's possible to unadmin yourself. I don't think that's an issue.
+				else if (isAdminCheck.user_id === ourUserId) {
+					return reply.code(403).send({ error: "You can't remove admin privileges from yourself. Why would you?" });
+				}
 				await new Promise<void>((resolve, reject) => {
 					fastify.sqlite.run(`
 							DELETE FROM admins WHERE user_id = ?
