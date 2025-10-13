@@ -12,3 +12,8 @@ dist/
 
 # Tailwind generated CSS.
 frontend/public/styles.css
+
+
+# Editor directories and files.
+.vscode/
+.prettierrc
