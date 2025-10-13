@@ -31,9 +31,9 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 		db.run(`
 			CREATE TABLE IF NOT EXISTS users (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				username TEXT NOT NULL UNIQUE,
+				username TEXT NOT NULL UNIQUE COLLATE NOCASE,
 				password TEXT NOT NULL,
-				email TEXT NOT NULL UNIQUE,
+				email TEXT NOT NULL UNIQUE COLLATE NOCASE,
 				display_name TEXT NOT NULL,
 				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
