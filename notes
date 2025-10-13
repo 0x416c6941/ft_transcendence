@@ -2,8 +2,6 @@
 5. JWT - what if user account is deleted? Does JWT still work?
 	"auth.ts - authenticateToken":
 		Perhaps add here fastify.sqlite check if yes?
-8. Display_name -> can't be username (but can be username of that same user)
-9. Lowercase vs uppercase check in usernames and display_name
 10. Avatar max size check
 	Also: should resize the avatar as well? Or could we just
 		leave the original resolution?
