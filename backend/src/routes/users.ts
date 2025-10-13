@@ -249,8 +249,22 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			const { id } = request.params;
 			const { username, password, email, display_name } = request.body;
 
-			// Authorization check: users can only update their own profile
-			if (request.user?.userId !== parseInt(id)) {
+			/* Authorization check: users can only update their own profile,
+			 * OR they must be an admin. */
+			const adminCheck = await new Promise<any>((resolve, reject) => {
+				fastify.sqlite.get(`
+						SELECT user_id FROM admins WHERE user_id = ?
+					`, [request.user?.userId], (err: Error | null, row: any) => {
+						if (err) {
+							reject(err);
+						}
+						else {
+							resolve(row);
+						}
+					}
+				);
+			});
+			if (request.user?.userId !== parseInt(id) && adminCheck === undefined) {
 				return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
 			}
 
@@ -315,7 +329,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
-	// Delete a user by ID
+	// Delete a user by ID (protected - must be the same user or admin)
 	fastify.delete<{ Params: UserParams }>(
 		'/users/:id',
 		{
@@ -325,11 +339,24 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
 			const { id } = request.params;
 
-			// Authorization check: users can only delete their own profile
-			if (request.user?.userId !== parseInt(id)) {
+			/* Authorization check: users can only update their own profile,
+			 * OR they must be an admin. */
+			const adminCheck = await new Promise<any>((resolve, reject) => {
+				fastify.sqlite.get(`
+						SELECT user_id FROM admins WHERE user_id = ?
+					`, [request.user?.userId], (err: Error | null, row: any) => {
+						if (err) {
+							reject(err);
+						}
+						else {
+							resolve(row);
+						}
+					}
+				);
+			});
+			if (request.user?.userId !== parseInt(id) && adminCheck === undefined) {
 				return reply.code(403).send({ error: 'Forbidden: You can only delete your own profile' });
 			}
-
 			try {
 				const result = await new Promise<any>((resolve, reject) => {
 					fastify.sqlite.run(

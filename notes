@@ -1,13 +1,7 @@
 2. User table - add 42 UUID / username NULLable field
-4. backend/routes/users.ts: line 234 and 248 - but only admin check is done for now?
-	The same store goes for DELETE user: make admin able
-		to remove user accounts
 5. JWT - what if user account is deleted? Does JWT still work?
 	"auth.ts - authenticateToken":
 		Perhaps add here fastify.sqlite check if yes?
-6. "Admin" column
-7. Special request available by admins and admins only
-	to make another user administrator or take admin role from them away
 8. Display_name -> can't be username (but can be username of that same user)
 9. Lowercase vs uppercase check in usernames and display_name
 10. Avatar max size check
