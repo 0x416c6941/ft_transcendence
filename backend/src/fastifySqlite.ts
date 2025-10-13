@@ -26,7 +26,7 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 		})
 	});
 
-	// Create users table if it doesn't exist
+	// Create `users` table if it doesn't exist yet
 	await new Promise<void>((resolve, reject) => {
 		db.run(`
 			CREATE TABLE IF NOT EXISTS users (
@@ -36,6 +36,21 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 				email TEXT NOT NULL UNIQUE,
 				display_name TEXT NOT NULL,
 				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`, (err: Error | null) => {
+			if (err) {
+				reject(err);
+			} else {
+				resolve();
+			}
+		});
+	});
+	// Create `admins` table if it doesn't exist yet
+	await new Promise<void>((resolve, reject) => {
+		db.run(`
+			CREATE TABLE IF NOT EXISTS admins (
+				user_id INTEGER PRIMARY KEY,
+				FOREIGN KEY (user_id) REFERENCES users (id)
 			)
 		`, (err: Error | null) => {
 			if (err) {

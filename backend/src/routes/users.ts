@@ -39,6 +39,10 @@ interface UserParams {
 	id: string;
 }
 
+interface MakeOrUnmakeAdminBody {
+	username: string;
+}
+
 export default async function userRoutes(fastify: FastifyInstance) {
 	// Create a new user (Register)
 	fastify.post<{ Body: CreateUserBody }>(
@@ -349,6 +353,196 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			} catch (err: any) {
 				fastify.log.error(err);
 				return reply.code(500).send({ error: 'Failed to delete user' });
+			}
+		}
+	);
+
+	// TODO: makeOrUnmakeAdminSchema
+	fastify.put<{ Body: MakeOrUnmakeAdminBody }>(
+		'/users/admins',
+		{
+			preHandler: authenticateToken
+		},
+		async (request: FastifyRequest<{ Body: MakeOrUnmakeAdminBody }>, reply: FastifyReply) => {
+			const { username } = request.body;
+
+			// This should NEVER happen.
+			if (request.user === undefined) {
+				fastify.log.error('"request.user" is undefined');
+				return reply.code(500).send({ error: `"request.user" is undefined` });
+			}
+			const ourUserId = request.user.userId;
+			try {
+				// Checking if our user has admin privileges.
+				const ourUser = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(`
+							SELECT 1337 FROM admins WHERE user_id = ?
+						`, [ourUserId], (err: Error | null, row: any) => {
+							if (err) {
+								reject(err);
+							}
+							else {
+								resolve(row);
+							}
+						}
+					);
+				});
+
+				if (!ourUser) {
+					return reply.code(403).send({ error: "You're not an admin" });
+				}
+
+				// Making `username` an admin.
+				let idToMakeAdmin: number | null;
+
+				const user = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(`
+							SELECT id FROM users WHERE username = ?
+						`, [username], (err: Error | null, row: any) => {
+							if (err) {
+								reject(err);
+							}
+							else {
+								resolve(row);
+							}
+						}
+					);
+				});
+				if (!user) {
+					return reply.code(403).send({ error: "Provided username doesn't exist" });
+				}
+				idToMakeAdmin = user.id;
+				// Checking if `username` is admin already.
+				const alreadyAdminCheck = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(`
+							SELECT 1337 FROM admins WHERE user_id = ?
+						`, [idToMakeAdmin], (err: Error | null, row: any) => {
+							if (err) {
+								reject(err);
+							}
+							else {
+								resolve(row);
+							}
+						}
+					);
+				});
+				if (alreadyAdminCheck) {
+					return reply.code(409).send({ error: "Provided username is already an admin" });
+				}
+				await new Promise<void>((resolve, reject) => {
+					fastify.sqlite.run(`
+							INSERT INTO admins (user_id) VALUES (?)
+						`, [idToMakeAdmin], (err: Error | null) => {
+							if (err) {
+								reject(err);
+							}
+							else {
+								resolve();
+							}
+						}
+					);
+				});
+
+				return reply.code(200).send({ message: 'Successfully made user an admin' });
+			}
+			catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(500).send({ error: 'SQLite request failed' });
+			}
+		}
+	);
+
+	fastify.delete<{ Body: MakeOrUnmakeAdminBody }>(
+		'/users/admins',
+		{
+			preHandler: authenticateToken
+		},
+		async (request: FastifyRequest<{ Body: MakeOrUnmakeAdminBody }>, reply: FastifyReply) => {
+			const { username } = request.body;
+
+			// This should NEVER happen.
+			if (request.user === undefined) {
+				fastify.log.error('"request.user" is undefined');
+				return reply.code(500).send({ error: `"request.user" is undefined` });
+			}
+			const ourUserId = request.user.userId;
+			try {
+				// Checking if our user has admin privileges.
+				const ourUser = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(`
+							SELECT 1337 FROM admins WHERE user_id = ?
+						`, [ourUserId], (err: Error | null, row: any) => {
+							if (err) {
+								reject(err);
+							}
+							else {
+								resolve(row);
+							}
+						}
+					);
+				});
+
+				if (!ourUser) {
+					return reply.code(403).send({ error: "You're not an admin" });
+				}
+
+				// Removing admin privileges of `username`.
+				let idToUnmakeAdmin: number | null;
+
+				const user = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(`
+							SELECT id FROM users WHERE username = ?
+						`, [username], (err: Error | null, row: any) => {
+							if (err) {
+								reject(err);
+							}
+							else {
+								resolve(row);
+							}
+						}
+					);
+				});
+				if (!user) {
+					return reply.code(403).send({ error: "Provided username doesn't exist" });
+				}
+				idToUnmakeAdmin = user.id;
+				// Checking if `username` is admin.
+				const isAdminCheck = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(`
+							SELECT 1337 FROM admins WHERE user_id = ?
+						`, [idToUnmakeAdmin], (err: Error | null, row: any) => {
+							if (err) {
+								reject(err);
+							}
+							else {
+								resolve(row);
+							}
+						}
+					);
+				});
+				if (!isAdminCheck) {
+					return reply.code(409).send({ error: "Provided username isn't an admin" });
+				}
+				// Yes, it's possible to unadmin yourself. I don't think that's an issue.
+				await new Promise<void>((resolve, reject) => {
+					fastify.sqlite.run(`
+							DELETE FROM admins WHERE user_id = ?
+						`, [idToUnmakeAdmin], (err: Error | null) => {
+							if (err) {
+								reject(err);
+							}
+							else {
+								resolve();
+							}
+						}
+					);
+				});
+
+				return reply.code(200).send({ message: 'Successfully unmade user an admin' });
+			}
+			catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(500).send({ error: 'SQLite request failed' });
 			}
 		}
 	);
