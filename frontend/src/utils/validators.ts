@@ -47,3 +47,17 @@ export function validatePassword(val: string): FieldResult {
   }
   return { status: true };
 }
+
+export function validateNickname(val: string): FieldResult {
+  const value = (val ?? "").trim().normalize("NFKC");
+  if (!value) {
+    return { status: false, err_msg: "Nickname is required." };
+  }
+  if (!/^[a-zA-Z0-9_]{1,20}$/.test(value)) {
+    return {
+      status: false,
+      err_msg: "Use 1–20 letters, numbers, or underscores.",
+    };
+  }
+  return { status: true };
+}
