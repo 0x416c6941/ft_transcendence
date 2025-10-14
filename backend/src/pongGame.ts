@@ -2,9 +2,9 @@
 import { FastifyInstance } from 'fastify';
 import { Server, Socket } from 'socket.io';
 
-const WIDTH = 800;
-const HEIGHT = 480;
-const paddleWidth = 10;
+const WIDTH = 640;
+const HEIGHT = 360;
+const paddleWidth = 12;
 const paddleHeight = 80;
 const paddleSpeed = 6;
 const ballSize = 10;

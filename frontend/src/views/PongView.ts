@@ -63,20 +63,16 @@ export default class PongView extends AbstractView {
 
     async getHtml(): Promise<string> {
         return `
-      <main class="min-h-screen flex flex-col items-center bg-neutral-900 py-8 overflow-x-hidden">
-        <div class="w-full max-w-[960px] mx-auto px-5 flex flex-col items-center">
-          <h1 class="text-3xl font-bold text-white mb-6">Transcendence Pong</h1>
+      <main class="h-screen flex flex-col items-center justify-center bg-neutral-900 overflow-hidden">
+        <div class="w-full max-w-[860px] mx-auto flex flex-col items-center justify-center">
+          <h1 class="text-2xl font-bold text-white mb-3">Transcendence Pong</h1>
           
-          <div class="w-full bg-[#0f1220] rounded-lg border-2 border-neutral-700 shadow-lg p-4 mb-4">
-            <canvas id="pong" width="800" height="480" class="w-full aspect-[5/3] rounded"></canvas>
+          <div class="bg-[#0f1220] rounded-lg border-2 border-neutral-700 shadow-lg p-3 mb-3">
+            <canvas id="pong" width="640" height="360" class="rounded"></canvas>
           </div>
           
-          <div class="w-full bg-neutral-800 rounded-lg p-4 flex justify-center items-center border border-neutral-700">
-            <div id="score" class="text-3xl font-bold text-white">0 : 0</div>
-          </div>
-          
-          <div class="mt-8 text-center">
-            <button id="back-button" class="mt-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-lg transition-colors font-medium">
+          <div class="flex flex-row items-center justify-center mb-3">
+            <button id="back-button" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-lg transition-colors font-medium">
               Back to Home
             </button>
           </div>
@@ -222,7 +218,7 @@ export default class PongView extends AbstractView {
         this.ctx.strokeStyle = '#334155';
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
-        this.ctx.arc(WIDTH / 2, HEIGHT / 2, 50, 0, Math.PI * 2);
+        this.ctx.arc(WIDTH / 2, HEIGHT / 2, 35, 0, Math.PI * 2);
         this.ctx.stroke();
 
         // Paddles
@@ -254,11 +250,26 @@ export default class PongView extends AbstractView {
         this.ctx.fill();
         this.ctx.shadowBlur = 0;
 
-        // Update score display
-        const scoreEl = document.getElementById('score');
-        if (scoreEl) {
-            scoreEl.textContent = `${this.snap.score.left} : ${this.snap.score.right}`;
-        }
+        // Draw score on canvas
+        this.ctx.font = "bold 32px Arial";
+        this.ctx.textAlign = "center";
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.shadowColor = "#60a5fa";
+        this.ctx.shadowBlur = 10;
+        
+        // Left score
+        this.ctx.fillStyle = "#3b82f6";
+        this.ctx.fillText(this.snap.score.left.toString(), WIDTH / 2 - 40, 40);
+        
+        // Separator
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.fillText(":", WIDTH / 2, 40);
+        
+        // Right score
+        this.ctx.fillStyle = "#f8fafc";
+        this.ctx.fillText(this.snap.score.right.toString(), WIDTH / 2 + 40, 40);
+        
+        this.ctx.shadowBlur = 0;
     }
 }
 
