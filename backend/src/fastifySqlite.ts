@@ -35,7 +35,8 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 				password TEXT NOT NULL,
 				email TEXT NOT NULL UNIQUE COLLATE NOCASE,
 				display_name TEXT NOT NULL,
-				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				account_id_42 INTEGER
 			)
 		`, (err: Error | null) => {
 			if (err) {

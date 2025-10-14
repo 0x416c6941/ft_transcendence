@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import bcrypt from 'bcrypt';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, checkUserExistence, UserExistenceCheckStatus } from '../middleware/auth.js';
 import {
 	registerUserSchema,
 	loginUserSchema,
@@ -11,6 +11,8 @@ import {
 	updateUserSchema,
 	deleteUserSchema
 } from '../schemas/user.schemas.js';
+import fs from 'node:fs';
+import { URLSearchParams } from 'url';
 
 /* Higher number => more Bcrypt hashing rounds
    => more time is necessary and more difficult is brute-forcing. */
@@ -182,6 +184,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		try {
 			const users = await new Promise<any[]>((resolve, reject) => {
 				fastify.sqlite.all(
+					// Returning linked 42 account ID would be weird, hence not doing it.
 					`SELECT id, username, email, display_name, created_at FROM users`,
 					[],
 					(err: Error | null, rows: any[]) => {
@@ -211,6 +214,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			try {
 				const user = await new Promise<any>((resolve, reject) => {
 					fastify.sqlite.get(
+						// Returning linked 42 account ID would be weird, hence not doing it.
 						`SELECT id, username, email, display_name, created_at FROM users WHERE id = ?`,
 						[id],
 						(err: Error | null, row: any) => {
@@ -385,7 +389,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	);
 
 	// TODO: makeOrUnmakeAdminSchema
-	fastify.put<{ Body: MakeOrUnmakeAdminBody }>(
+	fastify.post<{ Body: MakeOrUnmakeAdminBody }>(
 		'/users/admins',
 		{
 			preHandler: authenticateToken
@@ -479,6 +483,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
+	// TODO: makeOrUnmakeAdminSchema
 	fastify.delete<{ Body: MakeOrUnmakeAdminBody }>(
 		'/users/admins',
 		{
@@ -575,4 +580,66 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			}
 		}
 	);
+
+	/* Unified route to link 42 account to logged in user,
+	 * or log in with 42 account linked to the user. */
+	fastify.post('/users/oauth/42', async (request: FastifyRequest, reply: FastifyReply) => {
+		const oauth42UidPath = process.env.BACKEND_OAUTH_42_UID_PATH;
+		const oauth42SecretPath = process.env.BACKEND_OAUTH_42_SECRET_PATH;
+		if (!oauth42UidPath || !oauth42SecretPath) {
+			return reply.code(500).send({ error: 'OAuth ENV problem on server side' });
+		}
+
+		let oauth42Uid, oauth42Secret;
+		try {
+			oauth42Uid = await new Promise<any>((resolve, reject) => {
+				fs.readFile(oauth42UidPath, (err: Error | null, data: any) => {
+					if (err) {
+						reject(err);
+					}
+					else {
+						resolve(data);
+					}
+				});
+			});
+			oauth42Secret = await new Promise<any>((resolve, reject) => {
+				fs.readFile(oauth42SecretPath, (err: Error | null, data: any) => {
+					if (err) {
+						reject(err);
+					}
+					else {
+						resolve(data);
+					}
+				});
+			});
+		}
+		catch (err: any) {
+			fastify.log.error(err);
+			return reply.code(500).send({ error: 'OAuth ENV problem on server side' });
+		}
+
+		const baseUrl = 'https://api.intra.42.fr/oauth/authorize';
+		let params = new URLSearchParams({
+			client_id: `${oauth42Uid}`,
+			redirect_uri: 'https://localhost/api/users/oauth/42/callback',
+			scope: 'public',
+			response_type: 'code'
+		});
+		if (request.headers.authorization) {
+			await authenticateToken(request, reply);
+			// Authentication failed.
+			if (!request.user) {
+				return;
+			}
+
+			const existenceCheck = await checkUserExistence(fastify, request, reply);
+			// User's account was deleted.
+			if (existenceCheck !== UserExistenceCheckStatus.Exists) {
+				return;
+			}
+			params.append('state', request.headers.authorization);
+		}
+
+		return reply.redirect(`${baseUrl}?${params.toString()}`);
+	});
 }

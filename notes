@@ -1,11 +1,9 @@
 2. User table - add 42 UUID / username NULLable field
-5. JWT - what if user account is deleted? Does JWT still work?
-	"auth.ts - authenticateToken":
-		Perhaps add here fastify.sqlite check if yes?
 10. Avatar max size check
 	Also: should resize the avatar as well? Or could we just
 		leave the original resolution?
 11. Friends with IO check: can't be friend with your own self
+12. For user management: online status (potentially w/ socket.io)
 
 SQL table after users are done:
 	but all of this to discuss after users are done, but the main idea
