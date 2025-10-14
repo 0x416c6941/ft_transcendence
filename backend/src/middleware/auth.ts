@@ -1,4 +1,4 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { verifyToken, extractTokenFromHeader, JwtPayload } from '../utils/jwt.js';
 
 /**
@@ -8,6 +8,16 @@ declare module 'fastify' {
 	interface FastifyRequest {
 		user?: JwtPayload;
 	}
+}
+
+/**
+ * @enum UserExistenceCheckStatus
+ * Return value of checkUserExistence().
+ */
+export enum UserExistenceCheckStatus {
+	DoesntExist,
+	Exists,
+	DbFailure	///< The database query failed to execute.
 }
 
 /**
@@ -56,5 +66,36 @@ export async function optionalAuth(
 	} catch (error) {
 		// Token is invalid but we don't reject the request
 		// User info just won't be available
+	}
+}
+
+export async function checkUserExistence(fastify: FastifyInstance,
+	request: FastifyRequest,
+	reply: FastifyReply
+): Promise<UserExistenceCheckStatus> {
+	try {
+		const dbExistenceCheck = await new Promise<any>((resolve, reject) => {
+			fastify.sqlite.get(`SELECT 1337 FROM users u WHERE u.id = ?`, [request.user?.userId],
+				(err: Error | null, row: any) => {
+					if (err) {
+						reject(err);
+					}
+					else {
+						resolve(row);
+					}
+				}
+			);
+		});
+
+		if (!dbExistenceCheck) {
+			reply.code(401).send({ error: "Your account doesn't exist anymore" });
+			return UserExistenceCheckStatus.DoesntExist;
+		}
+		return UserExistenceCheckStatus.Exists;
+	}
+	catch (err: any) {
+		fastify.log.error(err);
+		reply.code(500).send({ error: 'SQLite request failed' });
+		return UserExistenceCheckStatus.DbFailure;
 	}
 }
