@@ -463,7 +463,8 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				await new Promise<void>((resolve, reject) => {
 					fastify.sqlite.run(`
 							INSERT INTO admins (user_id) VALUES (?)
-						`, [idToMakeAdmin], (err: Error | null) => {
+						`, [idToMakeAdmin],
+						function (err: Error | null) {
 							if (err) {
 								reject(err);
 							}
@@ -561,7 +562,8 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				await new Promise<void>((resolve, reject) => {
 					fastify.sqlite.run(`
 							DELETE FROM admins WHERE user_id = ?
-						`, [idToUnmakeAdmin], (err: Error | null) => {
+						`, [idToUnmakeAdmin],
+						function (err: Error | null) {
 							if (err) {
 								reject(err);
 							}
