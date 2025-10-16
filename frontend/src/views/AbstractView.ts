@@ -49,7 +49,6 @@ export default class AbstractView {
 	/**
 	 * @method
 	 * Set the document's (tab's) title to `title`.
-	 * @param {string} title	Document's title to set.
 	 */
 	setDocumentTitle(): void {
 	}
