@@ -56,6 +56,36 @@ const start = async () => {
 		throw new Error("process.env.BACKEND_FASTIFY_PORT isn't a number.");
 	}
 	try {
+		// Loading 42's OAuth credentials.
+		if (!process.env.BACKEND_OAUTH_42_UID_PATH || !process.env.BACKEND_OAUTH_42_SECRET_PATH) {
+			fastify.log.error(`process.env.BACKEND_OAUTH_42_UID_PATH
+				or process.env.BACKEND_OAUTH_42_SECRET_PATH are undefined`);
+			process.exit(1);
+		}
+		const oauth42Uid: string = await new Promise<string>((resolve, reject) => {
+			fs.readFile(process.env.BACKEND_OAUTH_42_UID_PATH!, (err: Error | null, data: any) => {
+				if (err) {
+					reject(err);
+				}
+				resolve(data);
+			});
+		});
+		const oauth42Secret: string = await new Promise<string>((resolve, reject) => {
+			fs.readFile(process.env.BACKEND_OAUTH_42_SECRET_PATH!, (err: Error | null, data: any) => {
+				if (err) {
+					reject(err);
+				}
+				resolve(data);
+			});
+		});
+		
+		fastify.decorate('config', {
+			oauth42: {
+				uid: String(oauth42Uid).trim(),
+				secret: String(oauth42Secret).trim()
+			}
+		});
+
 		// Socket.IO initialization.
 		const io = new Server(fastify.server, {
 			path: '/api/socket.io/'

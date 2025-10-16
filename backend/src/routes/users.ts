@@ -11,39 +11,19 @@ import {
 	updateUserSchema,
 	deleteUserSchema
 } from '../schemas/user.schemas.js';
-import fs from 'node:fs';
+import {
+	ApiError,
+	exchange42CodeFor42Token,
+	get42PublicData,
+	getUserFromDbById,
+	getUserFromDbByAccountId42,
+	updateUserAccountId42InDb
+} from '../utils/users.js';
 import { URLSearchParams } from 'url';
 
 /* Higher number => more Bcrypt hashing rounds
    => more time is necessary and more difficult is brute-forcing. */
 const SALT_ROUNDS = 10;
-
-interface CreateUserBody {
-	username: string;
-	password: string;
-	email: string;
-	display_name: string;
-}
-
-interface UpdateUserBody {
-	username?: string;
-	password?: string;
-	email?: string;
-	display_name?: string;
-}
-
-interface LoginBody {
-	username: string;
-	password: string;
-}
-
-interface UserParams {
-	id: string;
-}
-
-interface MakeOrUnmakeAdminBody {
-	username: string;
-}
 
 export default async function userRoutes(fastify: FastifyInstance) {
 	// Create a new user (Register)
@@ -584,64 +564,124 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	);
 
 	/* Unified route to link 42 account to logged in user,
-	 * or log in with 42 account linked to the user. */
+	 * or log in with 42 account linked to the user.
+	 * TODO: oauth42schema */
 	fastify.post('/users/oauth/42', async (request: FastifyRequest, reply: FastifyReply) => {
-		const oauth42UidPath = process.env.BACKEND_OAUTH_42_UID_PATH;
-		const oauth42SecretPath = process.env.BACKEND_OAUTH_42_SECRET_PATH;
-		if (!oauth42UidPath || !oauth42SecretPath) {
-			return reply.code(500).send({ error: 'OAuth ENV problem on server side' });
-		}
-
-		let oauth42Uid, oauth42Secret;
-		try {
-			oauth42Uid = await new Promise<any>((resolve, reject) => {
-				fs.readFile(oauth42UidPath, (err: Error | null, data: any) => {
-					if (err) {
-						reject(err);
-					}
-					else {
-						resolve(data);
-					}
-				});
-			});
-			oauth42Secret = await new Promise<any>((resolve, reject) => {
-				fs.readFile(oauth42SecretPath, (err: Error | null, data: any) => {
-					if (err) {
-						reject(err);
-					}
-					else {
-						resolve(data);
-					}
-				});
-			});
-		}
-		catch (err: any) {
-			fastify.log.error(err);
-			return reply.code(500).send({ error: 'OAuth ENV problem on server side' });
-		}
-
 		const baseUrl = 'https://api.intra.42.fr/oauth/authorize';
 		let params = new URLSearchParams({
-			client_id: `${oauth42Uid}`,
+			client_id: `${fastify.config.oauth42.uid}`,
 			redirect_uri: 'https://localhost/api/users/oauth/42/callback',
 			scope: 'public',
 			response_type: 'code'
 		});
 		if (request.headers.authorization) {
 			await authenticateToken(request, reply);
-			// Authentication failed.
+			// Authentication failed and `authenticateToken()` replied with 401.
 			if (!request.user) {
 				return;
 			}
 
-			const existenceCheck = await checkUserExistence(fastify, request, reply);
-			// User's account was deleted.
-			if (existenceCheck !== UserExistenceCheckStatus.Exists) {
-				return;
+			try {
+				const user = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get('SELECT * FROM users u WHERE u.id = ?',
+						[request.user!.userId],
+						function (err: Error | null, row: any) {
+							if (err) {
+								reject(err);
+							}
+							resolve(row);
+						}
+					)
+				});
+
+				if (user === undefined) {
+					return reply.code(403).send({ error: 'Unauthorized: User not found' });
+				}
+				else if (user.account_id_42) {
+					return reply.code(409).send({ error: 'This user is already linked to some 42 account' });
+				}
+			}
+			catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(500).send({ error: 'SQLite request failed' });
 			}
 			params.append('state', request.headers.authorization);
 		}
 
 		return reply.redirect(`${baseUrl}?${params.toString()}`);
 	});
+
+	/* A continuation of "POST" route on "/users/oauth/42".
+	 * TODO: oauth42CallbackSchema */
+	fastify.get<{ Querystring: Oauth42CallbackQuerystring }>(
+		'/users/oauth/42/callback',
+		async (request: FastifyRequest<{ Querystring: Oauth42CallbackQuerystring }>, reply: FastifyReply) => {
+			try {
+				const token = await exchange42CodeFor42Token(fastify, request);
+
+				const account42Data = await get42PublicData(token);
+
+				// Authorized user wants to link 42 account.
+				if (request.query.state) {
+					/* `authenticateToken()` awaits "Authorization: Bearer *TOKEN*"
+					 * in `request.headers.authorization`. */
+					request.headers.authorization = request.query.state;
+					await authenticateToken(request, reply);
+					// Authentication failed and `authenticateToken()` replied with 401.
+					if (!request.user) {
+						return;
+					}
+
+					const user = await getUserFromDbById(fastify, request.user.userId!);
+					if (!user) {
+						return reply.code(403).send({ error: 'Unauthorized: User not found' });
+					}
+					else if (user.account_id_42) {
+						return reply.code(409).send({ error: 'This user is already linked to some 42 account' });
+					}
+
+					const account42Test = await getUserFromDbByAccountId42(fastify, account42Data.id);
+					if (account42Test) {
+						fastify.log.info(JSON.stringify(account42Test));
+						return reply.code(409).send({ error: 'This 42 account is already linked to someone else' });
+					}
+
+					await updateUserAccountId42InDb(fastify, user.id, account42Data.id);
+
+					return reply.code(200).send({ message: 'Successfully linked 42 account' });
+				}
+				// User wants to log in.
+				else {
+					const user = await getUserFromDbByAccountId42(fastify, account42Data.id);
+					if (!user) {
+						return reply.code(404).send({ error: "This 42 account isn't linked to any user" });
+					}
+
+					// Generate JWT tokens
+					const accessToken = generateAccessToken(user.id, user.username);
+					const refreshToken = generateRefreshToken(user.id, user.username);
+
+					// Return tokens and user data (without password)
+					return reply.code(200).send({
+						message: 'Login successful',
+						accessToken,
+						refreshToken,
+						user: {
+							id: user.id,
+							username: user.username,
+							email: user.email,
+							display_name: user.display_name
+						}
+					});
+				}
+			}
+			catch (error: unknown) {
+				fastify.log.error(error);
+				if (error instanceof ApiError) {
+					return reply.code(error.replyHttpCode).send(error.message);
+				}
+				return reply.code(500).send({ error: 'An internal server error occurred' });
+			}
+		}
+	);
 }
