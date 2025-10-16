@@ -51,7 +51,7 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 		db.run(`
 			CREATE TABLE IF NOT EXISTS admins (
 				user_id INTEGER PRIMARY KEY,
-				FOREIGN KEY (user_id) REFERENCES users (id)
+				FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 			)
 		`, (err: Error | null) => {
 			if (err) {
