@@ -13,11 +13,13 @@ import {
 } from '../schemas/user.schemas.js';
 import {
 	ApiError,
-	exchange42CodeFor42Token,
-	get42PublicData,
+	getUserFromDbByUsername,
 	getUserFromDbById,
 	getUserFromDbByAccountId42,
-	updateUserAccountId42InDb
+	getUserFromAdminsTable,
+	updateUserAccountId42InDb,
+	exchange42CodeFor42Token,
+	get42PublicData
 } from '../utils/users.js';
 import { URLSearchParams } from 'url';
 
@@ -235,21 +237,19 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
 			/* Authorization check: users can only update their own profile,
 			 * OR they must be an admin. */
-			const adminCheck = await new Promise<any>((resolve, reject) => {
-				fastify.sqlite.get(`
-						SELECT user_id FROM admins WHERE user_id = ?
-					`, [request.user?.userId], (err: Error | null, row: any) => {
-						if (err) {
-							reject(err);
-						}
-						else {
-							resolve(row);
-						}
-					}
-				);
-			});
-			if (request.user?.userId !== parseInt(id) && adminCheck === undefined) {
-				return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
+			try {
+				const adminCheck = await getUserFromAdminsTable(fastify, request.user!.userId);
+
+				if (request.user?.userId !== parseInt(id) && !adminCheck) {
+					return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
+				}
+			}
+			catch (error: unknown) {
+				fastify.log.error(error);
+				if (error instanceof ApiError) {
+					return reply.code(error.replyHttpCode).send(error.message);
+				}
+				return reply.code(500).send({ error: 'An internal server error occurred' });
 			}
 
 			// Build dynamic update query
@@ -325,22 +325,21 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
 			/* Authorization check: users can only update their own profile,
 			 * OR they must be an admin. */
-			const adminCheck = await new Promise<any>((resolve, reject) => {
-				fastify.sqlite.get(`
-						SELECT user_id FROM admins WHERE user_id = ?
-					`, [request.user?.userId], (err: Error | null, row: any) => {
-						if (err) {
-							reject(err);
-						}
-						else {
-							resolve(row);
-						}
-					}
-				);
-			});
-			if (request.user?.userId !== parseInt(id) && adminCheck === undefined) {
-				return reply.code(403).send({ error: 'Forbidden: You can only delete your own profile' });
+			try {
+				const adminCheck = await getUserFromAdminsTable(fastify, request.user!.userId);
+
+				if (request.user?.userId !== parseInt(id) && !adminCheck) {
+					return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
+				}
 			}
+			catch (error: unknown) {
+				fastify.log.error(error);
+				if (error instanceof ApiError) {
+					return reply.code(error.replyHttpCode).send(error.message);
+				}
+				return reply.code(500).send({ error: 'An internal server error occurred' });
+			}
+
 			try {
 				const result = await new Promise<any>((resolve, reject) => {
 					fastify.sqlite.run(
@@ -385,61 +384,23 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			const ourUserId = request.user.userId;
 			try {
 				// Checking if our user has admin privileges.
-				const ourUser = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get(`
-							SELECT 1337 FROM admins WHERE user_id = ?
-						`, [ourUserId], (err: Error | null, row: any) => {
-							if (err) {
-								reject(err);
-							}
-							else {
-								resolve(row);
-							}
-						}
-					);
-				});
-
+				const ourUser = await getUserFromAdminsTable(fastify, ourUserId);
 				if (!ourUser) {
 					return reply.code(403).send({ error: "You're not an admin" });
 				}
 
 				// Making `username` an admin.
-				let idToMakeAdmin: number | null;
-
-				const user = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get(`
-							SELECT id FROM users WHERE username = ?
-						`, [username], (err: Error | null, row: any) => {
-							if (err) {
-								reject(err);
-							}
-							else {
-								resolve(row);
-							}
-						}
-					);
-				});
+				const user = await getUserFromDbByUsername(fastify, username);
 				if (!user) {
 					return reply.code(403).send({ error: "Provided username doesn't exist" });
 				}
-				idToMakeAdmin = user.id;
+				const idToMakeAdmin = user.id;
 				// Checking if `username` is admin already.
-				const alreadyAdminCheck = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get(`
-							SELECT 1337 FROM admins WHERE user_id = ?
-						`, [idToMakeAdmin], (err: Error | null, row: any) => {
-							if (err) {
-								reject(err);
-							}
-							else {
-								resolve(row);
-							}
-						}
-					);
-				});
+				const alreadyAdminCheck = await getUserFromAdminsTable(fastify, idToMakeAdmin);
 				if (alreadyAdminCheck) {
 					return reply.code(409).send({ error: "Provided username is already an admin" });
 				}
+
 				await new Promise<void>((resolve, reject) => {
 					fastify.sqlite.run(`
 							INSERT INTO admins (user_id) VALUES (?)
@@ -481,64 +442,27 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			const ourUserId = request.user.userId;
 			try {
 				// Checking if our user has admin privileges.
-				const ourUser = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get(`
-							SELECT 1337 FROM admins WHERE user_id = ?
-						`, [ourUserId], (err: Error | null, row: any) => {
-							if (err) {
-								reject(err);
-							}
-							else {
-								resolve(row);
-							}
-						}
-					);
-				});
+				const ourUser = await getUserFromAdminsTable(fastify, ourUserId);
 
 				if (!ourUser) {
 					return reply.code(403).send({ error: "You're not an admin" });
 				}
 
 				// Removing admin privileges of `username`.
-				let idToUnmakeAdmin: number | null;
-
-				const user = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get(`
-							SELECT id FROM users WHERE username = ?
-						`, [username], (err: Error | null, row: any) => {
-							if (err) {
-								reject(err);
-							}
-							else {
-								resolve(row);
-							}
-						}
-					);
-				});
+				const user = await getUserFromDbByUsername(fastify, username);
 				if (!user) {
 					return reply.code(403).send({ error: "Provided username doesn't exist" });
 				}
-				idToUnmakeAdmin = user.id;
+				const idToUnmakeAdmin = user.id;
 				// Checking if `username` is admin.
-				const isAdminCheck = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get(`
-							SELECT user_id FROM admins WHERE user_id = ?
-						`, [idToUnmakeAdmin], (err: Error | null, row: any) => {
-							if (err) {
-								reject(err);
-							}
-							else {
-								resolve(row);
-							}
-						}
-					);
-				});
+				const isAdminCheck = await getUserFromAdminsTable(fastify, idToUnmakeAdmin);
 				if (!isAdminCheck) {
 					return reply.code(409).send({ error: "Provided username isn't an admin" });
 				}
 				else if (isAdminCheck.user_id === ourUserId) {
 					return reply.code(403).send({ error: "You can't remove admin privileges from yourself. Why would you?" });
 				}
+
 				await new Promise<void>((resolve, reject) => {
 					fastify.sqlite.run(`
 							DELETE FROM admins WHERE user_id = ?
@@ -582,19 +506,9 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			}
 
 			try {
-				const user = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get('SELECT * FROM users u WHERE u.id = ?',
-						[request.user!.userId],
-						function (err: Error | null, row: any) {
-							if (err) {
-								reject(err);
-							}
-							resolve(row);
-						}
-					)
-				});
+				const user = await getUserFromDbById(fastify, request.user!.userId);
 
-				if (user === undefined) {
+				if (!user) {
 					return reply.code(403).send({ error: 'Unauthorized: User not found' });
 				}
 				else if (user.account_id_42) {
@@ -632,7 +546,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 						return;
 					}
 
-					const user = await getUserFromDbById(fastify, request.user.userId!);
+					const user = await getUserFromDbById(fastify, request.user!.userId);
 					if (!user) {
 						return reply.code(403).send({ error: 'Unauthorized: User not found' });
 					}
@@ -674,6 +588,48 @@ export default async function userRoutes(fastify: FastifyInstance) {
 						}
 					});
 				}
+			}
+			catch (error: unknown) {
+				fastify.log.error(error);
+				if (error instanceof ApiError) {
+					return reply.code(error.replyHttpCode).send(error.message);
+				}
+				return reply.code(500).send({ error: 'An internal server error occurred' });
+			}
+		}
+	);
+
+	/* A route to unlink 42 account.
+	 * TODO: oauth42DeleteSchema */
+	fastify.delete<{ Params: UserParams }>(
+		'/users/oauth/42/:id',
+		{
+			preHandler: authenticateToken
+		},
+		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
+			const { id } = request.params;
+
+			/* Authorization check:
+			 * users can only unlink 42 account from their own profile,
+			 * OR they must be an admin. */
+			try {
+				const adminCheck = await getUserFromAdminsTable(fastify, request.user!.userId);
+
+				if (request.user!.userId !== parseInt(id) && !adminCheck) {
+					return reply.code(403).send({ error: 'Forbidden: You can only unlink 42 account from your own profile' });
+				}
+
+				const existenceCheck = await getUserFromDbById(fastify, parseInt(id));
+				if (!existenceCheck) {
+					return reply.code(409).send({ error: "That user doesn't exist anymore" });
+				}
+				else if (!existenceCheck.account_id_42) {
+					return reply.code(404).send({ error: "You don't have any linked 42 account" });
+				}
+
+				await updateUserAccountId42InDb(fastify, request.user!.userId, null);
+				
+				return reply.code(200).send({ message: 'Successfully unlinked 42 account' });
 			}
 			catch (error: unknown) {
 				fastify.log.error(error);

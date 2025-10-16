@@ -1,4 +1,3 @@
-2. User table - add 42 UUID / username NULLable field
 10. Avatar max size check
 	Also: should resize the avatar as well? Or could we just
 		leave the original resolution?

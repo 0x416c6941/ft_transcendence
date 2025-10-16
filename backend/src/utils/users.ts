@@ -27,8 +27,38 @@ export class ApiError extends Error {
 }
 
 /**
+ * Get user with `username` from `fastify.sqlite`.
+ * @param {FastifyInstance}	fastify		Instance of a Fastify server.
+ * @param {string}		username	ID of the user to get from `fastify.sqlite`.
+ * @return Promise<object>	Object containing user with `username` from `fastify.sqlite`.
+ * 				If object is undefined, then user with `username`
+ * 				doesn't exist in `fastify.sqlite`.
+ * @throws {ApiError}	Throws if request to `fastify.sqlite` failed.
+ */
+export async function getUserFromDbByUsername(fastify: FastifyInstance, username: string) {
+	try {
+		const user = await new Promise<any>((resolve, reject) => {
+			fastify.sqlite.get('SELECT * FROM users u WHERE u.username = ?',
+				[username],
+				function (err: Error | null, row: any) {
+					if (err) {
+						reject(err);
+					}
+					resolve(row);
+				}
+			);
+		});
+
+		return user;
+	}
+	catch (err: unknown) {
+		throw new ApiError('SQLite request failed', 500, err);
+	}
+}
+
+/**
  * Get user with `id` from `fastify.sqlite`.
- * @param {FastifyInstance}	fastify	Instance of the Fastify server.
+ * @param {FastifyInstance}	fastify	Instance of a Fastify server.
  * @param {number}		id	ID of the user to get from `fastify.sqlite`.
  * @return Promise<object>	Object containing user with `id` from `fastify.sqlite`.
  * 				If object is undefined, then user with `id`
@@ -57,12 +87,12 @@ export async function getUserFromDbById(fastify: FastifyInstance, id: number) {
 }
 
 /**
- * Get user with `account42Id` from `fastify.sqlite`.
- * @param {FastifyInstance}	fastify		Instance of the Fastify server.
- * @param {number}		account42Id	ID of the linked 42 account of a user
+ * Get user with `accountId42` from `fastify.sqlite`.
+ * @param {FastifyInstance}	fastify		Instance of a Fastify server.
+ * @param {number}		accountId42	ID of the linked 42 account of a user
  * 						to get from `fastify.sqlite`.
  * @return Promise<object>	Object containing user with linked 42 account
- * 				`account42Id` from `fastify.sqlite`.
+ * 				`accountId42` from `fastify.sqlite`.
  * 				If object is undefined, then the provided
  * 				42 account ID isn't linked to any user in `fastify.sqlite`.
  * @throws {ApiError}	Throws if request to `fastify.sqlite` failed.
@@ -88,20 +118,58 @@ export async function getUserFromDbByAccountId42(fastify: FastifyInstance, accou
 	}
 }
 
-export async function updateUserAccountId42InDb(fastify: FastifyInstance,
-	userId: number, accountId42: number) {
+/**
+ * Return record from "admins" table, where "user_id" is `userId`.
+ * @param {FastifyInstance}	fastify	Instance of a Fastify server.
+ * @param {number}		userId	ID of the user in "admins" table.
+ * @return Promise<object>	Row from "admins" table, if `userId` is recorded.
+ * 				Object will otherwise be undefined.
+ * @throws {ApiError}	Throws if request to `fastify.sqlite` failed.
+ */
+export async function getUserFromAdminsTable(fastify: FastifyInstance, userId: number) {
 	try {
-		await new Promise<void>((resolve, reject) => {
+		const check = await new Promise<any>((resolve, reject) => {
+			fastify.sqlite.get('SELECT * FROM admins a where a.user_id = ?',
+				[userId],
+				function (err: Error | null, row: any) {
+					if (err) {
+						reject(err);
+					}
+					resolve(row);
+				}
+			)
+		});
+
+		return check;
+	}
+	catch (err: unknown) {
+		throw new ApiError('SQLite request failed', 500, err);
+	}
+}
+
+/**
+ * Update "account_id_42" with `accountId42` of a user with `userId`.
+ * @param {FastifyInstance}	fastify		Instance of a Fastify server.
+ * @param {number}		userId		ID of a user to update 
+ * @param {number | null}	accountId42	Either an ID of 42 account to link
+ * 						or `null` to unlink 42 account.
+ */
+export async function updateUserAccountId42InDb(fastify: FastifyInstance,
+	userId: number, accountId42: number | null) {
+	try {
+		const result = await new Promise<SqliteRunResult>((resolve, reject) => {
 			fastify.sqlite.run('UPDATE users SET account_id_42 = ? WHERE id = ?',
 				[accountId42, userId],
 				function (err: Error | null) {
 					if (err) {
 						reject(err);
 					}
-					resolve();
+					resolve(this);
 				}
 			);
 		});
+
+		return result;
 	}
 	catch(err: unknown) {
 		throw new ApiError('SQLite request failed', 500, err);
@@ -110,7 +178,7 @@ export async function updateUserAccountId42InDb(fastify: FastifyInstance,
 
 /**
  * Exchange 42 OAuth code for 42 OAuth token.
- * @param {FastifyInstance} 	fastify	Instance of the Fastify server.
+ * @param {FastifyInstance} 	fastify	Instance of a Fastify server.
  * @param {FastifyRequest}	request	Request with the 42 OAuth code we've just received.
  * @return Promise<object>	Object containing response from 42 OAuth API
  * 				including the OAuth token.

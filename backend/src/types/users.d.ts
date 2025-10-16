@@ -2,6 +2,29 @@
  * @fileoverview Custom types used in "/users" routes.
  */
 
+/**
+ * @interface SqliteRunResult
+ * Type for `run()` result of SQLite,
+ * since SQLite doesn't provide type bindings for it.
+ */
+interface SqliteRunResult {
+	/**
+	 * @property {any} lastID
+	 * ID of the last changed row.
+	 * @remarks Information is valid ONLY
+	 * 	if the query was a successful INSERT statement.
+	 */
+	lastID: any;
+
+	/**
+	 * @property {number} changes
+	 * Amount of changes after the query.
+	 * @remarks Information is valid ONLY
+	 * 	if the query was a successful UPDATE or DELETE statement.
+	 */
+	changes: number;
+}
+
 interface CreateUserBody {
 	username: string;
 	password: string;
