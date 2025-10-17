@@ -18,6 +18,7 @@
 		"src/views/NotFoundView.ts",
 		"src/views/HomeView.ts",
 		"src/views/LoginView.ts",
-		"src/views/RegisterView.ts"
+		"src/views/RegisterView.ts",
+		"src/views/ProfileView.ts"
 	]
 }
