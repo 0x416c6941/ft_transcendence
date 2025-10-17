@@ -1,4 +1,4 @@
-import Router from '../router.js';
+import Router from "../router.js";
 
 /**
  * @class AbstractView
@@ -30,7 +30,11 @@ export default class AbstractView {
 	 */
 	protected queryParams: URLSearchParams;
 
-	constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
+	constructor(
+		router: Router,
+		pathParams: Map<string, string>,
+		queryParams: URLSearchParams
+	) {
 		// Shallow copy of all objects.
 		this.router = router;
 		this.pathParams = pathParams;
@@ -43,29 +47,27 @@ export default class AbstractView {
 	 * @return {Promise<string>} HTML content for our SPA's root container.
 	 */
 	async getHtml(): Promise<string> {
-		return '';
+		return "";
 	}
 
 	/**
 	 * @method
 	 * Set the document's (tab's) title to `title`.
+	 * @param {string} title	Document's title to set.
 	 */
-	setDocumentTitle(): void {
-	}
+	setDocumentTitle(): void {}
 
 	/**
 	 * @method
 	 * @brief Call this method after view is rendered.
 	 * @details Sets up event listeners, creats Socket.IO sockets, etc.
 	 */
-	setup(): void {
-	}
+	setup(): void {}
 
 	/**
 	 * @method
 	 * @brief Always call this method right before closing a view.
 	 * @details Deregisters events, closes Socket.IO sockets, etc.
 	 */
-	cleanup(): void {
-	}
+	cleanup(): void {}
 }
