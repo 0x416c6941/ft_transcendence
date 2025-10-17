@@ -76,14 +76,13 @@ export default class PongView extends AbstractView {
           </div>
           
           <div class="mt-8 text-center">
-            <p class="mb-4 text-neutral-300 font-medium">Use <span class="bg-neutral-800 text-white px-2 py-1 rounded">↑</span> and <span class="bg-neutral-800 text-white px-2 py-1 rounded">↓</span> arrow keys to control your paddle</p>
             <button id="back-button" class="mt-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-lg transition-colors font-medium">
               Back to Home
             </button>
           </div>
-        </div>
+        </div> 
       </main>
-    `;
+    `; 
     }
 
     setDocumentTitle(): void {
