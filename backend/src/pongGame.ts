@@ -18,6 +18,10 @@ type GameState = {
     paddles: { leftY: number; rightY: number };
     score: { left: number; right: number };
 };
+type ReadyState = {
+    left: boolean;
+    right: boolean;
+};
 
 // Initial game state
 const state: GameState = {
@@ -25,6 +29,15 @@ const state: GameState = {
     paddles: { leftY: HEIGHT / 2 - paddleHeight / 2, rightY: HEIGHT / 2 - paddleHeight / 2 },
     score: { left: 0, right: 0 },
 };
+
+// Ready state tracking
+const readyState: ReadyState = {
+    left: false,
+    right: false,
+};
+
+// Game active state
+let gameActive = false;
 
 // Player tracking
 const players = new Map<string, { side: Side; input: InputState }>();
@@ -40,6 +53,43 @@ function resetBall(direction: 1 | -1): void {
     state.ball.y = HEIGHT / 2;
     state.ball.vx = 4 * direction;
     state.ball.vy = (Math.random() * 2 + 2) * (Math.random() < 0.5 ? -1 : 1);
+}
+
+// Reset game state to initial values
+function resetGameState(): void {
+    state.score.left = 0;
+    state.score.right = 0;
+    state.ball.x = WIDTH / 2;
+    state.ball.y = HEIGHT / 2;
+    state.ball.vx = 4;
+    state.ball.vy = 3;
+    state.paddles.leftY = HEIGHT / 2 - paddleHeight / 2;
+    state.paddles.rightY = HEIGHT / 2 - paddleHeight / 2;
+}
+
+// Stop the game and notify clients
+function stopGame(io: Server): void {
+    gameActive = false;
+    io.emit('game_stopped');
+    io.emit('ready_state', readyState);
+}
+
+// Reassign roles to spectators if a side is free
+function reassignRoles(io: Server): void {
+    const ids = Array.from(players.keys());
+    const currentSides = Array.from(players.values()).map((p) => p.side);
+    const hasLeft = currentSides.indexOf('left') !== -1;
+    const hasRight = currentSides.indexOf('right') !== -1;
+    let newRole: Side | null = null;
+    if (!hasLeft) newRole = 'left';
+    else if (!hasRight) newRole = 'right';
+    for (const id of ids) {
+        if (players.get(id)?.side === 'spectator' && newRole) {
+            players.get(id)!.side = newRole;
+            io.to(id).emit('role', { side: newRole });
+            break;
+        }
+    }
 }
 
 // Update game state - one step of physics
@@ -107,25 +157,80 @@ export function setupPongGame(fastify: FastifyInstance, io: Server): void {
         const side: Side = hasLeft
             ? hasRight ? 'spectator' : 'right'
             : 'left';
-
+        
         players.set(socket.id, { side, input: { up: false, down: false } });
-        socket.emit('role', { side });
+
+        const sendStateToClient = () => {
+            socket.emit('role', { side });
+            socket.emit('ready_state', readyState);
+
+        };
+
+        sendStateToClient();
+
+        socket.on('request_state', sendStateToClient);
+
+        socket.on('player_ready', (data: { side: Side; ready: boolean }) => {
+            const player = players.get(socket.id);
+            if (!player || data.side === 'spectator') {
+                return;
+            }
+            if (player.side !== data.side) {
+                return;
+            }
+            
+            readyState[data.side] = data.ready;
+            io.emit('ready_state', readyState);
+
+            // Check if both players are ready
+            if (readyState.left && readyState.right && !gameActive) {
+                gameActive = true;
+                
+                // Reset the game state
+                state.score.left = 0;
+                state.score.right = 0;
+                state.ball.x = WIDTH / 2;
+                state.ball.y = HEIGHT / 2;
+                state.ball.vx = 4;
+                state.ball.vy = 3;
+                state.paddles.leftY = HEIGHT / 2 - paddleHeight / 2;
+                state.paddles.rightY = HEIGHT / 2 - paddleHeight / 2;
+
+                const snapshot = {
+                    width: WIDTH,
+                    height: HEIGHT,
+                    paddles: state.paddles,
+                    ball: { x: state.ball.x, y: state.ball.y },
+                    score: state.score,
+                };
+                io.emit('game_state', snapshot);
+            }
+        });
 
         socket.on('input', (data: Partial<InputState>) => {
             const player = players.get(socket.id);
             if (!player) return;
             if (player.side === 'spectator') return;
+            if (!gameActive) return;
 
             player.input.up = !!data.up;
             player.input.down = !!data.down;
         });
 
         socket.on('disconnect', (reason: string) => {
+            const player = players.get(socket.id);
+            if (player && (player.side === 'left' || player.side === 'right')) {
+                readyState[player.side] = false;
+                resetGameState();
+                stopGame(io);
+                setTimeout(() => reassignRoles(io), 100);
+            }
             players.delete(socket.id);
         });
     });
 
     setInterval(() => {
+        if (!gameActive) return;
         step();
         const snapshot = {
             width: WIDTH,

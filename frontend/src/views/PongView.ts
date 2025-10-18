@@ -3,59 +3,19 @@ import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 import { io } from '../socket.js';
 
-/**
- * @class PongView
- * Pong game view.
- */
 export default class PongView extends AbstractView {
-    /**
-     * @property {HTMLCanvasElement | null} canvas
-     * @private
-     * Canvas element for the Pong game
-     */
     private canvas: HTMLCanvasElement | null = null;
-
-    /**
-     * @property {CanvasRenderingContext2D | null} ctx
-     * @private
-     * Canvas rendering context
-     */
     private ctx: CanvasRenderingContext2D | null = null;
-
-    /**
-     * @property {any} socket
-     * @private
-     * Socket.IO connection
-     */
     private socket: any = null;
-
-    /**
-     * @property {Snapshot | null} snap
-     * @private
-     * Latest game state snapshot received from server
-     */
     private snap: Snapshot | null = null;
-
-    /**
-     * @property {string} mySide
-     * @private
-     * Player's assigned role: 'left', 'right', or 'spectator'
-     */
     private mySide: 'left' | 'right' | 'spectator' = 'spectator';
-
-    /**
-     * @property {object} input
-     * @private
-     * Current input state
-     */
+    private gameReadyState = {
+        left: false,
+        right: false
+    };
     private input = { up: false, down: false };
-
-    /**
-     * @property {number} animationFrameId
-     * @private
-     * ID of the animation frame for cleaning up
-     */
     private animationFrameId: number | null = null;
+    private gameActive: boolean = false;
 
     constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
         super(router, pathParams, queryParams);
@@ -71,14 +31,17 @@ export default class PongView extends AbstractView {
             <canvas id="pong" width="640" height="360" class="rounded"></canvas>
           </div>
           
-          <div class="flex flex-row items-center justify-center mb-3">
+          <div class="flex flex-row items-center justify-center gap-4 mb-3">
+            <button id="start-button" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-lg transition-colors font-medium">
+              Ready to Play
+            </button>
             <button id="back-button" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-lg transition-colors font-medium">
               Back to Home
             </button>
           </div>
         </div> 
       </main>
-    `; 
+    `;
     }
 
     setDocumentTitle(): void {
@@ -86,31 +49,41 @@ export default class PongView extends AbstractView {
     }
 
     setup(): void {
-        // Initialize canvas
+        this.socket = io;
         this.canvas = document.getElementById('pong') as HTMLCanvasElement;
-        if (!this.canvas) {
-            console.error('Canvas not found');
-            return;
-        }
-
         this.ctx = this.canvas.getContext('2d');
-
-        // Set up back button
         document.getElementById('back-button')?.addEventListener('click', () => {
             this.router.navigate('/');
         });
-
-        this.socket = io;
-
-        // Socket.IO event handlers
+        const startButton = document.getElementById('start-button');
+        if (startButton) {
+            startButton.addEventListener('click', this.handleStartClick);
+        }
+        
+        this.socket.on('game_stopped', () => {
+            if (this.ctx) {
+                this.ctx.clearRect(0, 0, this.canvas?.width || 0, this.canvas?.height || 0);
+            }
+            this.snap = null;
+            this.gameActive = false;
+            this.gameReadyState = { left: false, right: false };
+            this.updateStartButton();
+        });
 
         this.socket.on('role', (data: { side: 'left' | 'right' | 'spectator' }) => {
             this.mySide = data.side;
-            console.log('my side:', this.mySide);
+            this.updateStartButton();
         });
 
         this.socket.on('game_state', (data: Snapshot) => {
             this.snap = data;
+            this.gameActive = true;
+        });
+
+        this.socket.on('ready_state', (data: { left: boolean, right: boolean }) => {
+            this.gameReadyState = data;
+            this.gameActive = data.left && data.right;
+            this.updateStartButton();
         });
 
         // Set up keyboard input handlers
@@ -134,9 +107,14 @@ export default class PongView extends AbstractView {
         });
 
 
+        // Remove start button event listener
+        document.getElementById('start-button')?.removeEventListener('click', this.handleStartClick);
+
         if (this.socket) {
             this.socket.off('role');
             this.socket.off('game_state');
+            this.socket.off('ready_state');
+            this.socket.off('game_stopped');
             this.socket = null;
         }
 
@@ -189,11 +167,50 @@ export default class PongView extends AbstractView {
     };
 
     // Draw the game state
+    private handleStartClick = (): void => {
+        if (this.mySide === 'spectator') {
+            return;
+        }
+
+        const currentState = this.mySide === 'left' ? this.gameReadyState.left : this.gameReadyState.right;
+        this.socket?.emit('player_ready', { side: this.mySide, ready: !currentState });
+    };
+
+    private updateStartButton(): void {
+        const startButton = document.getElementById('start-button');
+        if (!startButton) return;
+
+
+        if (this.mySide === 'spectator' || (this.gameReadyState.left && this.gameReadyState.right)) {
+            startButton.style.display = 'none';
+            return;
+        }
+
+        startButton.style.display = 'block';
+        const myReadyState = this.mySide === 'left' ? this.gameReadyState.left : this.gameReadyState.right;
+
+        startButton.textContent = myReadyState ? 'Waiting...' : 'Ready to Play';
+        startButton.classList.toggle('bg-yellow-600', myReadyState);
+        startButton.classList.toggle('hover:bg-yellow-700', myReadyState);
+        startButton.classList.toggle('bg-green-600', !myReadyState);
+        startButton.classList.toggle('hover:bg-green-700', !myReadyState);
+    }
+
     private draw(): void {
-        if (!this.snap || !this.ctx || !this.canvas) return;
+        if (!this.ctx || !this.canvas) return;
 
         const WIDTH = this.canvas.width;
         const HEIGHT = this.canvas.height;
+
+        if (!this.gameActive || !this.snap) {
+            this.ctx.fillStyle = '#0f1220';
+            this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            this.ctx.strokeStyle = '#1e293b';
+            this.ctx.lineWidth = 4;
+            this.ctx.strokeRect(0, 0, WIDTH, HEIGHT);
+            return;
+        }
 
         // Background
         this.ctx.fillStyle = '#0f1220';
@@ -256,19 +273,19 @@ export default class PongView extends AbstractView {
         this.ctx.fillStyle = "#ffffff";
         this.ctx.shadowColor = "#60a5fa";
         this.ctx.shadowBlur = 10;
-        
+
         // Left score
         this.ctx.fillStyle = "#3b82f6";
         this.ctx.fillText(this.snap.score.left.toString(), WIDTH / 2 - 40, 40);
-        
+
         // Separator
         this.ctx.fillStyle = "#ffffff";
         this.ctx.fillText(":", WIDTH / 2, 40);
-        
+
         // Right score
         this.ctx.fillStyle = "#f8fafc";
         this.ctx.fillText(this.snap.score.right.toString(), WIDTH / 2 + 40, 40);
-        
+
         this.ctx.shadowBlur = 0;
     }
 }
