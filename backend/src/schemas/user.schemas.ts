@@ -314,7 +314,7 @@ export const deleteUserSchema = {
 };
 
 export const makeAdminSchema = {
-	description: 'Grant or revoke admin privileges of a user by username',
+	description: 'Grant admin privileges to a user by username',
 	tags: ['users'],
 	security: [{ bearerAuth: [] }],
 	body: {
@@ -329,7 +329,7 @@ export const makeAdminSchema = {
 			}
 		},
 		403: {
-			description: "Forbidden - you're not an admin",
+			description: "Forbidden - request sender isn't an admin",
 			$ref: 'Error#'
 		},
 		404: {
@@ -338,6 +338,40 @@ export const makeAdminSchema = {
 		},
 		409: {
 			description: 'Conflict - provided username already is an admin',
+			$ref: 'Error#'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
+
+export const unmakeAdminSchema = {
+	description: 'Revoke admin privileges of a user by username',
+	tags: ['users'],
+	security: [{ bearerAuth: [] }],
+	body: {
+		$ref: 'MakeOrUnmakeAdminRequest#'
+	},
+	response: {
+		200: {
+			description: 'Successfully unmade user an admin',
+			type: 'object',
+			properties: {
+				message: { type: 'string' }
+			}
+		},
+		403: {
+			description: "Forbidden - request sender isn't an admin or is trying to revoke admin privileges of themselves",
+			$ref: 'Error#'
+		},
+		404: {
+			description: "Not found - provided username doesn't exist",
+			$ref: 'Error#'
+		},
+		409: {
+			description: "Conflict - provided username isn't an admin",
 			$ref: 'Error#'
 		},
 		500: {

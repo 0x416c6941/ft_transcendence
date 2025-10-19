@@ -10,7 +10,8 @@ import {
 	getUserByIdSchema,
 	updateUserSchema,
 	deleteUserSchema,
-	makeAdminSchema
+	makeAdminSchema,
+	unmakeAdminSchema
 } from '../schemas/user.schemas.js';
 import {
 	ApiError,
@@ -368,7 +369,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
-	/* Grant admin privileges to user by username (must be providewd in body).
+	/* Grant admin privileges to user by username (must be provided in body).
 	 * Protected - user trying to do must be authorized and must be an admin. */
 	fastify.post<{ Body: MakeOrUnmakeAdminBody }>(
 		'/users/admins',
@@ -428,11 +429,13 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
-	// TODO: makeOrUnmakeAdminSchema
+	/* Revoke admin privileges of a user by username (must be provided in body).
+	 * Protected - user trying to do must be authorized and must be an admin. */
 	fastify.delete<{ Body: MakeOrUnmakeAdminBody }>(
 		'/users/admins',
 		{
-			preHandler: authenticateToken
+			preHandler: authenticateToken,
+			schema: unmakeAdminSchema
 		},
 		async (request: FastifyRequest<{ Body: MakeOrUnmakeAdminBody }>, reply: FastifyReply) => {
 			const { username } = request.body;
@@ -454,7 +457,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				// Removing admin privileges of `username`.
 				const user = await dbGetUserByUsername(fastify, username);
 				if (!user) {
-					return reply.code(403).send({ error: "Provided username doesn't exist" });
+					return reply.code(404).send({ error: "Provided username doesn't exist" });
 				}
 				const idToUnmakeAdmin = user.id;
 				// Checking if `username` is admin.
