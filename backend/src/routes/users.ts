@@ -11,7 +11,8 @@ import {
 	updateUserSchema,
 	deleteUserSchema,
 	makeAdminSchema,
-	unmakeAdminSchema
+	unmakeAdminSchema,
+	oauth42Schema
 } from '../schemas/user.schemas.js';
 import {
 	ApiError,
@@ -494,9 +495,14 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	);
 
 	/* Unified route to link 42 account to logged in user,
-	 * or log in with 42 account linked to the user.
+	 * or log in with 42 account linked to the user
+	 * (in the latter case, JWT must be present in "Authorization: Bearer" header).
 	 * TODO: oauth42schema */
-	fastify.post('/users/oauth/42', async (request: FastifyRequest, reply: FastifyReply) => {
+	fastify.post('/users/oauth/42',
+		{
+			schema: oauth42Schema
+		},
+		async (request: FastifyRequest, reply: FastifyReply) => {
 		const baseUrl = 'https://api.intra.42.fr/oauth/authorize';
 		let params = new URLSearchParams({
 			client_id: `${fastify.config.oauth42.uid}`,
@@ -504,6 +510,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			scope: 'public',
 			response_type: 'code'
 		});
+
 		if (request.headers.authorization) {
 			await authenticateToken(request, reply);
 			// Authentication failed and `authenticateToken()` replied with 401.
@@ -518,7 +525,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					return reply.code(403).send({ error: 'Unauthorized: User not found' });
 				}
 				else if (user.account_id_42) {
-					return reply.code(409).send({ error: 'This user is already linked to some 42 account' });
+					return reply.code(409).send({ error: 'This user has already linked some 42 account' });
 				}
 			}
 			catch (err: any) {

@@ -380,3 +380,25 @@ export const unmakeAdminSchema = {
 		}
 	}
 };
+
+export const oauth42Schema = {
+	description: 'Link 42 account to a user or log in with previously linked 42 account',
+	tags: ['users'],
+	response: {
+		302: {
+			description: 'Redirection to 42 for login'
+		},
+		403: {
+			description: "Forbidden - JWT token is valid, however user doesn't exist anymore",
+			$ref: 'Error#'
+		},
+		409: {
+			description: "Conflict - user tries to link a 42 account, yet some 42 account is already linked to them",
+			$ref: 'Error#'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
