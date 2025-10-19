@@ -78,6 +78,7 @@ export const userSchemas = [
 	{
 		$id: 'MakeOrUnmakeAdminRequest',
 		type: 'object',
+		required: ['username'],
 		properties: {
 			username: { type: 'string', description: 'Username of a user to grant or revoke admin privileges of' }
 		}
@@ -85,9 +86,18 @@ export const userSchemas = [
 	{
 		$id: 'Oauth42CallbackRequest',
 		type: 'object',
+		required: ['code'],
 		properties: {
 			code: { type: 'string', description: 'Code from 42 API to exchange for token' },
 			state: { type: 'string', description: 'Our JWT token sent back to us, signaling user wants to link 42 account' }
+		}
+	},
+	{
+		$id: 'Oauth42UnlinkRequest',
+		type: 'object',
+		required: ['id'],
+		properties: {
+			id: { type: 'number', description: 'ID of a user to unlink 42 account from' }
 		}
 	},
 	{
@@ -435,6 +445,39 @@ export const oauth42CallbackSchema = {
 		},
 		409: {
 			description: 'Conflict - either user has already linked some 42 account, or this 42 account is linked to someone else',
+			$ref: 'Error#'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
+
+export const oauth42UnlinkSchema = {
+	description: 'Unlink 42 account from a user',
+	tags: ['users'],
+	params: {
+		$ref: 'Oauth42UnlinkRequest#'
+	},
+	response: {
+		200: {
+			description: 'Successfully unlinked 42 account',
+			type: 'object',
+			properties: {
+				message: { type: 'string' }
+			}
+		},
+		403: {
+			description: "Forbidden - user requested to unlink 42 account from soneone else, yet they aren't an admin",
+			$ref: 'Error#'
+		},
+		404: {
+			description: "Not found - provided user doesn't any 42 account linked",
+			$ref: 'Error#'
+		},
+		409: {
+			description: 'Conflict - JWT token was provided, yet user was removed from the system',
 			$ref: 'Error#'
 		},
 		500: {

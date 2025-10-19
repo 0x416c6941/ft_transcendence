@@ -13,7 +13,8 @@ import {
 	makeAdminSchema,
 	unmakeAdminSchema,
 	oauth42Schema,
-	oauth42CallbackSchema
+	oauth42CallbackSchema,
+	oauth42UnlinkSchema
 } from '../schemas/user.schemas.js';
 import {
 	ApiError,
@@ -615,11 +616,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	);
 
 	/* A route to unlink 42 account.
-	 * TODO: oauth42DeleteSchema */
+	 * Protected: users can only unlink 42 account from their own profile, or they must be an admin. */
 	fastify.delete<{ Params: UserParams }>(
 		'/users/oauth/42/:id',
 		{
-			preHandler: authenticateToken
+			preHandler: authenticateToken,
+			schema: oauth42UnlinkSchema
 		},
 		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
 			const { id } = request.params;
@@ -631,7 +633,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
 
 				if (request.user!.userId !== parseInt(id) && !adminCheck) {
-					return reply.code(403).send({ error: 'Forbidden: You can only unlink 42 account from your own profile' });
+					return reply.code(403).send({ error: 'You can only unlink 42 account from your own profile' });
 				}
 
 				const existenceCheck = await dbGetUserById(fastify, parseInt(id));
@@ -639,7 +641,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					return reply.code(409).send({ error: "That user doesn't exist anymore" });
 				}
 				else if (!existenceCheck.account_id_42) {
-					return reply.code(404).send({ error: "You don't have any linked 42 account" });
+					return reply.code(404).send({ error: "That user doesn't have any linked 42 account" });
 				}
 
 				await dbUpdateUserAccountId42(fastify, request.user!.userId, null);
