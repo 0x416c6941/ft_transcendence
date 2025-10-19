@@ -40,3 +40,9 @@ openssl x509 -req -in "${SECRETS_DIR}/${BACKEND_CSR_OUT_FILENAME}"		\
 
 # JWT Secret Key for Backend.
 openssl rand -hex "${SECRET_BACKEND_JWT_KEY_LENGTH}" > "${SECRETS_DIR}/${SECRET_BACKEND_JWT_KEY_FILENAME}"
+printf '\n'
+echo "Successfully generated JWT Secret Key for Backend."
+
+printf '\n'
+echo "Successfully generated all credentials, however you still need to manually provide credentials for 42 OAuth."
+echo "Backend server won't start without them."

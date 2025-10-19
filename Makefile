@@ -10,6 +10,8 @@ DC_CMD := docker compose -f ./docker-compose.yaml --env-file $(ENV_FILE)
 all: up
 
 ${SECRETS_DIR}:
+	# XXX: You still need to manully provide credentials for 42 OAuth.
+	# Backend server won't start without them.
 	@./prep_keys.sh
 
 .PHONY: up
@@ -32,7 +34,8 @@ kill:
 down:
 	@$(DC_CMD) down
 
-# Cleans EVERTYTHING related to Docker, including images created in "up" recipe.
+# Cleans EVERYTHING related to this project,
+# including all files and credentials in "${SECRETS_DIR}".
 .PHONY: clean
 clean: down
 	@./docker_clean.sh
