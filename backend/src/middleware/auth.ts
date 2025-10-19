@@ -68,34 +68,3 @@ export async function optionalAuth(
 		// User info just won't be available
 	}
 }
-
-export async function checkUserExistence(fastify: FastifyInstance,
-	request: FastifyRequest,
-	reply: FastifyReply
-): Promise<UserExistenceCheckStatus> {
-	try {
-		const dbExistenceCheck = await new Promise<any>((resolve, reject) => {
-			fastify.sqlite.get(`SELECT 1337 FROM users u WHERE u.id = ?`, [request.user?.userId],
-				(err: Error | null, row: any) => {
-					if (err) {
-						reject(err);
-					}
-					else {
-						resolve(row);
-					}
-				}
-			);
-		});
-
-		if (!dbExistenceCheck) {
-			reply.code(401).send({ error: "Your account doesn't exist anymore" });
-			return UserExistenceCheckStatus.DoesntExist;
-		}
-		return UserExistenceCheckStatus.Exists;
-	}
-	catch (err: any) {
-		fastify.log.error(err);
-		reply.code(500).send({ error: 'SQLite request failed' });
-		return UserExistenceCheckStatus.DbFailure;
-	}
-}

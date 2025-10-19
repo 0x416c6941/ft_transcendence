@@ -76,6 +76,13 @@ export const userSchemas = [
 		}
 	},
 	{
+		$id: 'MakeOrUnmakeAdminRequest',
+		type: 'object',
+		properties: {
+			username: { type: 'string', description: 'username of a user to grant or revoke admin privileges of' }
+		}
+	},
+	{
 		$id: 'Error',
 		type: 'object',
 		properties: {
@@ -297,6 +304,40 @@ export const deleteUserSchema = {
 		},
 		404: {
 			description: 'User not found',
+			$ref: 'Error#'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
+
+export const makeAdminSchema = {
+	description: 'Grant or revoke admin privileges of a user by username',
+	tags: ['users'],
+	security: [{ bearerAuth: [] }],
+	body: {
+		$ref: 'MakeOrUnmakeAdminRequest#'
+	},
+	response: {
+		200: {
+			description: 'Successfully made user an admin',
+			type: 'object',
+			properties: {
+				message: { type: 'string' }
+			}
+		},
+		403: {
+			description: "Forbidden - you're not an admin",
+			$ref: 'Error#'
+		},
+		404: {
+			description: "Not found - provided username doesn't exist",
+			$ref: 'Error#'
+		},
+		409: {
+			description: 'Conflict - provided username already is an admin',
 			$ref: 'Error#'
 		},
 		500: {
