@@ -79,7 +79,15 @@ export const userSchemas = [
 		$id: 'MakeOrUnmakeAdminRequest',
 		type: 'object',
 		properties: {
-			username: { type: 'string', description: 'username of a user to grant or revoke admin privileges of' }
+			username: { type: 'string', description: 'Username of a user to grant or revoke admin privileges of' }
+		}
+	},
+	{
+		$id: 'Oauth42CallbackRequest',
+		type: 'object',
+		properties: {
+			code: { type: 'string', description: 'Code from 42 API to exchange for token' },
+			state: { type: 'string', description: 'Our JWT token sent back to us, signaling user wants to link 42 account' }
 		}
 	},
 	{
@@ -393,7 +401,40 @@ export const oauth42Schema = {
 			$ref: 'Error#'
 		},
 		409: {
-			description: "Conflict - user tries to link a 42 account, yet some 42 account is already linked to them",
+			description: 'Conflict - user tries to link a 42 account, yet some 42 account is already linked to them',
+			$ref: 'Error#'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
+
+export const oauth42CallbackSchema = {
+	description: 'Exchange 42 code received from 42 API to 42 access token for the user authorization or account linkage',
+	tags: ['users'],
+	querystring: {
+		$ref: 'Oauth42CallbackRequest#'
+	},
+	response: {
+		200: {
+			description: 'Successfully exchanged 42 code to 42 access token and processed user request',
+			type: 'object',
+			properties: {
+				message: { type: 'string' }
+			}
+		},
+		403: {
+			description: "Forbidden - JWT token is valid, however user who wants to link 42 account doesn't exist anymore",
+			$ref: 'Error#'
+		},
+		404: {
+			description: "Not found - 42 account was used for login, yet isn't linked to any user",
+			$ref: 'Error#'
+		},
+		409: {
+			description: 'Conflict - either user has already linked some 42 account, or this 42 account is linked to someone else',
 			$ref: 'Error#'
 		},
 		500: {

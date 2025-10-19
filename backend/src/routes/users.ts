@@ -12,7 +12,8 @@ import {
 	deleteUserSchema,
 	makeAdminSchema,
 	unmakeAdminSchema,
-	oauth42Schema
+	oauth42Schema,
+	oauth42CallbackSchema
 } from '../schemas/user.schemas.js';
 import {
 	ApiError,
@@ -496,8 +497,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
 	/* Unified route to link 42 account to logged in user,
 	 * or log in with 42 account linked to the user
-	 * (in the latter case, JWT must be present in "Authorization: Bearer" header).
-	 * TODO: oauth42schema */
+	 * (in the latter case, JWT must be present in "Authorization: Bearer" header). */
 	fastify.post('/users/oauth/42',
 		{
 			schema: oauth42Schema
@@ -538,10 +538,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		return reply.redirect(`${baseUrl}?${params.toString()}`);
 	});
 
-	/* A continuation of "POST" route on "/users/oauth/42".
-	 * TODO: oauth42CallbackSchema */
+	// A continuation of "POST" route on "/users/oauth/42".
 	fastify.get<{ Querystring: Oauth42CallbackQuerystring }>(
 		'/users/oauth/42/callback',
+		{
+			schema: oauth42CallbackSchema
+		},
 		async (request: FastifyRequest<{ Querystring: Oauth42CallbackQuerystring }>, reply: FastifyReply) => {
 			try {
 				const token = await exchange42CodeFor42Token(fastify, request);
