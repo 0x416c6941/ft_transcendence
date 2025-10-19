@@ -10,6 +10,8 @@ import userRoutes from "./routes/users.js";
 import { allSchemas } from "./schemas/index.js";
 import { registerSwagger } from "./swagger/config.js";
 import { setupPongGame } from "./pongGame.js";
+import cookie from "@fastify/cookie";
+import cors from "@fastify/cors";
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -73,6 +75,12 @@ const start = async () => {
     throw new Error("process.env.BACKEND_FASTIFY_PORT isn't a number.");
   }
   try {
+    await fastify.register(cookie) // secret: process.env.COOKIE_SECRET, // optionallly can be signed cookies
+    await fastify.register(cors, {
+      origin: ["https://localhost/"], // the frontend origin allowed
+      credentials: true, // allow sending cookies or Authorization headers
+  });
+
     // Socket.IO initialization.
     const io = new Server(fastify.server, {
       path: "/api/socket.io/",

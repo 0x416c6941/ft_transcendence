@@ -32,6 +32,9 @@
 		"test:ui": "vitest --ui"
 	},
 	"dependencies": {
+		"@fastify/cookie": "^11.0.2",
+		"@fastify/cors": "^11.1.0",
+		"@fastify/jwt": "^10.0.0",
 		"@fastify/swagger": "^9.5.2",
 		"@fastify/swagger-ui": "^5.2.3",
 		"@types/bcrypt": "^6.0.0",
@@ -41,6 +44,7 @@
 		"fastify": "~5.6",
 		"fastify-plugin": "~5.1",
 		"jsonwebtoken": "^9.0.2",
+		"run": "^1.5.0",
 		"socket.io": "~4.8",
 		"sqlite3": "~5.1"
 	},

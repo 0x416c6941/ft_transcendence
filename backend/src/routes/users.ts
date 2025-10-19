@@ -1,11 +1,12 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import '@fastify/cookie';
 import bcrypt from 'bcrypt';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt.js';
 import { authenticateToken } from '../middleware/auth.js';
 import {
 	registerUserSchema,
 	loginUserSchema,
-	refreshTokenSchema,
+	// refreshTokenSchema, // no longer needed; refresh uses cookie now
 	getAllUsersSchema,
 	getUserByIdSchema,
 	updateUserSchema,
@@ -13,6 +14,28 @@ import {
 } from '../schemas/user.schemas.js';
 
 const SALT_ROUNDS = 10;
+
+// centralize cookie options (adjust for your deployment)
+const ACCESS_MAX_AGE = 60 * 15;           // 15 minutes
+const REFRESH_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+const sameSite: 'lax' | 'none' = 'lax';
+const secure = true;                       // keep true in production (HTTPS)
+
+const accessCookieOpts = {
+  httpOnly: true as const,
+  secure,
+  sameSite,
+  path: '/' as const,
+  maxAge: ACCESS_MAX_AGE
+};
+
+const refreshCookieOpts = {
+  httpOnly: true as const,
+  secure,
+  sameSite,
+  path: '/api/users/refresh' as const,
+  maxAge: REFRESH_MAX_AGE
+};
 
 interface CreateUserBody {
 	username: string;
@@ -122,18 +145,30 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				const accessToken = generateAccessToken(user.id, user.username);
 				const refreshToken = generateRefreshToken(user.id, user.username);
 
-				// Return tokens and user data (without password)
-				return reply.code(200).send({
-					message: 'Login successful',
-					accessToken,
-					refreshToken,
-					user: {
-						id: user.id,
-						username: user.username,
-						email: user.email,
-						display_name: user.display_name
-					}
-				});
+				// Set tokens in HttpOnly cookies
+				reply.setCookie('accessToken', accessToken, accessCookieOpts)
+					.setCookie('refreshToken', refreshToken, refreshCookieOpts)
+					.code(200)
+					.send({
+						message: 'Login successful',
+						user: {
+							id: user.id,
+							username: user.username,
+							email: user.email,
+							display_name: user.display_name
+						}
+					});
+				// return reply.code(200).send({
+				// 	message: 'Login successful',
+				// 	accessToken,
+				// 	refreshToken,
+				// 	user: {
+				// 		id: user.id,
+				// 		username: user.username,
+				// 		email: user.email,
+				// 		display_name: user.display_name
+				// 	}
+				// });
 			} catch (err: any) {
 				fastify.log.error(err);
 				return reply.code(500).send({ error: 'Failed to login' });
@@ -144,9 +179,13 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	// Refresh token endpoint
 	fastify.post<{ Body: { refreshToken: string } }>(
 		'/users/refresh',
-		{ schema: refreshTokenSchema },
+		// { schema: refreshTokenSchema },  // remove schema because body is not used
 		async (request: FastifyRequest<{ Body: { refreshToken: string } }>, reply: FastifyReply) => {
 			const { refreshToken } = request.body;
+			// Validate the refresh token
+			if (!refreshToken) {
+        			return reply.code(401).send({ error: 'Missing refresh token' });
+      			}
 
 			try {
 				// Verify the refresh token
@@ -157,10 +196,15 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				const newAccessToken = generateAccessToken(decoded.userId, decoded.username);
 				const newRefreshToken = generateRefreshToken(decoded.userId, decoded.username);
 
-				return reply.code(200).send({
-					accessToken: newAccessToken,
-					refreshToken: newRefreshToken
-				});
+				// Set new tokens in HttpOnly cookies
+				reply.setCookie('accessToken', newAccessToken, accessCookieOpts)
+					.setCookie('refreshToken', newRefreshToken, refreshCookieOpts)
+					.code(200)
+					.send({	message: 'Tokens refreshed successfully'});
+				// return reply.code(200).send({
+				// 	accessToken: newAccessToken,
+				// 	refreshToken: newRefreshToken
+				// });
 			} catch (error) {
 				return reply.code(403).send({
 					error: 'Invalid or expired refresh token'
@@ -168,6 +212,13 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			}
 		}
 	);
+
+	// Logout: clear cookies
+  	fastify.post('/users/logout', async (_req: FastifyRequest, reply: FastifyReply) => {
+    		reply.clearCookie('accessToken', { path: accessCookieOpts.path })
+      		.clearCookie('refreshToken', { path: refreshCookieOpts.path })
+      		.send({ message: 'Logged out' });
+  	});
 
 	// Get all users
 	fastify.get('/users', {
