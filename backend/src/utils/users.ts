@@ -35,7 +35,7 @@ export class ApiError extends Error {
  * 				doesn't exist in `fastify.sqlite`.
  * @throws {ApiError}	Throws if request to `fastify.sqlite` failed.
  */
-export async function getUserFromDbByUsername(fastify: FastifyInstance, username: string) {
+export async function dbGetUserByUsername(fastify: FastifyInstance, username: string) {
 	try {
 		const user = await new Promise<any>((resolve, reject) => {
 			fastify.sqlite.get('SELECT * FROM users u WHERE u.username = ?',
@@ -65,7 +65,7 @@ export async function getUserFromDbByUsername(fastify: FastifyInstance, username
  * 				doesn't exist in `fastify.sqlite`.
  * @throws {ApiError}	Throws if request to `fastify.sqlite` failed.
  */
-export async function getUserFromDbById(fastify: FastifyInstance, id: number) {
+export async function dbGetUserById(fastify: FastifyInstance, id: number) {
 	try {
 		const user = await new Promise<any>((resolve, reject) => {
 			fastify.sqlite.get('SELECT * FROM users u WHERE u.id = ?',
@@ -97,7 +97,7 @@ export async function getUserFromDbById(fastify: FastifyInstance, id: number) {
  * 				42 account ID isn't linked to any user in `fastify.sqlite`.
  * @throws {ApiError}	Throws if request to `fastify.sqlite` failed.
  */
-export async function getUserFromDbByAccountId42(fastify: FastifyInstance, accountId42: number) {
+export async function dbGetUserByAccountId42(fastify: FastifyInstance, accountId42: number) {
 	try {
 		const user = await new Promise<any>((resolve, reject) => {
 			fastify.sqlite.get('SELECT * FROM users u WHERE u.account_id_42 = ?',
@@ -126,7 +126,7 @@ export async function getUserFromDbByAccountId42(fastify: FastifyInstance, accou
  * 				Object will otherwise be undefined.
  * @throws {ApiError}	Throws if request to `fastify.sqlite` failed.
  */
-export async function getUserFromAdminsTable(fastify: FastifyInstance, userId: number) {
+export async function dbGetAdminByUserId(fastify: FastifyInstance, userId: number) {
 	try {
 		const check = await new Promise<any>((resolve, reject) => {
 			fastify.sqlite.get('SELECT * FROM admins a where a.user_id = ?',
@@ -154,7 +154,7 @@ export async function getUserFromAdminsTable(fastify: FastifyInstance, userId: n
  * @param {number | null}	accountId42	Either an ID of 42 account to link
  * 						or `null` to unlink 42 account.
  */
-export async function updateUserAccountId42InDb(fastify: FastifyInstance,
+export async function dbUpdateUserAccountId42(fastify: FastifyInstance,
 	userId: number, accountId42: number | null) {
 	try {
 		const result = await new Promise<SqliteRunResult>((resolve, reject) => {

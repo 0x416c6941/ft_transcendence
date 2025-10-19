@@ -13,11 +13,11 @@ import {
 } from '../schemas/user.schemas.js';
 import {
 	ApiError,
-	getUserFromDbByUsername,
-	getUserFromDbById,
-	getUserFromDbByAccountId42,
-	getUserFromAdminsTable,
-	updateUserAccountId42InDb,
+	dbGetUserByUsername,
+	dbGetUserById,
+	dbGetUserByAccountId42,
+	dbGetAdminByUserId,
+	dbUpdateUserAccountId42,
 	exchange42CodeFor42Token,
 	get42PublicData
 } from '../utils/users.js';
@@ -238,7 +238,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			/* Authorization check: users can only update their own profile,
 			 * OR they must be an admin. */
 			try {
-				const adminCheck = await getUserFromAdminsTable(fastify, request.user!.userId);
+				const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
 
 				if (request.user?.userId !== parseInt(id) && !adminCheck) {
 					return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
@@ -326,7 +326,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			/* Authorization check: users can only update their own profile,
 			 * OR they must be an admin. */
 			try {
-				const adminCheck = await getUserFromAdminsTable(fastify, request.user!.userId);
+				const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
 
 				if (request.user?.userId !== parseInt(id) && !adminCheck) {
 					return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
@@ -384,19 +384,19 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			const ourUserId = request.user.userId;
 			try {
 				// Checking if our user has admin privileges.
-				const ourUser = await getUserFromAdminsTable(fastify, ourUserId);
+				const ourUser = await dbGetAdminByUserId(fastify, ourUserId);
 				if (!ourUser) {
 					return reply.code(403).send({ error: "You're not an admin" });
 				}
 
 				// Making `username` an admin.
-				const user = await getUserFromDbByUsername(fastify, username);
+				const user = await dbGetUserByUsername(fastify, username);
 				if (!user) {
 					return reply.code(403).send({ error: "Provided username doesn't exist" });
 				}
 				const idToMakeAdmin = user.id;
 				// Checking if `username` is admin already.
-				const alreadyAdminCheck = await getUserFromAdminsTable(fastify, idToMakeAdmin);
+				const alreadyAdminCheck = await dbGetAdminByUserId(fastify, idToMakeAdmin);
 				if (alreadyAdminCheck) {
 					return reply.code(409).send({ error: "Provided username is already an admin" });
 				}
@@ -442,20 +442,20 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			const ourUserId = request.user.userId;
 			try {
 				// Checking if our user has admin privileges.
-				const ourUser = await getUserFromAdminsTable(fastify, ourUserId);
+				const ourUser = await dbGetAdminByUserId(fastify, ourUserId);
 
 				if (!ourUser) {
 					return reply.code(403).send({ error: "You're not an admin" });
 				}
 
 				// Removing admin privileges of `username`.
-				const user = await getUserFromDbByUsername(fastify, username);
+				const user = await dbGetUserByUsername(fastify, username);
 				if (!user) {
 					return reply.code(403).send({ error: "Provided username doesn't exist" });
 				}
 				const idToUnmakeAdmin = user.id;
 				// Checking if `username` is admin.
-				const isAdminCheck = await getUserFromAdminsTable(fastify, idToUnmakeAdmin);
+				const isAdminCheck = await dbGetAdminByUserId(fastify, idToUnmakeAdmin);
 				if (!isAdminCheck) {
 					return reply.code(409).send({ error: "Provided username isn't an admin" });
 				}
@@ -506,7 +506,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			}
 
 			try {
-				const user = await getUserFromDbById(fastify, request.user!.userId);
+				const user = await dbGetUserById(fastify, request.user!.userId);
 
 				if (!user) {
 					return reply.code(403).send({ error: 'Unauthorized: User not found' });
@@ -546,7 +546,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 						return;
 					}
 
-					const user = await getUserFromDbById(fastify, request.user!.userId);
+					const user = await dbGetUserById(fastify, request.user!.userId);
 					if (!user) {
 						return reply.code(403).send({ error: 'Unauthorized: User not found' });
 					}
@@ -554,19 +554,19 @@ export default async function userRoutes(fastify: FastifyInstance) {
 						return reply.code(409).send({ error: 'This user is already linked to some 42 account' });
 					}
 
-					const account42Test = await getUserFromDbByAccountId42(fastify, account42Data.id);
+					const account42Test = await dbGetUserByAccountId42(fastify, account42Data.id);
 					if (account42Test) {
 						fastify.log.info(JSON.stringify(account42Test));
 						return reply.code(409).send({ error: 'This 42 account is already linked to someone else' });
 					}
 
-					await updateUserAccountId42InDb(fastify, user.id, account42Data.id);
+					await dbUpdateUserAccountId42(fastify, user.id, account42Data.id);
 
 					return reply.code(200).send({ message: 'Successfully linked 42 account' });
 				}
 				// User wants to log in.
 				else {
-					const user = await getUserFromDbByAccountId42(fastify, account42Data.id);
+					const user = await dbGetUserByAccountId42(fastify, account42Data.id);
 					if (!user) {
 						return reply.code(404).send({ error: "This 42 account isn't linked to any user" });
 					}
@@ -613,13 +613,13 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			 * users can only unlink 42 account from their own profile,
 			 * OR they must be an admin. */
 			try {
-				const adminCheck = await getUserFromAdminsTable(fastify, request.user!.userId);
+				const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
 
 				if (request.user!.userId !== parseInt(id) && !adminCheck) {
 					return reply.code(403).send({ error: 'Forbidden: You can only unlink 42 account from your own profile' });
 				}
 
-				const existenceCheck = await getUserFromDbById(fastify, parseInt(id));
+				const existenceCheck = await dbGetUserById(fastify, parseInt(id));
 				if (!existenceCheck) {
 					return reply.code(409).send({ error: "That user doesn't exist anymore" });
 				}
@@ -627,7 +627,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					return reply.code(404).send({ error: "You don't have any linked 42 account" });
 				}
 
-				await updateUserAccountId42InDb(fastify, request.user!.userId, null);
+				await dbUpdateUserAccountId42(fastify, request.user!.userId, null);
 				
 				return reply.code(200).send({ message: 'Successfully unlinked 42 account' });
 			}
