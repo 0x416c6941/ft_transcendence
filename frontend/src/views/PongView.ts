@@ -50,6 +50,7 @@ export default class PongView extends AbstractView {
 
     setup(): void {
         this.socket = io;
+        this.socket.emit('request_state');
         this.canvas = document.getElementById('pong') as HTMLCanvasElement;
         this.ctx = this.canvas.getContext('2d');
         document.getElementById('back-button')?.addEventListener('click', () => {
