@@ -14,8 +14,12 @@ async getHtml(): Promise<string> {
       <div class="flex flex-col space-y-4">
         <a href="/login" data-link
            class="bg-sky-500 text-white px-4 py-2 rounded shadow text-center">Login</a>
-        <a href="/pong" data-link
-           class="bg-indigo-500 text-white px-4 py-2 rounded shadow text-center">Play Pong</a>
+        <a href="/rooms/new" data-link
+            class="bg-green-500 text-white px-4 py-2 rounded shadow text-center">Create Room</a>
+        <a href="/rooms/join" data-link
+            class="bg-blue-500 text-white px-4 py-2 rounded shadow text-center">Join Room</a>
+        <a href="/pong-local" data-link
+            class="bg-indigo-500 text-white px-4 py-2 rounded shadow text-center">Play Pong (Local)</a>
       </div>
     </main>
   `;

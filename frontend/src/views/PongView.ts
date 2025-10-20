@@ -9,16 +9,17 @@ export default class PongView extends AbstractView {
     private socket: any = null;
     private snap: Snapshot | null = null;
     private mySide: 'left' | 'right' | 'spectator' = 'spectator';
-    private gameReadyState = {
-        left: false,
-        right: false
-    };
+    private gameReadyState = { left: false, right: false };
     private input = { up: false, down: false };
     private animationFrameId: number | null = null;
     private gameActive: boolean = false;
+    private roomId: string | null = null;
+    private winner: 'left' | 'right' | null = null;
+    private gameEnded: boolean = false;
 
     constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
         super(router, pathParams, queryParams);
+        this.roomId = queryParams.get('roomId');
     }
 
     async getHtml(): Promise<string> {
@@ -48,25 +49,59 @@ export default class PongView extends AbstractView {
         document.title = APP_NAME.concat(' - Pong Game');
     }
 
+    private handleBackClick = (): void => {
+        if (this.roomId) this.socket?.emit('leave_room', { roomId: this.roomId });
+        this.router.navigate('/rooms/join');
+    };
+
+    private handleStartClick = (): void => {
+        if (this.mySide === 'spectator' || !this.roomId) return;
+        const current = this.mySide === 'left' ? this.gameReadyState.left : this.gameReadyState.right;
+        this.socket?.emit('player_ready', { roomId: this.roomId, side: this.mySide, ready: !current });
+    };
+
+    private handleKeyDown = (e: KeyboardEvent): void => {
+        if (e.key === 'ArrowUp' && !this.input.up) { this.input.up = true; this.sendInput(); }
+        if (e.key === 'ArrowDown' && !this.input.down) { this.input.down = true; this.sendInput(); }
+    };
+
+    private handleKeyUp = (e: KeyboardEvent): void => {
+        if (e.key === 'ArrowUp' && this.input.up) { this.input.up = false; this.sendInput(); }
+        if (e.key === 'ArrowDown' && this.input.down) { this.input.down = false; this.sendInput(); }
+    };
+
     setup(): void {
+        // require roomId
+        if (!this.roomId) {
+            this.router.navigate('/rooms/join');
+            return;
+        }
+
         this.socket = io;
-        this.socket.emit('request_state');
+        this.socket.emit('request_state', { roomId: this.roomId });
+
         this.canvas = document.getElementById('pong') as HTMLCanvasElement;
         this.ctx = this.canvas.getContext('2d');
-        document.getElementById('back-button')?.addEventListener('click', () => {
-            this.router.navigate('/');
-        });
-        const startButton = document.getElementById('start-button');
-        if (startButton) {
-            startButton.addEventListener('click', this.handleStartClick);
-        }
-        
+
+        document.getElementById('back-button')?.addEventListener('click', this.handleBackClick);
+        document.getElementById('start-button')?.addEventListener('click', this.handleStartClick);
+
         this.socket.on('game_stopped', () => {
-            if (this.ctx) {
-                this.ctx.clearRect(0, 0, this.canvas?.width || 0, this.canvas?.height || 0);
-            }
             this.snap = null;
             this.gameActive = false;
+            this.gameReadyState = { left: false, right: false };
+            this.winner = null;
+            this.gameEnded = false;
+            this.updateStartButton();
+        });
+
+        this.socket.on('game_end', ({ winner }: { winner: 'left' | 'right' }) => {
+            console.log('Game ended, winner:', winner);
+            console.log('Setting winner to:', winner);
+            this.winner = winner;
+            console.log('Winner set to:', this.winner);
+            this.gameActive = false;
+            this.gameEnded = true;
             this.gameReadyState = { left: false, right: false };
             this.updateStartButton();
         });
@@ -79,86 +114,58 @@ export default class PongView extends AbstractView {
         this.socket.on('game_state', (data: Snapshot) => {
             this.snap = data;
             this.gameActive = true;
-        });
-
-        this.socket.on('ready_state', (data: { left: boolean, right: boolean }) => {
-            this.gameReadyState = data;
-            this.gameActive = data.left && data.right;
+            if (this.gameEnded) {
+                this.gameEnded = false;
+                this.winner = null;
+            }
             this.updateStartButton();
         });
 
-        // Set up keyboard input handlers
+        this.socket.on('ready_state', (data: { left: boolean; right: boolean }) => {
+            this.gameReadyState = data;
+            // Do not enable gameActive based on ready_state — start confirms game_state
+            this.updateStartButton();
+        });
+
+        // keyboard
         window.addEventListener('keydown', this.handleKeyDown);
         window.addEventListener('keyup', this.handleKeyUp);
 
-        // Start the game loop
+        // render loop
         this.animationFrameId = requestAnimationFrame(this.loop);
     }
 
-
-
     cleanup(): void {
-        // Remove event listeners
+        // keyboard
         window.removeEventListener('keydown', this.handleKeyDown);
         window.removeEventListener('keyup', this.handleKeyUp);
 
-        // Remove UI event handlers
-        document.getElementById('back-button')?.removeEventListener('click', () => {
-            this.router.navigate('/');
-        });
-
-
-        // Remove start button event listener
+        // UI
+        document.getElementById('back-button')?.removeEventListener('click', this.handleBackClick);
         document.getElementById('start-button')?.removeEventListener('click', this.handleStartClick);
 
+        // sockets
         if (this.socket) {
             this.socket.off('role');
             this.socket.off('game_state');
             this.socket.off('ready_state');
             this.socket.off('game_stopped');
+            this.socket.off('game_end');
+            // just in case, correctly leave the room when leaving the page
+            if (this.roomId) this.socket.emit('leave_room', { roomId: this.roomId });
             this.socket = null;
         }
 
-        // Stop animation loop
-        if (this.animationFrameId !== null) {
-            cancelAnimationFrame(this.animationFrameId);
-        }
+        // stop loop
+        if (this.animationFrameId !== null) cancelAnimationFrame(this.animationFrameId);
     }
-
-    // Keyboard input handlers
-    private handleKeyDown = (e: KeyboardEvent): void => {
-        if (e.key === 'ArrowUp') {
-            if (!this.input.up) {
-                this.input.up = true;
-                this.sendInput();
-            }
-        }
-        if (e.key === 'ArrowDown') {
-            if (!this.input.down) {
-                this.input.down = true;
-                this.sendInput();
-            }
-        }
-    };
-
-    private handleKeyUp = (e: KeyboardEvent): void => {
-        if (e.key === 'ArrowUp') {
-            if (this.input.up) {
-                this.input.up = false;
-                this.sendInput();
-            }
-        }
-        if (e.key === 'ArrowDown') {
-            if (this.input.down) {
-                this.input.down = false;
-                this.sendInput();
-            }
-        }
-    };
 
     // Send input to server
     private sendInput(): void {
-        this.socket?.emit('input', this.input);
+        if (!this.roomId || this.mySide === 'spectator') return;
+        // can not check gameActive — server ignores, but save traffic:
+        if (!this.gameActive) return;
+        this.socket?.emit('input', { roomId: this.roomId, ...this.input });
     }
 
     // Game rendering loop
@@ -167,60 +174,56 @@ export default class PongView extends AbstractView {
         this.animationFrameId = requestAnimationFrame(this.loop);
     };
 
-    // Draw the game state
-    private handleStartClick = (): void => {
-        if (this.mySide === 'spectator') {
-            return;
-        }
-
-        const currentState = this.mySide === 'left' ? this.gameReadyState.left : this.gameReadyState.right;
-        this.socket?.emit('player_ready', { side: this.mySide, ready: !currentState });
-    };
-
     private updateStartButton(): void {
         const startButton = document.getElementById('start-button');
         if (!startButton) return;
 
-
-        if (this.mySide === 'spectator' || (this.gameReadyState.left && this.gameReadyState.right)) {
+        // hide if spectator or match is going
+        if (this.mySide === 'spectator' || this.gameActive) {
             startButton.style.display = 'none';
             return;
         }
 
         startButton.style.display = 'block';
-        const myReadyState = this.mySide === 'left' ? this.gameReadyState.left : this.gameReadyState.right;
+        const myReady = this.mySide === 'left' ? this.gameReadyState.left : this.gameReadyState.right;
 
-        startButton.textContent = myReadyState ? 'Waiting...' : 'Ready to Play';
-        startButton.classList.toggle('bg-yellow-600', myReadyState);
-        startButton.classList.toggle('hover:bg-yellow-700', myReadyState);
-        startButton.classList.toggle('bg-green-600', !myReadyState);
-        startButton.classList.toggle('hover:bg-green-700', !myReadyState);
+        startButton.textContent = myReady ? 'Waiting...' : 'Ready to Play';
+        startButton.classList.toggle('bg-yellow-600', myReady);
+        startButton.classList.toggle('hover:bg-yellow-700', myReady);
+        startButton.classList.toggle('bg-green-600', !myReady);
+        startButton.classList.toggle('hover:bg-green-700', !myReady);
     }
 
     private draw(): void {
+        console.log('Draw called, winner:', this.winner, 'snap:', !!this.snap, 'gameActive:', this.gameActive);
         if (!this.ctx || !this.canvas) return;
-
         const WIDTH = this.canvas.width;
         const HEIGHT = this.canvas.height;
 
-        if (!this.gameActive || !this.snap) {
-            this.ctx.fillStyle = '#0f1220';
-            this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-            this.ctx.strokeStyle = '#1e293b';
-            this.ctx.lineWidth = 4;
-            this.ctx.strokeRect(0, 0, WIDTH, HEIGHT);
-            return;
-        }
-
-        // Background
+        // background/frame
         this.ctx.fillStyle = '#0f1220';
         this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-        // Draw border around the field
         this.ctx.strokeStyle = '#1e293b';
         this.ctx.lineWidth = 4;
         this.ctx.strokeRect(0, 0, WIDTH, HEIGHT);
+
+        // if no snapshot — draw hints and exit
+        if (!this.snap) {
+            this.ctx.fillStyle = '#94a3b8';
+            this.ctx.font = '16px Arial';
+            this.ctx.textAlign = 'center';
+
+            if (this.mySide === 'spectator') {
+                this.ctx.fillText('You are a spectator. Waiting for players…', WIDTH / 2, HEIGHT / 2);
+            } else {
+                const myReady = this.mySide === 'left' ? this.gameReadyState.left : this.gameReadyState.right;
+                const oppReady = this.mySide === 'left' ? this.gameReadyState.right : this.gameReadyState.left;
+                if (!myReady) this.ctx.fillText('Press "Ready to Play"', WIDTH / 2, HEIGHT / 2);
+                else if (!oppReady) this.ctx.fillText('Waiting for opponent…', WIDTH / 2, HEIGHT / 2);
+                else this.ctx.fillText('Starting…', WIDTH / 2, HEIGHT / 2);
+            }
+            return;
+        }
 
         // Center dashed line
         this.ctx.strokeStyle = '#334155';
@@ -231,34 +234,23 @@ export default class PongView extends AbstractView {
         this.ctx.lineTo(WIDTH / 2, HEIGHT);
         this.ctx.stroke();
         this.ctx.setLineDash([]);
-
-        // Center circle
-        this.ctx.strokeStyle = '#334155';
-        this.ctx.lineWidth = 2;
         this.ctx.beginPath();
         this.ctx.arc(WIDTH / 2, HEIGHT / 2, 35, 0, Math.PI * 2);
         this.ctx.stroke();
 
         // Paddles
-        const paddleWidth = 12;
-        const paddleHeight = 80;
-
-        // Left paddle (blue)
+        const paddleWidth = 12, paddleHeight = 80;
         this.ctx.fillStyle = '#3b82f6';
         this.ctx.shadowColor = '#60a5fa';
         this.ctx.shadowBlur = 10;
         this.ctx.fillRect(0, this.snap.paddles.leftY, paddleWidth, paddleHeight);
-
-        // Right paddle (white)
         this.ctx.fillStyle = '#f8fafc';
         this.ctx.shadowColor = '#94a3b8';
         this.ctx.shadowBlur = 10;
         this.ctx.fillRect(WIDTH - paddleWidth, this.snap.paddles.rightY, paddleWidth, paddleHeight);
-
-        // Reset shadow for other elements
         this.ctx.shadowBlur = 0;
 
-        // Ball with a glow effect
+        // ball
         const ballSize = 10;
         this.ctx.fillStyle = '#ffffff';
         this.ctx.shadowColor = '#f8fafc';
@@ -268,30 +260,29 @@ export default class PongView extends AbstractView {
         this.ctx.fill();
         this.ctx.shadowBlur = 0;
 
-        // Draw score on canvas
-        this.ctx.font = "bold 32px Arial";
-        this.ctx.textAlign = "center";
-        this.ctx.fillStyle = "#ffffff";
-        this.ctx.shadowColor = "#60a5fa";
-        this.ctx.shadowBlur = 10;
-
-        // Left score
-        this.ctx.fillStyle = "#3b82f6";
+        // score
+        this.ctx.font = 'bold 32px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillStyle = '#3b82f6';
         this.ctx.fillText(this.snap.score.left.toString(), WIDTH / 2 - 40, 40);
-
-        // Separator
-        this.ctx.fillStyle = "#ffffff";
-        this.ctx.fillText(":", WIDTH / 2, 40);
-
-        // Right score
-        this.ctx.fillStyle = "#f8fafc";
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillText(':', WIDTH / 2, 40);
+        this.ctx.fillStyle = '#f8fafc';
         this.ctx.fillText(this.snap.score.right.toString(), WIDTH / 2 + 40, 40);
 
-        this.ctx.shadowBlur = 0;
+        // show winner if game ended
+        if (this.gameEnded && this.winner) {
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            this.ctx.fillStyle = '#000000';
+            this.ctx.font = 'bold 48px Arial';
+            this.ctx.fillText(`${this.winner.toUpperCase()} WINS!`, WIDTH / 2, HEIGHT / 2);
+            this.ctx.font = '24px Arial';
+            this.ctx.fillText('Press Ready to Play for a rematch', WIDTH / 2, HEIGHT / 2 + 60);
+        }
     }
 }
 
-// Game state type definitions
 type Snapshot = {
     width: number;
     height: number;
