@@ -50,15 +50,23 @@ export const userSchemas = [
 		}
 	},
 	{
-		$id: 'LoginResponse',
+		$id: 'LoginCookieResponse',
 		type: 'object',
 		properties: {
 			message: { type: 'string', description: 'Success message' },
-			accessToken: { type: 'string', description: 'JWT access token (expires in 24 hours)' },
-			refreshToken: { type: 'string', description: 'JWT refresh token (expires in 7 days)' },
 			user: { $ref: 'User#' }
 		}
 	},
+	// {
+	// 	$id: 'LoginResponse',
+	// 	type: 'object',
+	// 	properties: {
+	// 		message: { type: 'string', description: 'Success message' },
+	// 		accessToken: { type: 'string', description: 'JWT access token (expires in 24 hours)' },
+	// 		refreshToken: { type: 'string', description: 'JWT refresh token (expires in 7 days)' },
+	// 		user: { $ref: 'User#' }
+	// 	}
+	// },
 	{
 		$id: 'RefreshTokenRequest',
 		type: 'object',
@@ -81,7 +89,12 @@ export const userSchemas = [
 		properties: {
 			error: { type: 'string', description: 'Error message' }
 		}
-	}
+	},
+	{
+		$id: 'MessageResponse',
+		type: 'object',
+		properties: { message: { type: 'string', description: 'Human-readable message' } }
+	},
 ];
 
 // ============================================
@@ -129,7 +142,7 @@ export const loginUserSchema = {
 	response: {
 		200: {
 			description: 'Login successful',
-			$ref: 'LoginResponse#'
+			$ref: 'LoginCookieResponse#'
 		},
 		400: {
 			description: 'Bad request - missing required fields',
@@ -147,16 +160,13 @@ export const loginUserSchema = {
 };
 
 export const refreshTokenSchema = {
-	description: 'Refresh access token using refresh token',
+	description: 'Rotate tokens using refresh cookie; sets new cookies.',
 	tags: ['auth'],
-	security: [],
-	body: {
-		$ref: 'RefreshTokenRequest#'
-	},
+	security: [{ cookieAuth: [] }],
 	response: {
 		200: {
 			description: 'New access token generated',
-			$ref: 'RefreshTokenResponse#'
+			$ref: 'MessageResponse#'
 		},
 		400: {
 			description: 'Missing refresh token',
@@ -167,6 +177,15 @@ export const refreshTokenSchema = {
 			$ref: 'Error#'
 		}
 	}
+};
+
+export const logoutSchema = {
+	description: 'Clear auth cookies.',
+  	tags: ['auth'],
+  	security: [{ cookieAuth: [] }],
+  	response: {
+    		200: { description: 'Logged out', $ref: 'MessageResponse#' }
+  	}
 };
 
 export const getAllUsersSchema = {
@@ -193,6 +212,7 @@ export const getAllUsersSchema = {
 export const getUserByIdSchema = {
 	description: 'Retrieve a specific user by ID (password excluded)',
 	tags: ['users'],
+	security: [{ cookieAuth: [] }],
 	params: {
 		type: 'object',
 		properties: {
@@ -222,7 +242,7 @@ export const getUserByIdSchema = {
 export const updateUserSchema = {
 	description: 'Update user information (authentication required, can only update own profile)',
 	tags: ['users'],
-	security: [{ bearerAuth: [] }],
+	security: [{ cookieAuth: [] }],
 	params: {
 		type: 'object',
 		properties: {
@@ -271,7 +291,7 @@ export const updateUserSchema = {
 export const deleteUserSchema = {
 	description: 'Delete a user by ID',
 	tags: ['users'],
-	security: [{ bearerAuth: [] }],
+	security: [{ cookieAuth: [] }],
 	params: {
 		type: 'object',
 		properties: {
@@ -304,4 +324,20 @@ export const deleteUserSchema = {
 			$ref: 'Error#'
 		}
 	}
+};
+
+export const getCurrentUserSchema = {
+  description: 'Get the currently authenticated user from the access cookie',
+  tags: ['users'],
+  security: [{ cookieAuth: [] }],
+  response: {
+    200: {
+      description: 'Current user details',
+      type: 'object',
+      properties: {
+        user: { $ref: 'User#' }
+      }
+    },
+    401: { description: 'Unauthorized', $ref: 'Error#' }
+  }
 };
