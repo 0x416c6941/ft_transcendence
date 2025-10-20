@@ -657,4 +657,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			}
 		}
 	);
+
+	// TODO: getUserAvatarSchema
+	fastify.get<{ Params: UserParams }>(
+		'/users/:id/avatar',
+		async(request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
+			const { id } = request.params;
+		}
+	);
 }
