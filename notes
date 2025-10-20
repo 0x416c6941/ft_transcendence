@@ -1,6 +1,8 @@
 10. Avatar max size check
 	Also: should resize the avatar as well? Or could we just
 		leave the original resolution?
+	In what way will we receive avatars?
+	Is it just gonna be 1 whole body?
 11. Friends with IO check: can't be friend with your own self
 12. For user management: online status (potentially w/ socket.io)
 

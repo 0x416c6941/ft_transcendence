@@ -15,7 +15,8 @@ import {
 	oauth42Schema,
 	oauth42CallbackSchema,
 	oauth42UnlinkSchema,
-	getUserAvatarSchema
+	getUserAvatarSchema,
+	resetUserAvatarSchema
 } from '../schemas/user.schemas.js';
 import {
 	ApiError,
@@ -368,6 +369,11 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					return reply.code(404).send({ error: 'User not found' });
 				}
 
+				// Removing custom user avatar, if exists.
+				await fsPromises.rm(
+					path.join(fastify.config.avatarsPath.avatarsPath, `${id}.webp`),
+					{ force: true });
+
 				return reply.code(200).send({ message: 'User deleted successfully' });
 			} catch (err: any) {
 				fastify.log.error(err);
@@ -662,7 +668,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
-	// TODO: getUserAvatarSchema
 	fastify.get<{ Params: UserParams }>(
 		'/users/:id/avatar',
 		{
@@ -693,6 +698,57 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			catch (err: any) {
 				fastify.log.error(err, 'Error while sending an avatar');
 				return reply.code(500).send({ error: "Couldn't read an avatar on server side" });
+			}
+		}
+	);
+
+	// TODO: update avatar route.
+
+	fastify.post<{ Params: UserParams }>(
+		'/users/:id/avatar/reset',
+		{
+			preHandler: authenticateToken,
+			schema: resetUserAvatarSchema
+		},
+		async(request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
+			const { id } = request.params;
+
+			// Checking if user at all still exists.
+			try {
+				const user = await dbGetUserById(fastify, parseInt(id));
+
+				if (!user) {
+					return reply.code(404).send({ error: "Your JWT token is valid, yet user doesn't exist" });
+				}
+			}
+			catch (error: unknown) {
+				fastify.log.error(error);
+				if (error instanceof ApiError) {
+					return reply.code(error.replyHttpCode).send(error.message);
+				}
+				return reply.code(500).send({ error: 'An internal server error occurred' });
+			}
+
+			const avatarPathToRemove = path.join(fastify.config.avatarsPath.avatarsPath,
+					`${id}.webp`);
+
+			// Checking if custom avatar exists.
+			try {
+				await fsPromises.access(avatarPathToRemove);
+			}
+			catch {
+				return reply.code(409).send({ error: "You don't have any custom avatar" });
+			}
+
+			// Removing the user's avatar.
+			try {
+				await fsPromises.rm(avatarPathToRemove);
+
+				return reply.code(200).send({ message: 'Successfully reset avatar to a default one' });
+			}
+			catch (err: any) {
+				fastify.log.error(err, "Couldn't remove avatar");
+				return reply.code(500).send({ error: "Couldn't remove avatar" });
 			}
 		}
 	);

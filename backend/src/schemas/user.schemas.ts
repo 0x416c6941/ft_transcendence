@@ -326,7 +326,7 @@ export const deleteUserSchema = {
 			$ref: 'Error#'
 		},
 		404: {
-			description: 'User not found',
+			description: 'Not found - User not found',
 			$ref: 'Error#'
 		},
 		500: {
@@ -521,6 +521,36 @@ export const getUserAvatarSchema = {
 					}
 				}
 			}
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
+
+export const resetUserAvatarSchema = {
+	description: "Reset user's avatar to a default one",
+	tags: ['users'],
+	security: [{ bearerAuth: [] }],
+	params: {
+		$ref: 'GenericParamIdUserRequest#'
+	},
+	response: {
+		200: {
+			description: 'Successfully reset avatar',
+			type: 'object',
+			properties: {
+				message: { type: 'string' }
+			}
+		},
+		404: {
+			description: 'Not found - JWT token is valid, yet user was already removed from the system',
+			$ref: 'Error#'
+		},
+		409: {
+			description: "Conflict - user doesn't have any custom avatar",
+			$ref: 'Error#'
 		},
 		500: {
 			description: 'Internal server error',
