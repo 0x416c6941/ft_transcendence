@@ -115,6 +115,7 @@ const start = async () => {
 			);
 		}
 
+		// Appending `config` to Fastify instance.
 		fastify.decorate('config', {
 			oauth42: {
 				uid: String(oauth42Uid).trim(),
@@ -138,6 +139,7 @@ const start = async () => {
 				fastify.log.info(`Sock disconnect: ${socket.id}`);
 			})
 		})
+
 		/* IPv4 only here.
 		 * We don't need to take care of IPv6, since we'll either way
 		 * receive data from NGINX as a reverse proxy on IPv4. */

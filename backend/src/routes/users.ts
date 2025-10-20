@@ -14,7 +14,8 @@ import {
 	unmakeAdminSchema,
 	oauth42Schema,
 	oauth42CallbackSchema,
-	oauth42UnlinkSchema
+	oauth42UnlinkSchema,
+	getUserAvatarSchema
 } from '../schemas/user.schemas.js';
 import {
 	ApiError,
@@ -27,6 +28,9 @@ import {
 	get42PublicData
 } from '../utils/users.js';
 import { URLSearchParams } from 'url';
+import path from 'node:path';
+import fsPromises from 'node:fs/promises';
+import mime from 'mime';
 
 /* Higher number => more Bcrypt hashing rounds
    => more time is necessary and more difficult is brute-forcing. */
@@ -658,13 +662,38 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
-	/*
 	// TODO: getUserAvatarSchema
 	fastify.get<{ Params: UserParams }>(
 		'/users/:id/avatar',
+		{
+			schema: getUserAvatarSchema
+		},
 		async(request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
 			const { id } = request.params;
+
+			// Check if user-specific avatar exists.
+			let avatarPath = path.join(fastify.config.avatarsPath.avatarsPath,
+				`${id}.webp`);
+			try {
+				await fsPromises.access(avatarPath, fsPromises.constants.R_OK);
+			}
+			catch {
+				avatarPath = fastify.config.avatarsPath.defaultAvatarPath;
+			}
+
+			try {
+				if (path.extname(avatarPath) !== '.webp') {
+					fastify.log.warn(`Avatar at: ${avatarPath} isn't "image/webp"`);
+				}
+				const avatar = await fsPromises.readFile(avatarPath);
+
+				reply.header('Content-Type', mime.getType(avatarPath));
+				return reply.code(200).send(avatar);
+			}
+			catch (err: any) {
+				fastify.log.error(err, 'Error while sending an avatar');
+				return reply.code(500).send({ error: "Couldn't read an avatar on server side" });
+			}
 		}
 	);
-	 */
 }

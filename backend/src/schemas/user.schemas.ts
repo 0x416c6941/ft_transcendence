@@ -93,12 +93,17 @@ export const userSchemas = [
 		}
 	},
 	{
-		$id: 'Oauth42UnlinkRequest',
+		$id: 'GenericParamIdUserRequest',
 		type: 'object',
 		required: ['id'],
 		properties: {
-			id: { type: 'number', description: 'ID of a user to unlink 42 account from' }
+			id: { type: 'number', description: 'ID of a user' }
 		}
+	},
+	{
+		$id: 'ImageResponse',
+		type: 'string',
+		format: 'binary'
 	},
 	{
 		$id: 'Error',
@@ -458,7 +463,7 @@ export const oauth42UnlinkSchema = {
 	description: 'Unlink 42 account from a user',
 	tags: ['users'],
 	params: {
-		$ref: 'Oauth42UnlinkRequest#'
+		$ref: 'GenericParamIdUserRequest#'
 	},
 	response: {
 		200: {
@@ -479,6 +484,43 @@ export const oauth42UnlinkSchema = {
 		409: {
 			description: 'Conflict - JWT token was provided, yet user was removed from the system',
 			$ref: 'Error#'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
+
+export const getUserAvatarSchema = {
+	description: 'Get avatar of a user',
+	tags: ['users'],
+	params: {
+		$ref: 'GenericParamIdUserRequest#'
+	},
+	response: {
+		200: {
+			description: 'Avatar of a given user',
+			headers: {
+				'Content-Type': {
+					type: 'string',
+					description: 'MIME type of avatar'
+				}
+			},
+			content: {
+				'image/webp': {
+					schema: {
+						$ref: 'ImageResponse#'
+					}
+				},
+				/* Just in case, however our server should never return an avatar
+				* of MIME type different than "image/webp". */
+				'image/*': {
+					schema: {
+						$ref: 'ImageResponse#'
+					}
+				}
+			}
 		},
 		500: {
 			description: 'Internal server error',
