@@ -21,10 +21,10 @@ export const DIV_ID: string = "app";
  */
 export const PATHS_TO_ROUTE: PathToRegister[] = [
 	{ path: "/", constructor: HomeView },
-	{ path: "/login", constructor: LoginView },
 	{ path: "/pong", constructor: PongView },
-	{ path: "/register", constructor: RegisterView },
-	{ path: "/profile", constructor: ProfileView },
+	{ path: "/login", constructor: LoginView, guard: 'guest' },
+	{ path: "/register", constructor: RegisterView, guard: 'guest' },
+	{ path: "/profile", constructor: ProfileView, guard: 'auth' },
 ] as const;
 
 /**

@@ -11,6 +11,7 @@ import {
 } from "../utils/validators.js";
 import { nkfc, emailSan } from "../utils/sanitize.js";
 import { createUser } from "../api/users.js";
+import { auth } from "../auth.js";
 
 type SubmitHandler = (e: Event) => void;
 type InputHandler = (e: Event) => void;
@@ -136,6 +137,10 @@ export default class RegisterView extends AbstractView {
   }
 
   setup(): void {
+    if (auth.isAuthed()){
+      this.router.navigate("/");
+      return;
+    }
     this.formEl = document.getElementById("register-form") as HTMLFormElement | null;
     this.submitBtn = document.getElementById("register-submit") as HTMLButtonElement | null;
     if (!this.formEl) return;

@@ -7,6 +7,8 @@
 
 import AbstractView from './views/AbstractView.js';
 import NotFoundView from './views/NotFoundView.js';
+import { auth } from './auth.js';
+import { mountHeader } from './header.js';
 
 // Alias to avoid redundant typing...
 type AbstractViewConstructor = new (router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) => AbstractView;
@@ -28,6 +30,7 @@ export interface PathToRegister {
 	 * Constructor for the view (page) on `path`.
 	 */
 	constructor: AbstractViewConstructor;
+	guard?: 'auth' | 'guest';
 }
 
 /**
@@ -56,6 +59,8 @@ export default class Router {
 	 */
 	private _currentView: AbstractView | null;
 
+	private _bootstrapped = false;
+
 	/**
 	 * @method
 	 * @remarks Call the constructor only after the DOM has been loaded.
@@ -76,20 +81,21 @@ export default class Router {
 		this._routes = routes;
 
 		this._currentView = null;
-		this._render();
 
 		// Clicks (potentially on hyperlinks).
 		document.body.addEventListener('click', (e) => {
 			/* We take it as granted that only hyperlinks
-			 * would contain a custom "data-link" attribute. */
+			* would contain a custom "data-link" attribute. */
 			if (e.target instanceof HTMLElement &&
-			    e.target.matches('[data-link]')) {
-				e.preventDefault();
-				this.navigate((e.target as HTMLAnchorElement).href);
-			}
-		});
+				e.target.matches('[data-link]')) {
+					e.preventDefault();
+					this.navigate((e.target as HTMLAnchorElement).href);
+				}
+			});
 		// Window navigation arrows.
 		window.addEventListener('popstate', () => this._render());
+
+		this._render();
 	}
 
 	/**
@@ -112,6 +118,13 @@ export default class Router {
 	 * 				as SPA view is completely updated.
 	 */
 	private async _render(): Promise<void> {
+		// Ensure auth state once (prevents header flicker & correct guards)
+    		if (!this._bootstrapped) {
+    		  	await auth.bootstrap();
+    		  	this._bootstrapped = true;
+    		  	// mount reactive header once DOM exists (index.html header already present)
+    		  	mountHeader(this);
+    		}
 		/* An anonymous function to get a regex
 		 * for a routing path to see
 		 * if `location.pathname` matches it. */
@@ -134,14 +147,27 @@ export default class Router {
 			return location.pathname.match(pathToRegex(route.path)) !== null;
 		});
 
-		if (matches.length != 0) {
+		if (matches.length !== 0) {
+			const route = matches[0];
+
+			// Check guard
+			if (route.guard === 'auth' && !auth.isAuthed()) {
+				this.navigate('/login');
+				return this._render();
+			}
+
+			if (route.guard === 'guest' && auth.isAuthed()) {
+				history.replaceState({}, '', '/');
+				return this._render();
+			}
+
 			/* Getting rid of the whole string
 			 * and leaving only the capture group. */
-			const keys = [...matches[0].path.matchAll(/:(\w+)/g)].map((keys) => keys[1]);
+			const keys = [...route.path.matchAll(/:(\w+)/g)].map((keys) => keys[1]);
 			// The same story.
-			const values = location.pathname.match(pathToRegex(matches[0].path))!.slice(1);
+			const values = location.pathname.match(pathToRegex(route.path))!.slice(1);
 
-			newView = new matches[0].constructor(this,
+			newView = new route.constructor(this,
 					mapPathParams(keys, values), new URLSearchParams(window.location.search));
 		}
 		else {

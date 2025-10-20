@@ -11,6 +11,8 @@
 		"src/app.config.ts",
 		"src/router.ts",
 		"src/socket.ts",
+		"src/auth.ts",
+		"src/header.ts",
 		"src/api/users.ts",
 		"src/utils/validators.ts",
 		"src/utils/sanitize.ts",

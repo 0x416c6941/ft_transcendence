@@ -3,6 +3,7 @@ import Router from "../router.js";
 import { APP_NAME } from "../app.config.js";
 import { nkfc } from "../utils/sanitize.js";
 import { login } from "../api/users.js";
+import { auth } from "../auth.js";
 
 export default class LoginView extends AbstractView {
   private formEl: HTMLFormElement | null = null;
@@ -75,6 +76,12 @@ export default class LoginView extends AbstractView {
   }
 
   setup(): void {
+    // If already authenticated (guest-only route), bounce out immediately
+    if (auth.isAuthed()) {
+      this.router.navigate("/");
+      return;
+    }
+
     this.formEl = document.getElementById("login-form") as HTMLFormElement | null;
     this.submitBtn = document.getElementById("login-submit") as HTMLButtonElement | null;
     if (!this.formEl || !this.submitBtn) return;
@@ -121,9 +128,10 @@ export default class LoginView extends AbstractView {
       try {
         // Server will set HttpOnly cookies; response contains user info
         const data = await login({ username, password });
-
+        // Server sets cookies; auth store bootstraps user & notifies header
+        await auth.signIn(username, password);
         this.setText("form-success", "Login successful! Redirecting…");
-        setTimeout(() => this.router.navigate("/profile"), 800);
+        setTimeout(() => this.router.navigate("/"), 500);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Invalid username or password.";
         this.setText("form-error", msg);
