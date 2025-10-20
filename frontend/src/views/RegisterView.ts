@@ -3,11 +3,11 @@ import Router from "../router.js";
 import { APP_NAME } from "../app.config.js";
 
 import {
-	validateNickname,
-	validateUsername,
-	validateEmail,
-	validatePassword,
-	type FieldResult,
+  validateNickname,
+  validateUsername,
+  validateEmail,
+  validatePassword,
+  type FieldResult,
 } from "../utils/validators.js";
 import { nkfc, emailSan } from "../utils/sanitize.js";
 import { createUser } from "../api/users.js";
@@ -17,53 +17,24 @@ type InputHandler = (e: Event) => void;
 type FieldName = "nickname" | "username" | "email" | "password";
 
 const VALIDATORS: Record<FieldName, (v: string) => FieldResult> = {
-	nickname: validateNickname,
-	username: validateUsername,
-	email: validateEmail,
-	password: validatePassword,
+  nickname: validateNickname,
+  username: validateUsername,
+  email: validateEmail,
+  password: validatePassword,
 };
 
-/**
- * RegisterView
- * ------------
- * A client-side view that renders and manages the **user registration form**.
- *
- * Responsibilities:
- * - Renders the registration HTML template (nickname, username, email, password)
- * - Performs live client-side validation using functions from `utils/validators`
- * - Sanitizes input with `utils/sanitize` before submission
- * - Submits a `POST /api/users` request via `api/users.createUser`
- * - Displays inline field errors, form-level errors, and success messages
- * - Redirects the user to `/login` on successful registration
- *
- * Accessibility (a11y):
- * - Each input has associated `aria-describedby` help and error elements
- * - Uses `aria-invalid` and `role="alert"` to announce validation feedback
- *
- * Tech notes:
- * - Designed for ES module environments (type="module" in the browser)
- * - Imports `.js` extensions for compatibility when served as static JS
- * - Works with Fastify static serving or any bundler (Vite/Webpack)
- *
- * Key helpers:
- * - `validateField()` → runs the proper validator and paints feedback
- * - `setFormBusy()` → toggles button state and label during async work
- * - `clearFormMessages()` / `setFormError()` / `setFormSuccess()` → manage global feedback
- *
- */
-
 export default class RegisterView extends AbstractView {
-	private formEl: HTMLFormElement | null = null;
-	private submitBtn: HTMLButtonElement | null = null;
-	private onSubmit?: SubmitHandler;
-	private onInput?: InputHandler;
+  private formEl: HTMLFormElement | null = null;
+  private submitBtn: HTMLButtonElement | null = null;
+  private onSubmit?: SubmitHandler;
+  private onInput?: InputHandler;
 
-	setDocumentTitle(): void {
-		document.title = `${APP_NAME} - Register`;
-	}
+  setDocumentTitle(): void {
+    document.title = `${APP_NAME} - Register`;
+  }
 
-	async getHtml(): Promise<string> {
-		return `
+  async getHtml(): Promise<string> {
+    return `
       <main class="flex-1 flex flex-col items-center justify-center bg-neutral-200 dark:bg-neutral-900">
         <section class="w-full max-w-64 bg-neutral-100 rounded shadow p-2">
           <h1 class="txt-light-dark-sans text-3xl mb-4 text-center">Create your account</h1>
@@ -83,7 +54,7 @@ export default class RegisterView extends AbstractView {
                 maxlength="20"
                 pattern="^[a-zA-Z0-9_]{1,20}$"
                 required
-		aria-describedby="nickname-help nickname-error"
+                aria-describedby="nickname-help nickname-error"
               />
               <p id="nickname-help" class="text-neutral-500 text-sm mt-2">
                 1–20 chars, letters, numbers, underscores only.
@@ -162,159 +133,130 @@ export default class RegisterView extends AbstractView {
         </section>
       </main>
     `;
-	}
+  }
 
-	setup(): void {
-		this.formEl = document.getElementById(
-			"register-form"
-		) as HTMLFormElement | null;
-		this.submitBtn = document.getElementById(
-			"register-submit"
-		) as HTMLButtonElement | null;
-		if (!this.formEl) return;
+  setup(): void {
+    this.formEl = document.getElementById("register-form") as HTMLFormElement | null;
+    this.submitBtn = document.getElementById("register-submit") as HTMLButtonElement | null;
+    if (!this.formEl) return;
 
-		// live validation
-		this.onInput = (e: Event) => {
-			const target = e.target as HTMLInputElement | null;
-			if (!target || !target.name) return;
-			this.validateField(target.name as FieldName);
-		};
-		this.formEl.addEventListener("input", this.onInput);
-		this.formEl.addEventListener("blur", this.onInput, true);
+    // live validation
+    this.onInput = (e: Event) => {
+      const target = e.target as HTMLInputElement | null;
+      if (!target || !target.name) return;
+      this.validateField(target.name as FieldName);
+    };
+    this.formEl.addEventListener("input", this.onInput);
+    this.formEl.addEventListener("blur", this.onInput, true);
 
-		// submit
-		this.onSubmit = async (e: Event) => {
-			e.preventDefault();
-			if (!this.formEl || !this.submitBtn) return;
+    // submit
+    this.onSubmit = async (e: Event) => {
+      e.preventDefault();
+      if (!this.formEl || !this.submitBtn) return;
 
-			const nickname = this.getValue("nickname");
-			const username = this.getValue("username");
-			const email = this.getValue("email");
-			const password = this.getValue("password");
+      const nickname = this.getValue("nickname");
+      const username = this.getValue("username");
+      const email = this.getValue("email");
+      const password = this.getValue("password");
 
-			const nk = validateNickname(nickname);
-			const un = validateUsername(username);
-			const em = validateEmail(email);
-			const pw = validatePassword(password);
+      const nk = validateNickname(nickname);
+      const un = validateUsername(username);
+      const em = validateEmail(email);
+      const pw = validatePassword(password);
 
-			this.applyFieldResult("nickname", nk);
-			this.applyFieldResult("username", un);
-			this.applyFieldResult("email", em);
-			this.applyFieldResult("password", pw);
+      this.applyFieldResult("nickname", nk);
+      this.applyFieldResult("username", un);
+      this.applyFieldResult("email", em);
+      this.applyFieldResult("password", pw);
 
-			if (!(nk.status && un.status && em.status && pw.status))
-				return;
+      if (!(nk.status && un.status && em.status && pw.status)) return;
 
-			const payload = {
-				username: nkfc(username),
-				password,
-				email: emailSan(email),
-				display_name: nkfc(nickname),
-			};
+      const payload = {
+        username: nkfc(username),
+        password,
+        email: emailSan(email),
+        display_name: nkfc(nickname),
+      };
 
-			this.setFormBusy(true);
-			this.clearFormMessages();
+      this.setFormBusy(true);
+      this.clearFormMessages();
 
-			try {
-				await createUser(payload);
-				this.setFormSuccess(
-					"Account created! Redirecting…"
-				);
-				setTimeout(
-					() => this.router.navigate("/login"),
-					1500
-				);
-			} catch (err) {
-				const msg =
-					err instanceof Error
-						? err.message
-						: "Registration failed. Please try again.";
-				this.setFormError(msg);
-			} finally {
-				this.setFormBusy(false);
-			}
-		};
+      try {
+        await createUser(payload);
+        this.setFormSuccess("Account created! Redirecting…");
+        setTimeout(() => this.router.navigate("/login"), 1200);
+      } catch (err) {
+        // Friendlier message for common conflict case
+        const raw =
+          err instanceof Error ? err.message : "Registration failed. Please try again.";
+        const msg =
+          /409|exists|UNIQUE/i.test(raw)
+            ? "That username or email is already taken."
+            : raw;
+        this.setFormError(msg);
+      } finally {
+        this.setFormBusy(false);
+      }
+    };
 
-		this.formEl.addEventListener("submit", this.onSubmit);
-	}
+    this.formEl.addEventListener("submit", this.onSubmit);
+  }
 
-	cleanup(): void {
-		if (this.formEl && this.onSubmit)
-			this.formEl.removeEventListener(
-				"submit",
-				this.onSubmit
-			);
-		if (this.formEl && this.onInput) {
-			this.formEl.removeEventListener("input", this.onInput);
-			this.formEl.removeEventListener(
-				"blur",
-				this.onInput,
-				true
-			);
-		}
-		this.formEl = null;
-		this.submitBtn = null;
-		this.onSubmit = undefined;
-		this.onInput = undefined;
-	}
+  cleanup(): void {
+    if (this.formEl && this.onSubmit) this.formEl.removeEventListener("submit", this.onSubmit);
+    if (this.formEl && this.onInput) {
+      this.formEl.removeEventListener("input", this.onInput);
+      this.formEl.removeEventListener("blur", this.onInput, true);
+    }
+    this.formEl = null;
+    this.submitBtn = null;
+    this.onSubmit = undefined;
+    this.onInput = undefined;
+  }
 
-	// --------- helpers ---------
-	private getInput(name: FieldName): HTMLInputElement | null {
-		return (
-			(this.formEl?.elements.namedItem(
-				name
-			) as HTMLInputElement) || null
-		);
-	}
-	private getValue(name: FieldName): string {
-		return this.getInput(name)?.value ?? "";
-	}
-	private setError(name: FieldName, message: string): void {
-		const input = this.getInput(name);
-		const el = document.getElementById(`${name}-error`);
-		if (input) input.setAttribute("aria-invalid", "true");
-		if (el) el.textContent = message;
-	}
-	private clearError(name: FieldName): void {
-		const input = this.getInput(name);
-		const el = document.getElementById(`${name}-error`);
-		if (input) input.removeAttribute("aria-invalid");
-		if (el) el.textContent = "";
-	}
-	private applyFieldResult(name: FieldName, result: FieldResult): void {
-		result.status
-			? this.clearError(name)
-			: this.setError(name, result.err_msg);
-	}
-	private validateField(name: FieldName): void {
-		const map: Record<FieldName, (v: string) => FieldResult> = {
-			nickname: validateNickname,
-			username: validateUsername,
-			email: validateEmail,
-			password: validatePassword,
-		};
-		const res = map[name](this.getValue(name));
-		this.applyFieldResult(name, res);
-	}
-	private clearFormMessages(): void {
-		["form-error", "form-success"].forEach((id) => {
-			const el = document.getElementById(id);
-			if (el) el.textContent = "";
-		});
-	}
-	private setFormError(message: string): void {
-		const el = document.getElementById("form-error");
-		if (el) el.textContent = message;
-	}
-	private setFormSuccess(message: string): void {
-		const el = document.getElementById("form-success");
-		if (el) el.textContent = message;
-	}
-	private setFormBusy(busy: boolean): void {
-		if (!this.submitBtn) return;
-		this.submitBtn.disabled = busy;
-		this.submitBtn.textContent = busy
-			? "Creating account…"
-			: "Create account";
-	}
+  // --------- helpers ---------
+  private getInput(name: FieldName): HTMLInputElement | null {
+    return ((this.formEl?.elements.namedItem(name) as HTMLInputElement) || null);
+  }
+  private getValue(name: FieldName): string {
+    return this.getInput(name)?.value ?? "";
+  }
+  private setError(name: FieldName, message: string): void {
+    const input = this.getInput(name);
+    const el = document.getElementById(`${name}-error`);
+    if (input) input.setAttribute("aria-invalid", "true");
+    if (el) el.textContent = message;
+  }
+  private clearError(name: FieldName): void {
+    const input = this.getInput(name);
+    const el = document.getElementById(`${name}-error`);
+    if (input) input.removeAttribute("aria-invalid");
+    if (el) el.textContent = "";
+  }
+  private applyFieldResult(name: FieldName, result: FieldResult): void {
+    result.status ? this.clearError(name) : this.setError(name, result.err_msg);
+  }
+  private validateField(name: FieldName): void {
+    const res = VALIDATORS[name](this.getValue(name));
+    this.applyFieldResult(name, res);
+  }
+  private clearFormMessages(): void {
+    ["form-error", "form-success"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = "";
+    });
+  }
+  private setFormError(message: string): void {
+    const el = document.getElementById("form-error");
+    if (el) el.textContent = message;
+  }
+  private setFormSuccess(message: string): void {
+    const el = document.getElementById("form-success");
+    if (el) el.textContent = message;
+  }
+  private setFormBusy(busy: boolean): void {
+    if (!this.submitBtn) return;
+    this.submitBtn.disabled = busy;
+    this.submitBtn.textContent = busy ? "Creating account…" : "Create account";
+  }
 }
