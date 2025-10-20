@@ -1,5 +1,7 @@
 import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import fastifySqlite, { FastifySqliteOptions } from './fastifySqlite.js';
 import { Server } from "socket.io";
 import userRoutes from './routes/users.js';
@@ -25,8 +27,8 @@ const fastify: FastifyInstance = Fastify({
 
 // Connecting to DB.
 const dbVolPath = process.env.BACKEND_CONTAINER_DB_VOL_PATH;
-if (!dbVolPath) {
-	throw new Error("process.env.BACKEND_CONTAINER_DB_VOL_PATH isn't a valid path.");
+if (!dbVolPath || !path.isAbsolute(dbVolPath)) {
+	throw new Error("process.env.BACKEND_CONTAINER_DB_VOL_PATH isn't a valid absolute path.");
 }
 const dbFile = process.env.BACKEND_SQLITE_DB_NAME;
 if (!dbFile) {
@@ -35,7 +37,7 @@ if (!dbFile) {
 
 // Registering SQLite Fastify plugin.
 fastify.register(fastifySqlite, {
-	dbFile: dbVolPath.concat('/').concat(dbFile)
+	dbFile: path.join(dbVolPath, dbFile)
 });
 
 // Register all JSON schemas for validation (must be before routes)
@@ -78,11 +80,48 @@ const start = async () => {
 				resolve(data);
 			});
 		});
-		
+
+		/* Taking care of creating directory with avatars in Docker Volume
+		 * and the default user avatar. */
+		if (!process.env.BACKEND_AVATAR_PATH_IN_DB_VOL) {
+			fastify.log.error('process.env.BACKEND_AVATAR_PATH_IN_DB_VOL is undefined');
+			process.exit(1);
+		}
+		const avatarsPath = path.join(dbVolPath, process.env.BACKEND_AVATAR_PATH_IN_DB_VOL);
+		// Creating directory with avatars in Docker Volume, if it doesn't exist yet.
+		if (!fs.existsSync(avatarsPath)) {
+			await fs.mkdir(avatarsPath,
+				{ recursive: true, mode: 0o755 },
+				(err: any) => {
+					if (err) {
+						fastify.log.error(`Couldn't create directory for avatar storage: ${err}`);
+						process.exit(1);
+					}
+				}
+			);
+		}
+		const defaultAvatarPath = path.join(avatarsPath, 'default.webp');
+		/* Copying default avatar to directory with avatars in Docker Volume,
+		 * if it doesn't exist yet. */
+		if (!fs.existsSync(defaultAvatarPath)) {
+			fs.copyFile(path.join('blobs', 'default_avatar.webp'),
+				defaultAvatarPath,
+				(err: any) => {
+					if (err) {
+						fastify.log.error(`Couldn't copy default avatar: ${err}`);
+						process.exit(1);
+					}
+				}
+			);
+		}
+
 		fastify.decorate('config', {
 			oauth42: {
 				uid: String(oauth42Uid).trim(),
 				secret: String(oauth42Secret).trim()
+			},
+			avatarsPath: {
+				avatarsPath, defaultAvatarPath
 			}
 		});
 
