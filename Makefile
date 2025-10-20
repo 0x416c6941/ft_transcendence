@@ -34,9 +34,8 @@ kill:
 down:
 	@$(DC_CMD) down
 
-# Cleans EVERYTHING related to this project,
-# including all files and credentials in "${SECRETS_DIR}".
+# Cleans everything related to Docker, produced by this project.
+# "${SECRETS_DIR}" is left intact.
 .PHONY: clean
 clean: down
 	@./docker_clean.sh
-	@rm -rf ${SECRETS_DIR}
