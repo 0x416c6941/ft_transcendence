@@ -180,8 +180,9 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	fastify.post<{ Body: { refreshToken: string } }>(
 		'/users/refresh',
 		// { schema: refreshTokenSchema },  // remove schema because body is not used
-		async (request: FastifyRequest<{ Body: { refreshToken: string } }>, reply: FastifyReply) => {
-			const { refreshToken } = request.body;
+		async (request: FastifyRequest, reply: FastifyReply) => {
+    			const refreshToken = request.cookies?.refreshToken;
+
 			// Validate the refresh token
 			if (!refreshToken) {
         			return reply.code(401).send({ error: 'Missing refresh token' });
@@ -249,9 +250,14 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	// Get a specific user by ID
 	fastify.get<{ Params: UserParams }>(
 		'/users/:id',
-		{ schema: getUserByIdSchema },
+		{ preHandler: authenticateToken, schema: getUserByIdSchema },
 		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
 			const { id } = request.params;
+
+			// Only allow the owner to read their own profile
+			if (request.user?.userId !== parseInt(id)) {
+				return reply.code(403).send({ error: 'Forbidden: You can only access your own profile' });
+			}
 
 			try {
 				const user = await new Promise<any>((resolve, reject) => {
@@ -397,6 +403,41 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			} catch (err: any) {
 				fastify.log.error(err);
 				return reply.code(500).send({ error: 'Failed to delete user' });
+			}
+		}
+	);
+	// Current user (from cookie/header JWT)
+	fastify.get(
+		'/users/me',
+		{preHandler: authenticateToken},
+		async (request: FastifyRequest, reply: FastifyReply) => {
+			try {
+				if (!request.user) {
+					return reply.code(401).send({ error: 'Unauthorized' });
+				}
+
+				const user = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(
+						`SELECT id, username, email, display_name, created_at FROM users WHERE id = ?`,
+						[request.user!.userId],
+						(err: Error | null, row: any) => {
+							if (err) {
+								reject(err);
+							} else {
+								resolve(row);
+							}
+						}
+					);
+				});
+
+				if (!user) {
+					return reply.code(404).send({ error: 'User not found' });
+				}
+
+				return reply.code(200).send({ user });
+			} catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(500).send({ error: 'Failed to retrieve user' });
 			}
 		}
 	);
