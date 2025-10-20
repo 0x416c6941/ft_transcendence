@@ -178,3 +178,11 @@ export async function refresh(): Promise<{ message: string }> {
     retryOn401: false,
   });
 }
+
+// add near other exports
+export async function getCurrentUser(): Promise<UserById> {
+  return request<UserById>("/api/users/me", {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+}
