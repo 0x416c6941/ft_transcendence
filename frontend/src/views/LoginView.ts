@@ -4,51 +4,29 @@ import { APP_NAME } from "../app.config.js";
 import { nkfc } from "../utils/sanitize.js";
 import { login } from "../api/users.js";
 
-/**
- * LoginView
- * ----------
- * Renders and manages the **user login form**.
- *
- * Responsibilities:
- * - Displays username/password inputs with client-side validation
- * - Submits credentials to `POST /api/users/login`
- * - Shows inline and form-level error/success messages
- * - Stores access & refresh tokens for future authenticated requests
- * - Redirects the user to the home page (`/`) on successful login
- *
- * Accessibility:
- * - Uses `aria-invalid`, `aria-describedby`, and live regions for feedback
- * - Error and success messages announced by screen readers
- *
- * Technical Notes:
- * - Uses `nkfc()` from `utils/sanitize` for Unicode normalization
- * - Imports `login()` API helper for the backend request
- * - Compatible with both static ES modules and bundlers (Vite/Webpack)
- */
-
 export default class LoginView extends AbstractView {
-	private formEl: HTMLFormElement | null = null;
-	private submitBtn: HTMLButtonElement | null = null;
-	private onSubmit?: (e: Event) => void;
+  private formEl: HTMLFormElement | null = null;
+  private submitBtn: HTMLButtonElement | null = null;
+  private onSubmit?: (e: Event) => void;
 
-	constructor(
-		router: Router,
-		pathParams: Map<string, string>,
-		queryParams: URLSearchParams
-	) {
-		super(router, pathParams, queryParams);
-	}
+  constructor(
+    router: Router,
+    pathParams: Map<string, string>,
+    queryParams: URLSearchParams
+  ) {
+    super(router, pathParams, queryParams);
+  }
 
-	setDocumentTitle(): void {
-		document.title = `${APP_NAME} - Login`;
-	}
+  setDocumentTitle(): void {
+    document.title = `${APP_NAME} - Login`;
+  }
 
-	async getHtml(): Promise<string> {
-		return `
+  async getHtml(): Promise<string> {
+    return `
       <main class="h-screen flex flex-col justify-center items-center bg-neutral-100 dark:bg-neutral-900">
         <h1 class="txt-light-dark-sans text-3xl mb-6">Login to ${APP_NAME}</h1>
 
-        <form id="login-form" class="flex flex-col gap-4 w-64" novalidate>
+        <form id="login-form" class="flex flex-col gap-4 w-64">
           <div>
             <input
               id="username"
@@ -56,6 +34,8 @@ export default class LoginView extends AbstractView {
               type="text"
               placeholder="Username"
               autocomplete="username"
+              spellcheck="false"
+              autocapitalize="none"
               required
               class="txt-light-dark-sans w-full p-2 rounded border"
               aria-describedby="username-error"
@@ -70,6 +50,8 @@ export default class LoginView extends AbstractView {
               type="password"
               placeholder="Password"
               autocomplete="current-password"
+              spellcheck="false"
+              autocapitalize="none"
               required
               class="txt-light-dark-sans w-full p-2 rounded border"
               aria-describedby="password-error"
@@ -90,144 +72,94 @@ export default class LoginView extends AbstractView {
         </div>
       </main>
     `;
-	}
+  }
 
-	setup(): void {
-		this.formEl = document.getElementById(
-			"login-form"
-		) as HTMLFormElement | null;
-		this.submitBtn = document.getElementById(
-			"login-submit"
-		) as HTMLButtonElement | null;
-		if (!this.formEl || !this.submitBtn) return;
+  setup(): void {
+    this.formEl = document.getElementById("login-form") as HTMLFormElement | null;
+    this.submitBtn = document.getElementById("login-submit") as HTMLButtonElement | null;
+    if (!this.formEl || !this.submitBtn) return;
 
-		this.onSubmit = async (e: Event) => {
-			e.preventDefault();
-			if (!this.formEl || !this.submitBtn) return;
+    this.onSubmit = async (e: Event) => {
+      e.preventDefault();
+      if (!this.formEl || !this.submitBtn) return;
 
-			const username = nkfc(
-				(
-					this.formEl.elements.namedItem(
-						"username"
-					) as HTMLInputElement
-				)?.value ?? ""
-			);
-			const password =
-				(
-					this.formEl.elements.namedItem(
-						"password"
-					) as HTMLInputElement
-				)?.value ?? "";
+      const username = nkfc(
+        (this.formEl.elements.namedItem("username") as HTMLInputElement)?.value.trim() ?? ""
+      );
+      const password = nkfc(
+        (this.formEl.elements.namedItem("password") as HTMLInputElement)?.value.trim() ?? ""
+      );
 
-			// clear messages
-			this.setText("form-error", "");
-			this.setText("form-success", "");
-			this.setText("username-error", "");
-			this.setText("password-error", "");
-			document.getElementById("username")?.removeAttribute(
-				"aria-invalid"
-			);
-			document.getElementById("password")?.removeAttribute(
-				"aria-invalid"
-			);
+      // clear messages
+      this.setText("form-error", "");
+      this.setText("form-success", "");
+      this.setText("username-error", "");
+      this.setText("password-error", "");
+      document.getElementById("username")?.removeAttribute("aria-invalid");
+      document.getElementById("password")?.removeAttribute("aria-invalid");
 
-			// basic presence checks
-			if (!username) {
-				this.setFieldError(
-					"username",
-					"Username is required."
-				);
-				return;
-			}
-			if (!password) {
-				this.setFieldError(
-					"password",
-					"Password is required."
-				);
-				return;
-			}
+      // basic presence and length checks
+      if (!username) {
+        this.setFieldError("username", "Username is required.");
+        return;
+      }
+      if (!password) {
+        this.setFieldError("password", "Password is required.");
+        return;
+      }
+      if (username.length > 128) {
+        this.setFieldError("username", "Username too long.");
+        return;
+      }
+      if (password.length > 1024) {
+        this.setFieldError("password", "Password too long.");
+        return;
+      }
 
-			this.setBusy(true);
+      this.setBusy(true);
 
-			try {
-				const data = await login({
-					username,
-					password,
-				});
+      try {
+        // Server will set HttpOnly cookies; response contains user info
+        const data = await login({ username, password });
 
-				// Optional: store tokens for subsequent requests (adjust to your auth model)
-				try {
-					localStorage.setItem(
-						"accessToken",
-						data.accessToken
-					);
-					localStorage.setItem(
-						"refreshToken",
-						data.refreshToken
-					);
-					localStorage.setItem(
-						"userId",
-						String(data.user.id)
-					);
-				} catch {
-					/* storage can fail in private mode; non-fatal */
-				}
+        this.setText("form-success", "Login successful! Redirecting…");
+        setTimeout(() => this.router.navigate("/profile"), 800);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Invalid username or password.";
+        this.setText("form-error", msg);
+      } finally {
+        this.setBusy(false);
+      }
+    };
 
-				this.setText(
-					"form-success",
-					"Login successful! Redirecting…"
-				);
-				setTimeout(
-					() => this.router.navigate("/profile"),
-					1500
-				);
-			} catch (err) {
-				const msg =
-					err instanceof Error
-						? err.message
-						: "Invalid username or password.";
-				this.setText("form-error", msg);
-			} finally {
-				this.setBusy(false);
-			}
-		};
+    this.formEl.addEventListener("submit", this.onSubmit);
+  }
 
-		this.formEl.addEventListener("submit", this.onSubmit);
-	}
+  cleanup(): void {
+    if (this.formEl && this.onSubmit) {
+      this.formEl.removeEventListener("submit", this.onSubmit);
+    }
+    this.formEl = null;
+    this.submitBtn = null;
+    this.onSubmit = undefined;
+  }
 
-	cleanup(): void {
-		if (this.formEl && this.onSubmit) {
-			this.formEl.removeEventListener(
-				"submit",
-				this.onSubmit
-			);
-		}
-		this.formEl = null;
-		this.submitBtn = null;
-		this.onSubmit = undefined;
-	}
+  // ---------- helpers ----------
+  private setText(id: string, text: string): void {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
 
-	// ---------- helpers ----------
-	private setText(id: string, text: string): void {
-		const el = document.getElementById(id);
-		if (el) el.textContent = text;
-	}
+  private setFieldError(name: "username" | "password", message: string): void {
+    const input = document.getElementById(name) as HTMLInputElement | null;
+    const el = document.getElementById(`${name}-error`);
+    if (input) input.setAttribute("aria-invalid", "true");
+    if (el) el.textContent = message;
+  }
 
-	private setFieldError(
-		name: "username" | "password",
-		message: string
-	): void {
-		const input = document.getElementById(
-			name
-		) as HTMLInputElement | null;
-		const el = document.getElementById(`${name}-error`);
-		if (input) input.setAttribute("aria-invalid", "true");
-		if (el) el.textContent = message;
-	}
-
-	private setBusy(busy: boolean): void {
-		if (!this.submitBtn) return;
-		this.submitBtn.disabled = busy;
-		this.submitBtn.textContent = busy ? "Logging in…" : "Login";
-	}
+  private setBusy(busy: boolean): void {
+    if (!this.submitBtn) return;
+    this.submitBtn.disabled = busy;
+    this.submitBtn.textContent = busy ? "Logging in…" : "Login";
+  }
 }
