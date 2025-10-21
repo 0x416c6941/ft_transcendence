@@ -27,6 +27,10 @@ export default class OnlineUsers {
     this.socket = (window as any).userSocket;
     
     if (this.socket) {
+      // Check if userId is already available
+      if (this.socket.userId) {
+        this.currentUserId = this.socket.userId;
+      }
       this.setupSocketListeners();
     }
   }
@@ -66,6 +70,11 @@ export default class OnlineUsers {
     this.container.id = 'online-users-panel';
     this.container.className = 'fixed top-0 right-0 h-full w-80 bg-gray-800 shadow-2xl transform translate-x-full transition-transform duration-300 z-50';
     parentElement.appendChild(this.container);
+
+    // Request current state from server
+    if (this.socket) {
+      this.socket.emit('request_online_users');
+    }
 
     this.render();
   }

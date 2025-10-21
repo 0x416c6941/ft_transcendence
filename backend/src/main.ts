@@ -178,6 +178,14 @@ const start = async () => {
 				fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
 			});
 
+			// Handle request for current online users list
+			socket.on('request_online_users', () => {
+				const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
+					userId: id, username: data.username, displayName: data.displayName
+				}));
+				socket.emit('online_users_updated', usersList);
+			});
+
 			// Handle game invites
 			socket.on('game:invite', (data: { targetUserId: number }) => {
 				const targetUser = onlineUsers.get(data.targetUserId);

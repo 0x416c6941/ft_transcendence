@@ -33,6 +33,12 @@ document.addEventListener("DOMContentLoaded", (e) => {
 				console.error('Socket.IO connection error:', err.message);
 			});
 
+			// Store user info when received
+			socket.on('user_info', (data: { userId: number; username: string }) => {
+				socket.userId = data.userId;
+				socket.username = data.username;
+			});
+
 			// Store socket globally for access from components
 			(window as any).userSocket = socket;
 		}
