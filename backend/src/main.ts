@@ -7,6 +7,7 @@ import { Server } from "socket.io";
 import userRoutes from './routes/users.js';
 import { allSchemas } from './schemas/index.js';
 import { registerSwagger } from './swagger/config.js';
+import { setupTetrisGame } from './tetrisGame.js';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -139,6 +140,9 @@ const start = async () => {
 				fastify.log.info(`Sock disconnect: ${socket.id}`);
 			})
 		})
+
+		// Set up Tetris game server
+		setupTetrisGame(fastify, io);
 
 		/* IPv4 only here.
 		 * We don't need to take care of IPv6, since we'll either way

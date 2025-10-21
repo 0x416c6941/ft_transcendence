@@ -5,6 +5,7 @@
 import { PathToRegister } from './router.js';
 import HomeView from './views/HomeView.js';
 import LoginView from './views/LoginView.js';
+import TetrisView from './views/TetrisView.js';
 
 /**
  * @var {string} DIV_ID
@@ -19,6 +20,7 @@ export const DIV_ID: string = 'app';
 export const PATHS_TO_ROUTE: PathToRegister[] = [
 	{ path: '/', constructor: HomeView },
 	{ path: '/login', constructor: LoginView },
+	{ path: '/tetris', constructor: TetrisView },
 ] as const;
 
 /**
