@@ -54,7 +54,7 @@ export default class OnlineUsers {
     this.socket.on('game:invite_accepted', (data: { byUsername: string }) => {
       this.pendingInvite = null;
       this.showNotification(`${data.byUsername} accepted your invite!`, 'success');
-      setTimeout(() => this.router.navigate('/tetris'), 1500);
+      setTimeout(() => this.router.navigate('/tetris-remote'), 1500);
     });
 
     this.socket.on('game:invite_declined', (data: { byDisplayName: string }) => {
@@ -219,7 +219,7 @@ export default class OnlineUsers {
     this.socket?.emit('game:accept', { fromUserId: this.receivedInvite.fromUserId });
     this.showNotification('Invite accepted! Starting game...', 'success');
     this.receivedInvite = null;
-    setTimeout(() => this.router.navigate('/tetris'), 1500);
+    setTimeout(() => this.router.navigate('/tetris-remote'), 1500);
   }
 
   private declineInvite(): void {

@@ -9,6 +9,7 @@ import { allSchemas } from './schemas/index.js';
 import { registerSwagger } from './swagger/config.js';
 import { setupTetrisGame } from './tetrisGame.js';
 import { setupTetrisAI } from './tetrisAI.js';
+import { setupTetrisRemote } from './tetrisRemote.js';
 import { seedDatabase } from './seedDatabase.js';
 import { verifyToken } from './utils/jwt.js';
 
@@ -236,6 +237,7 @@ const start = async () => {
 		// Set up Tetris game servers
 		setupTetrisGame(fastify, io);
 		setupTetrisAI(fastify, io);
+		setupTetrisRemote(fastify, io);
 
 		/* IPv4 only here.
 		 * We don't need to take care of IPv6, since we'll either way

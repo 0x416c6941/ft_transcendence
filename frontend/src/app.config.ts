@@ -7,6 +7,7 @@ import HomeView from './views/HomeView.js';
 import LoginView from './views/LoginView.js';
 import TetrisView from './views/TetrisView.js';
 import TetrisAIView from './views/TetrisAIView.js';
+import TetrisRemoteView from './views/TetrisRemoteView.js';
 
 /**
  * @var {string} DIV_ID
@@ -23,6 +24,7 @@ export const PATHS_TO_ROUTE: PathToRegister[] = [
 	{ path: '/login', constructor: LoginView },
 	{ path: '/tetris', constructor: TetrisView },
 	{ path: '/tetris-ai', constructor: TetrisAIView },
+	{ path: '/tetris-remote', constructor: TetrisRemoteView },
 ] as const;
 
 /**
