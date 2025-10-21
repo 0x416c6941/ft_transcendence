@@ -26,9 +26,17 @@ async getHtml(): Promise<string> {
            class="${buttonClass} text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
           ${buttonText}
         </a>
-        <a href="/pong" data-link
+        <a href="/rooms/new" data-link
+           class="bg-green-600 text-white px-4 py-2 rounded shadow text-center">
+          Create Room
+        </a>
+        <a href="/rooms/join" data-link
+           class="bg-blue-600 text-white px-4 py-2 rounded shadow text-center">
+          Join Room
+        </a>
+        <a href="/pong-local" data-link
            class="bg-indigo-600 text-white px-4 py-2 rounded shadow text-center">
-          Play Pong
+          Play Pong (Local)
         </a>
         <a href="/tetris" data-link
            class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">

@@ -5,7 +5,12 @@
 import { PathToRegister } from './router.js';
 import HomeView from './views/HomeView.js';
 import LoginView from './views/LoginView.js';
+// Pong-related views.
 import PongView from './views/PongView.js';
+import CreateRoomView from './views/CreateRoomView.js';
+import JoinRoomView from './views/JoinRoomView.js';
+import PongLocalView from './views/PongLocalView.js';
+// Tetris-related views.
 import TetrisView from './views/TetrisView.js';
 import TetrisAIView from './views/TetrisAIView.js';
 import TetrisRemoteView from './views/TetrisRemoteView.js';
@@ -23,10 +28,13 @@ export const DIV_ID: string = 'app';
 export const PATHS_TO_ROUTE: PathToRegister[] = [
 	{ path: '/', constructor: HomeView },
 	{ path: '/login', constructor: LoginView },
+	{ path: '/rooms/new', constructor: CreateRoomView },
+	{ path: '/rooms/join', constructor: JoinRoomView },
 	{ path: '/pong', constructor: PongView },
+	{ path: '/pong-local', constructor: PongLocalView },
 	{ path: '/tetris', constructor: TetrisView },
 	{ path: '/tetris-ai', constructor: TetrisAIView },
-	{ path: '/tetris-remote', constructor: TetrisRemoteView },
+	{ path: '/tetris-remote', constructor: TetrisRemoteView }
 ] as const;
 
 /**
