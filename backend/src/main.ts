@@ -10,6 +10,7 @@ import { registerSwagger } from './swagger/config.js';
 import { setupTetrisGame } from './tetrisGame.js';
 import { setupTetrisAI } from './tetrisAI.js';
 import { seedDatabase } from './seedDatabase.js';
+import { verifyToken } from './utils/jwt.js';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -134,14 +135,92 @@ const start = async () => {
 			path: '/api/socket.io/'
 		});
 
+		// Online users tracking
+		const onlineUsers = new Map<number, { socketId: string; username: string; displayName: string }>();
+
+		// Socket.IO authentication middleware
+		io.use(async (socket, next) => {
+			try {
+				const token = socket.handshake.auth.token || 
+					socket.handshake.headers.cookie?.split(';')
+						.find(c => c.trim().startsWith('accessToken='))?.split('=')[1];
+
+				if (!token) return next(new Error('Authentication required'));
+
+				const decoded = verifyToken(token);
+				(socket as any).userId = decoded.userId;
+				(socket as any).username = decoded.username;
+				next();
+			} catch (error) {
+				next(new Error('Invalid token'));
+			}
+		});
+
 		fastify.decorate('io', io);
 		io.on('connection', (socket) => {
-			fastify.log.info(`New sock: ${socket.id}`);
+			const userId = (socket as any).userId;
+			const username = (socket as any).username;
+			
+			fastify.log.info(`User ${username} (${userId}) connected: ${socket.id}`);
+			socket.emit('user_info', { userId, username });
+
+			// Get user's display name and add to online users
+			fastify.sqlite.get('SELECT display_name FROM users WHERE id = ?', [userId], (err: Error | null, row: any) => {
+				if (err || !row) return fastify.log.error(`Failed to get display name for user ${userId}`);
+
+				onlineUsers.set(userId, { socketId: socket.id, username, displayName: row.display_name });
+
+				// Broadcast updated online users list
+				const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
+					userId: id, username: data.username, displayName: data.displayName
+				}));
+				io.emit('online_users_updated', usersList);
+				fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
+			});
+
+			// Handle game invites
+			socket.on('game:invite', (data: { targetUserId: number }) => {
+				const targetUser = onlineUsers.get(data.targetUserId);
+				if (!targetUser) return;
+				
+				io.to(targetUser.socketId).emit('game:invite_received', {
+					fromUserId: userId, fromUsername: username, fromDisplayName: onlineUsers.get(userId)?.displayName
+				});
+				fastify.log.info(`Game invite from ${username} to ${targetUser.username}`);
+			});
+
+			// Handle game invite acceptance
+			socket.on('game:accept', (data: { fromUserId: number }) => {
+				const inviterUser = onlineUsers.get(data.fromUserId);
+				if (!inviterUser) return;
+				
+				io.to(inviterUser.socketId).emit('game:invite_accepted', { byUserId: userId, byUsername: username });
+				fastify.log.info(`${username} accepted game invite from ${inviterUser.username}`);
+			});
+
+			// Handle game invite decline
+			socket.on('game:decline', (data: { fromUserId: number }) => {
+				const inviterUser = onlineUsers.get(data.fromUserId);
+				if (!inviterUser) return;
+				
+				io.to(inviterUser.socketId).emit('game:invite_declined', {
+					byUserId: userId, byUsername: username, byDisplayName: onlineUsers.get(userId)?.displayName
+				});
+				fastify.log.info(`${username} declined game invite from ${inviterUser.username}`);
+			});
 
 			socket.on('disconnect', () => {
-				fastify.log.info(`Sock disconnect: ${socket.id}`);
-			})
-		})
+				fastify.log.info(`User ${username} (${userId}) disconnected: ${socket.id}`);
+				onlineUsers.delete(userId);
+
+				// Broadcast updated online users list
+				const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
+					userId: id, username: data.username, displayName: data.displayName
+				}));
+				io.emit('online_users_updated', usersList);
+				fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
+			});
+		});
 
 		// Seed database with default users (if empty)
 		await seedDatabase(fastify);

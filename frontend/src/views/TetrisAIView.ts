@@ -1,6 +1,7 @@
 import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
+import OnlineUsers from '../components/OnlineUsers.js';
 
 /**
  * @class TetrisAIView
@@ -10,6 +11,7 @@ export default class TetrisAIView extends AbstractView {
     private socket: any = null;
     private gameState: GameSnapshot | null = null;
     private animationFrameId: number | null = null;
+    private onlineUsersComponent: OnlineUsers | null = null;
     
     // Key state tracking
     private keys = {
@@ -155,6 +157,16 @@ export default class TetrisAIView extends AbstractView {
         this.setupButtons();
         this.setupKeyboardControls();
         this.animationFrameId = requestAnimationFrame(this.loop);
+
+        // Mount OnlineUsers component if user is logged in
+        const hasAccessToken = document.cookie.split(';').some(cookie => cookie.trim().startsWith('accessToken='));
+        if (hasAccessToken && (window as any).userSocket) {
+            this.onlineUsersComponent = new OnlineUsers(this.router);
+            const mainElement = document.querySelector('main');
+            if (mainElement) {
+                this.onlineUsersComponent.mount(mainElement);
+            }
+        }
     }
 
     private setupSocket(): void {
@@ -239,6 +251,12 @@ export default class TetrisAIView extends AbstractView {
 
         if (this.animationFrameId !== null) {
             cancelAnimationFrame(this.animationFrameId);
+        }
+
+        // Unmount OnlineUsers component
+        if (this.onlineUsersComponent) {
+            this.onlineUsersComponent.unmount();
+            this.onlineUsersComponent = null;
         }
     }
 

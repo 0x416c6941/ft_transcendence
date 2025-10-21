@@ -129,6 +129,25 @@ export default class LoginView extends AbstractView {
       }
 
       this.showSuccess(`Welcome, ${username}!`, errorMsg, successMsg);
+
+      // Connect to Socket.IO with JWT token for online presence
+      const socket = (window as any).io(window.location.origin, {
+        path: '/api/socket.io/',
+        auth: {
+          token: data.accessToken
+        }
+      });
+
+      socket.on('connect', () => {
+        console.log('Connected to Socket.IO as authenticated user');
+      });
+
+      socket.on('connect_error', (err: Error) => {
+        console.error('Socket.IO connection error:', err.message);
+      });
+
+      // Store socket globally for access from other components
+      (window as any).userSocket = socket;
       
       // Reload page to show logout button
       setTimeout(() => {
@@ -141,6 +160,13 @@ export default class LoginView extends AbstractView {
   }
 
   private async logout(errorMsg: HTMLElement, successMsg: HTMLElement): Promise<void> {
+    // Disconnect Socket.IO if connected
+    const socket = (window as any).userSocket;
+    if (socket) {
+      socket.disconnect();
+      delete (window as any).userSocket;
+    }
+
     // Clear cookies
     document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     document.cookie = 'refreshToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';

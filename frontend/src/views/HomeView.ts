@@ -1,9 +1,11 @@
 import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
+import OnlineUsers from '../components/OnlineUsers.js';
 
 export default class HomeView extends AbstractView {
   private isLoggedIn: boolean = false;
+  private onlineUsersComponent: OnlineUsers | null = null;
 
   constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
     super(router, pathParams, queryParams);
@@ -26,12 +28,18 @@ async getHtml(): Promise<string> {
         </a>
         <a href="/tetris" data-link
            class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
-          Tetris (2 Players)
+          Tetris: Alias vs Alias
         </a>
         <a href="/tetris-ai" data-link
            class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
-          Tetris vs AI
+          Tetris: Alias vs AI
         </a>
+        ${this.isLoggedIn ? `
+        <button id="remote-game-btn"
+           class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
+          Remote Game
+        </button>
+        ` : ''}
       </div>
     </main>
   `;
@@ -46,6 +54,32 @@ async getHtml(): Promise<string> {
     return document.cookie.split(';').some(cookie => cookie.trim().startsWith('accessToken='));
   }
 
-  setup(): void {}
-  cleanup(): void {}
+  setup(): void {
+    // Mount OnlineUsers component if user is logged in
+    if (this.isLoggedIn && (window as any).userSocket) {
+      this.onlineUsersComponent = new OnlineUsers(this.router);
+      const mainElement = document.querySelector('main');
+      if (mainElement) {
+        this.onlineUsersComponent.mount(mainElement);
+      }
+
+      // Setup Remote Game button click handler
+      const remoteGameBtn = document.getElementById('remote-game-btn');
+      if (remoteGameBtn) {
+        remoteGameBtn.addEventListener('click', () => {
+          if (this.onlineUsersComponent) {
+            this.onlineUsersComponent.show();
+          }
+        });
+      }
+    }
+  }
+
+  cleanup(): void {
+    // Unmount OnlineUsers component
+    if (this.onlineUsersComponent) {
+      this.onlineUsersComponent.unmount();
+      this.onlineUsersComponent = null;
+    }
+  }
 }
