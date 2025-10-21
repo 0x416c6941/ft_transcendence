@@ -18,8 +18,6 @@ export default class HomeView extends AbstractView {
       <div class="flex flex-col space-y-4">
         <a href="/pong" data-link
            class="bg-sky-500 text-white px-4 py-2 rounded shadow text-center">Play Game</a>
-        <a href="/login" data-link
-           class="bg-sky-500 text-white px-4 py-2 rounded shadow text-center">Login</a>
       </div>
     </main>
     `;
