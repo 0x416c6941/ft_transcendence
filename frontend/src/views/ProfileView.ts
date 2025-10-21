@@ -1,13 +1,22 @@
 import AbstractView from "./AbstractView.js";
 import Router from "../router.js";
 import { APP_NAME } from "../app.config.js";
-import { ApiError, getUserById, type UserById, logout as apiLogout, getCurrentUser } from "../api/users.js";
+import {
+  ApiError,
+  getCurrentUser,
+  logout as apiLogout,
+  deleteUser as apiDeleteUser,
+} from "../api/users.js";
+import { auth } from "../auth.js";
 
 /**
  * ProfileView (cookie-based auth)
  * --------------------------------
- * - Uses cookies for auth (no Authorization header)
- * - Redirects to /login if no id or the session is invalid/expired
+ * - Uses HttpOnly cookies for session
+ * - Fetches user data from /api/users/me
+ * - Allows updating profile (display name, email, password)
+ * - Allows logout and account deletion
+ * - Redirects to /login if unauthenticated
  */
 export default class ProfileView extends AbstractView {
   constructor(
@@ -28,14 +37,37 @@ export default class ProfileView extends AbstractView {
         <section class="w-full max-w-96 bg-white dark:bg-neutral-800 rounded shadow p-4">
           <h1 class="txt-light-dark-sans text-2xl mb-4">Your profile</h1>
 
-          <div id="profile-content" class="space-y-2">
-            <p class="text-neutral-500">Loading…</p>
-          </div>
+          <form id="profile-form" class="space-y-4">
+            <div>
+              <label class="block text-sm text-neutral-500" for="display_name">Display name</label>
+              <input id="display_name" name="display_name"
+                class="w-full border rounded p-2 bg-neutral-50 dark:bg-neutral-700"
+                type="text" minlength="1" maxlength="20" required />
+            </div>
 
-          <p id="profile-error" class="text-red-500 text-sm mt-3" role="alert" aria-live="polite"></p>
+            <div>
+              <label class="block text-sm text-neutral-500" for="email">Email</label>
+              <input id="email" name="email"
+                class="w-full border rounded p-2 bg-neutral-50 dark:bg-neutral-700"
+                type="email" required />
+            </div>
 
-          <div class="mt-6 text-center">
-            <button id="logout-btn" class="bg-red-500 text-white py-1 px-3 rounded">Logout</button>
+            <div>
+              <label class="block text-sm text-neutral-500" for="password">New Password (optional)</label>
+              <input id="password" name="password"
+                class="w-full border rounded p-2 bg-neutral-50 dark:bg-neutral-700"
+                type="password" minlength="8" placeholder="Leave blank to keep current" />
+            </div>
+
+            <button id="update-btn" type="submit"
+              class="w-full bg-sky-500 text-white py-2 rounded shadow">Save changes</button>
+          </form>
+
+          <p id="profile-msg" class="text-sm mt-3 text-center"></p>
+
+          <div class="mt-6 text-center space-x-4">
+            <button id="logout-btn" class="bg-neutral-700 text-white py-1 px-3 rounded">Logout</button>
+            <button id="delete-btn" class="bg-red-500 text-white py-1 px-3 rounded">Delete Account</button>
           </div>
         </section>
       </main>
@@ -43,66 +75,102 @@ export default class ProfileView extends AbstractView {
   }
 
   async setup(): Promise<void> {
-    const container = document.getElementById("profile-content");
-    const err = document.getElementById("profile-error");
-    const logoutBtn = document.getElementById("logout-btn") as HTMLButtonElement | null;
-    if (!container || !err || !logoutBtn) return;
-
-    // --- Fetch current user (request() auto-tries /refresh on 401) ---
-    try {
-      const data: UserById = await getCurrentUser();
-      const { username, email, display_name } = data.user;
-
-      container.innerHTML = `
-        <dl class="divide-y divide-neutral-200 dark:divide-neutral-700">
-          <div class="py-2 grid grid-cols-3 gap-2">
-            <dt class="text-neutral-500">Display name</dt>
-            <dd class="col-span-2 txt-light-dark-sans">${escapeHtml(display_name ?? "")}</dd>
-          </div>
-          <div class="py-2 grid grid-cols-3 gap-2">
-            <dt class="text-neutral-500">Username</dt>
-            <dd class="col-span-2 txt-light-dark-sans">${escapeHtml(username)}</dd>
-          </div>
-          <div class="py-2 grid grid-cols-3 gap-2">
-            <dt class="text-neutral-500">Email</dt>
-            <dd class="col-span-2 txt-light-dark-sans">${escapeHtml(email)}</dd>
-          </div>
-        </dl>
-      `;
-      err.textContent = "";
-    } catch (e) {
-      const msg =
-        e instanceof Error ? e.message : "Failed to load profile.";
-      err.textContent = msg;
-      container.innerHTML = `<p class="text-neutral-500">Could not load your profile.</p>`;
-
-      // If unauthenticated even after refresh → send to login
-      if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
-        setTimeout(() => this.router.navigate("/login"), 800);
-      }
+    if (!auth.isAuthed()) {
+      this.router.navigate("/login");
+      return;
     }
 
-    // --- Logout (server clears cookies; we clear local userId) ---
+    const form = document.getElementById("profile-form") as HTMLFormElement | null;
+    const msg = document.getElementById("profile-msg");
+    const logoutBtn = document.getElementById("logout-btn") as HTMLButtonElement | null;
+    const deleteBtn = document.getElementById("delete-btn") as HTMLButtonElement | null;
+    const updateBtn = document.getElementById("update-btn") as HTMLButtonElement | null;
+    if (!form || !msg || !logoutBtn || !deleteBtn || !updateBtn) return;
+
+    // --- Load user data ---
+    try {
+      const data = await getCurrentUser();
+      const { username, email, display_name } = data.user;
+      (document.getElementById("display_name") as HTMLInputElement).value = display_name ?? "";
+      (document.getElementById("email") as HTMLInputElement).value = email;
+      msg.textContent = `Logged in as ${username}`;
+      msg.className = "text-neutral-500 text-sm text-center mt-2";
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "Failed to load profile.";
+      msg.textContent = m;
+      msg.className = "text-red-500 text-sm text-center mt-2";
+
+      if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+        await auth.signOut();
+        setTimeout(() => this.router.navigate("/login"), 800);
+      }
+      return;
+    }
+
+    // --- Update profile ---
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      msg.textContent = "";
+
+      const display_name = (document.getElementById("display_name") as HTMLInputElement).value.trim();
+      const email = (document.getElementById("email") as HTMLInputElement).value.trim();
+      const password = (document.getElementById("password") as HTMLInputElement).value.trim();
+
+      updateBtn.disabled = true;
+      updateBtn.textContent = "Saving…";
+
+      try {
+        const res = await fetch("/api/users/me", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ display_name, email, ...(password ? { password } : {}) }),
+        });
+
+        if (!res.ok) throw new Error(`Update failed (${res.status})`);
+        msg.textContent = "Profile updated successfully!";
+        msg.className = "text-green-600 text-sm text-center mt-2";
+      } catch (err) {
+        msg.textContent = err instanceof Error ? err.message : "Update failed.";
+        msg.className = "text-red-500 text-sm text-center mt-2";
+      } finally {
+        updateBtn.disabled = false;
+        updateBtn.textContent = "Save changes";
+      }
+    });
+
+    // --- Logout ---
     logoutBtn.addEventListener("click", async () => {
       logoutBtn.disabled = true;
       logoutBtn.textContent = "Logging out…";
       try {
         await apiLogout();
+        await auth.signOut();
+        this.router.navigate("/login");
       } catch {
-        // Even if the network fails, still clear local state
-      } finally {
         this.router.navigate("/login");
       }
     });
-  }
-}
 
-/** Tiny HTML escaper to avoid accidental injection when rendering text */
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    // --- Delete account ---
+    deleteBtn.addEventListener("click", async () => {
+      const confirmed = window.confirm("Delete your account permanently?");
+      if (!confirmed) return;
+
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = "Deleting…";
+      try {
+        await apiDeleteUser();
+        await auth.signOut();
+        msg.textContent = "Account deleted.";
+        msg.className = "text-green-600 text-sm text-center mt-2";
+        setTimeout(() => this.router.navigate("/register"), 1000);
+      } catch (err) {
+        msg.textContent = err instanceof Error ? err.message : "Deletion failed.";
+        msg.className = "text-red-500 text-sm text-center mt-2";
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = "Delete Account";
+      }
+    });
+  }
 }

@@ -441,4 +441,142 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			}
 		}
 	);
+	fastify.put('/users/me', {
+		preHandler: authenticateToken
+	}, async (request: FastifyRequest, reply: FastifyReply) => {
+		if (!request.user) return reply.code(401).send({ error: 'Unauthorized' });
+
+		const body = (request.body as UpdateUserBody) || {};
+  		const username = typeof body.username === 'string' ? body.username.trim() : undefined;
+  		const password = typeof body.password === 'string' ? body.password.trim() : undefined;
+  		const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : undefined;
+  		const display_name = typeof body.display_name === 'string' ? body.display_name.trim() : undefined;
+
+		// Basic validations (extend as needed)
+  		if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    			return reply.code(400).send({ error: 'Invalid email format' });
+  		}
+
+		const updates: string[] = [];
+		const values: any[] = [];
+
+		if (username && username.length > 0) {
+    			updates.push('username = ?');
+    			values.push(username);
+		}
+		if (password && password.length > 0) {
+		    	const hashed = await bcrypt.hash(password, SALT_ROUNDS);
+		    	updates.push('password = ?');
+		    	values.push(hashed);
+		}
+		if (email && email.length > 0) {
+		    	updates.push('email = ?');
+		    	values.push(email);
+		}
+		if (display_name && display_name.length > 0) {
+		    	updates.push('display_name = ?');
+		    	values.push(display_name);
+		}
+		if (updates.length === 0) {
+			return reply.code(400).send({ error: 'No fields to update' });
+		}
+
+		values.push(request.user.userId);
+
+		try {
+			const result = await new Promise<any>((resolve, reject) => {
+				fastify.sqlite.run(
+					`UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+					values,
+					function (err: Error | null) {
+						if (err) {
+							reject(err);
+						} else {
+							resolve(this);
+						}
+					}
+				);
+			});
+			// If no rows changed, user may still exist (values identical). Check existence.
+			if (result.changes === 0) {
+				const existing = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(
+						`SELECT id FROM users WHERE id = ?`,
+						[request.user!.userId],
+						(err: Error | null, row: any) => {
+							if (err) {
+								reject(err);
+							} else {
+								resolve(row);
+							}
+						}
+					);
+				});
+				if (!existing) {
+					return reply.code(404).send({ error: 'User not found' });
+				}
+			}
+
+			const updated = await new Promise<any>((resolve, reject) => {
+      				fastify.sqlite.get(
+        				`SELECT id, username, email, display_name, created_at FROM users WHERE id = ?`,
+        				[request.user!.userId],
+        				(err: Error | null, row: any) => (err ? reject(err) : resolve(row))
+      				);
+    			});
+
+// Optional: rotate tokens if username changed (uncomment if you want this behavior)
+    // if (username && username !== request.user.username) {
+    //   const newAccess = generateAccessToken(updated.id, updated.username);
+    //   const newRefresh = generateRefreshToken(updated.id, updated.username);
+    //   reply.setCookie('accessToken', newAccess, accessCookieOpts)
+    //        .setCookie('refreshToken', newRefresh, refreshCookieOpts);
+    // }
+			return reply.code(200).send({
+      				message: result.changes === 0 ? 'No changes' : 'Profile updated successfully',
+      				user: updated
+    			});
+  		} catch (err: any) {
+  			if (typeof err?.message === 'string' && err.message.includes('UNIQUE constraint failed')) {
+  			  	return reply.code(409).send({ error: 'Username or email already exists' });
+  			}
+  			fastify.log.error(err);
+  			return reply.code(500).send({ error: 'Failed to update profile' });
+		}
+	});
+
+	fastify.delete('/users/me', {
+		preHandler: authenticateToken
+	}, async (request: FastifyRequest, reply: FastifyReply) => {
+		if (!request.user) return reply.code(401).send({ error: 'Unauthorized' });
+
+		try {
+			const result = await new Promise<any>((resolve, reject) => {
+				fastify.sqlite.run(
+					`DELETE FROM users WHERE id = ?`,
+					[request.user!.userId],
+					function (err: Error | null) {
+						if (err) {
+							reject(err);
+						} else {
+							resolve(this);
+						}
+					}
+				);
+			});
+
+			if (result.changes === 0) {
+				return reply.code(404).send({ error: 'User not found' });
+			}
+
+			// Clear cookies on account deletion
+			reply.clearCookie('accessToken', { path: accessCookieOpts.path })
+				.clearCookie('refreshToken', { path: refreshCookieOpts.path })
+				.code(200)
+				.send({ message: 'User deleted successfully' });
+		} catch (err: any) {
+			fastify.log.error(err);
+			return reply.code(500).send({ error: 'Failed to delete user' });
+		}
+	});
 }

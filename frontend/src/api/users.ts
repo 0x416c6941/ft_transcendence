@@ -186,3 +186,23 @@ export async function getCurrentUser(): Promise<UserById> {
     headers: { Accept: "application/json" },
   });
 }
+
+
+export async function updateUser(payload: {
+  username?: string;
+  email?: string;
+  display_name?: string;
+  password?: string;
+}): Promise<{ message : string }> {
+  return request<{ message: string }>("/api/users/me", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteUser(): Promise<{ message: string }> {
+  return request<{ message: string }>("/api/users/me", {
+    method: "DELETE",
+  });
+}
