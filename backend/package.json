@@ -1,7 +1,6 @@
 {
 	"name": "ft_transcendence_backend",
 	"version": "0.0.1",
-	"author": "František Maxian <fmaxian@student.42prague.com> (https://github.com/gittwenstein)",
 	"contributors": [
 		{
 			"name": "Anastassiya Krasheninnikova",
@@ -14,6 +13,11 @@
 			"url": "https://github.com/hlib-lyshchuk"
 		},
 		{
+			"name": "František Maxian",
+			"email": "fmaxian@student.42prague.com",
+			"url": "https://github.com/gittwenstein"
+		},
+		{
 			"name": "Asset Sagymbayev",
 			"email": "asagymba@student.42prague.com",
 			"url": "https://github.com/0x416c6941"
@@ -22,16 +26,28 @@
 	"type": "module",
 	"scripts": {
 		"build": "tsc -p ./",
-		"start": "node ./dist/main.js"
+		"start": "node ./dist/main.js",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:ui": "vitest --ui"
 	},
 	"dependencies": {
-		"fastify": "~5.6",
+		"@fastify/swagger": "^9.5.2",
+		"@fastify/swagger-ui": "^5.2.3",
+		"@types/bcrypt": "^6.0.0",
+		"@types/jsonwebtoken": "^9.0.10",
 		"@types/node": "~24.5",
-		"sqlite3": "~5.1",
+		"bcrypt": "^6.0.0",
+		"fastify": "~5.6",
 		"fastify-plugin": "~5.1",
-		"socket.io": "~4.8"
+		"jsonwebtoken": "^9.0.2",
+		"socket.io": "~4.8",
+		"sqlite3": "~5.1",
+		"mime": "~4.1"
 	},
 	"devDependencies": {
-		"typescript": "~5.9"
+		"@vitest/ui": "^3.2.4",
+		"typescript": "~5.9",
+		"vitest": "^3.2.4"
 	}
 }

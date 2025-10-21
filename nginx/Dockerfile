@@ -13,7 +13,7 @@ RUN npm install && npm run build
 
 
 # NGINX image itself.
-FROM nginx:1.28
+FROM nginx:1.29
 LABEL ft_transcendence.stage="run"
 
 RUN rm -f /etc/nginx/default.conf		\

@@ -5,13 +5,16 @@
 		"target": "ES6",
 		"module": "Node16",
 		"strict": true,
-		"moduleResolution": "node16"
+		"moduleResolution": "node16",
+		"types": ["vitest/globals"]
 	},
 	"include": [
-		"src/types/fastify.d.ts"
+		"src/types/fastify.d.ts",
+		"src/types/users.d.ts"
 	],
 	"files": [
 		"src/main.ts",
-		"src/fastifySqlite.ts"
+		"src/fastifySqlite.ts",
+		"src/routes/users.ts"
 	]
 }
