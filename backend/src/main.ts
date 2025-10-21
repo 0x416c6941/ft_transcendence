@@ -9,6 +9,7 @@ import { allSchemas } from './schemas/index.js';
 import { registerSwagger } from './swagger/config.js';
 import { setupTetrisGame } from './tetrisGame.js';
 import { setupTetrisAI } from './tetrisAI.js';
+import { seedDatabase } from './seedDatabase.js';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -141,6 +142,9 @@ const start = async () => {
 				fastify.log.info(`Sock disconnect: ${socket.id}`);
 			})
 		})
+
+		// Seed database with default users (if empty)
+		await seedDatabase(fastify);
 
 		// Set up Tetris game servers
 		setupTetrisGame(fastify, io);
