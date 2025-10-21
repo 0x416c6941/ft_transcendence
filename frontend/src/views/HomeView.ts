@@ -18,7 +18,11 @@ async getHtml(): Promise<string> {
         </a>
         <a href="/tetris" data-link
            class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
-          Play Tetris
+          Tetris (2 Players)
+        </a>
+        <a href="/tetris-ai" data-link
+           class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
+          Tetris vs AI
         </a>
       </div>
     </main>

@@ -8,6 +8,7 @@ import userRoutes from './routes/users.js';
 import { allSchemas } from './schemas/index.js';
 import { registerSwagger } from './swagger/config.js';
 import { setupTetrisGame } from './tetrisGame.js';
+import { setupTetrisAI } from './tetrisAI.js';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -141,8 +142,9 @@ const start = async () => {
 			})
 		})
 
-		// Set up Tetris game server
+		// Set up Tetris game servers
 		setupTetrisGame(fastify, io);
+		setupTetrisAI(fastify, io);
 
 		/* IPv4 only here.
 		 * We don't need to take care of IPv6, since we'll either way
