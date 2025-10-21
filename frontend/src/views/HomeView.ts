@@ -37,7 +37,7 @@ async getHtml(): Promise<string> {
         ${this.isLoggedIn ? `
         <button id="remote-game-btn"
            class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
-          Remote Game
+          Tetris: Remote Game
         </button>
         ` : ''}
       </div>
