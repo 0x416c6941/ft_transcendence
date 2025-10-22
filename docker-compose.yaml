@@ -26,6 +26,9 @@ services:
     secrets:
       - ${SECRET_NAME_BACKEND_KEY}
       - ${SECRET_NAME_BACKEND_CRT}
+      - ${SECRET_NAME_BACKEND_JWT_KEY}
+      - ${SECRET_NAME_BACKEND_OAUTH_42_UID}
+      - ${SECRET_NAME_BACKEND_OAUTH_42_SECRET}
     volumes:
       - sqlite-db:${BACKEND_CONTAINER_DB_VOL_PATH}
     expose:
@@ -53,6 +56,15 @@ secrets:
   backend.crt:
     name: ${SECRET_NAME_BACKEND_CRT}
     file: ${SECRETS_DIR}/${SECRET_BACKEND_CRT_FILENAME}
+  jwt_secret.txt:
+    name: ${SECRET_NAME_BACKEND_JWT_KEY}
+    file: ${SECRETS_DIR}/${SECRET_BACKEND_JWT_KEY_FILENAME}
+  42_uid.txt:
+    name: ${SECRET_NAME_BACKEND_OAUTH_42_UID}
+    file: ${SECRETS_DIR}/${SECRET_BACKEND_OAUTH_42_UID_FILENAME}
+  42_secret.txt:
+    name: ${SECRET_NAME_BACKEND_OAUTH_42_SECRET}
+    file: ${SECRETS_DIR}/${SECRET_BACKEND_OAUTH_42_SECRET_FILENAME}
 
 volumes:
   sqlite-db:

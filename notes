@@ -1,0 +1,16 @@
+10. Avatar max size check
+	Also: should resize the avatar as well? Or could we just
+		leave the original resolution?
+	In what way will we receive avatars?
+	Is it just gonna be 1 whole body?
+11. Friends with IO check: can't be friend with your own self
+12. For user management: online status (potentially w/ socket.io)
+
+SQL table after users are done:
+	but all of this to discuss after users are done, but the main idea
+		at least for now is to have two tables:
+		tournaments and games, where tournaments contains
+			ids of games (1-n? m-n?)
+
+Update tests and swagger docs after all this stuff
+	(in the end? doesn't make sense to update each time during development).

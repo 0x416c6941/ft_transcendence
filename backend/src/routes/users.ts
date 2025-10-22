@@ -10,9 +10,32 @@ import {
 	getAllUsersSchema,
 	getUserByIdSchema,
 	updateUserSchema,
-	deleteUserSchema
+	deleteUserSchema,
+	makeAdminSchema,
+	unmakeAdminSchema,
+	oauth42Schema,
+	oauth42CallbackSchema,
+	oauth42UnlinkSchema,
+	getUserAvatarSchema,
+	resetUserAvatarSchema
 } from '../schemas/user.schemas.js';
+import {
+	ApiError,
+	dbGetUserByUsername,
+	dbGetUserById,
+	dbGetUserByAccountId42,
+	dbGetAdminByUserId,
+	dbUpdateUserAccountId42,
+	exchange42CodeFor42Token,
+	get42PublicData
+} from '../utils/users.js';
+import { URLSearchParams } from 'url';
+import path from 'node:path';
+import fsPromises from 'node:fs/promises';
+import mime from 'mime';
 
+/* Higher number => more Bcrypt hashing rounds
+   => more time is necessary and more difficult is brute-forcing. */
 const SALT_ROUNDS = 10;
 
 // centralize cookie options (adjust for your deployment)
@@ -228,6 +251,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		try {
 			const users = await new Promise<any[]>((resolve, reject) => {
 				fastify.sqlite.all(
+					// Returning linked 42 account ID would be weird, hence not doing it.
 					`SELECT id, username, email, display_name, created_at FROM users`,
 					[],
 					(err: Error | null, rows: any[]) => {
@@ -262,6 +286,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			try {
 				const user = await new Promise<any>((resolve, reject) => {
 					fastify.sqlite.get(
+						// Returning linked 42 account ID would be weird, hence not doing it.
 						`SELECT id, username, email, display_name, created_at FROM users WHERE id = ?`,
 						[id],
 						(err: Error | null, row: any) => {
@@ -300,9 +325,21 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			const { id } = request.params;
 			const { username, password, email, display_name } = request.body;
 
-			// Authorization check: users can only update their own profile
-			if (request.user?.userId !== parseInt(id)) {
-				return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
+			/* Authorization check: users can only update their own profile,
+			 * OR they must be an admin. */
+			try {
+				const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
+
+				if (request.user?.userId !== parseInt(id) && !adminCheck) {
+					return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
+				}
+			}
+			catch (error: unknown) {
+				fastify.log.error(error);
+				if (error instanceof ApiError) {
+					return reply.code(error.replyHttpCode).send(error.message);
+				}
+				return reply.code(500).send({ error: 'An internal server error occurred' });
 			}
 
 			// Build dynamic update query
@@ -348,6 +385,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					);
 				});
 
+				// May happen if user doesn't exist anymore.
 				if (result.changes === 0) {
 					return reply.code(404).send({ error: 'User not found' });
 				}
@@ -365,7 +403,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
-	// Delete a user by ID
+	// Delete a user by ID (protected - must be the same user or admin)
 	fastify.delete<{ Params: UserParams }>(
 		'/users/:id',
 		{
@@ -375,9 +413,21 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
 			const { id } = request.params;
 
-			// Authorization check: users can only delete their own profile
-			if (request.user?.userId !== parseInt(id)) {
-				return reply.code(403).send({ error: 'Forbidden: You can only delete your own profile' });
+			/* Authorization check: users can only update their own profile,
+			 * OR they must be an admin. */
+			try {
+				const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
+
+				if (request.user?.userId !== parseInt(id) && !adminCheck) {
+					return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
+				}
+			}
+			catch (error: unknown) {
+				fastify.log.error(error);
+				if (error instanceof ApiError) {
+					return reply.code(error.replyHttpCode).send(error.message);
+				}
+				return reply.code(500).send({ error: 'An internal server error occurred' });
 			}
 
 			try {
@@ -399,10 +449,386 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					return reply.code(404).send({ error: 'User not found' });
 				}
 
+				// Removing custom user avatar, if exists.
+				await fsPromises.rm(
+					path.join(fastify.config.avatarsPath.avatarsPath, `${id}.webp`),
+					{ force: true });
+
 				return reply.code(200).send({ message: 'User deleted successfully' });
 			} catch (err: any) {
 				fastify.log.error(err);
 				return reply.code(500).send({ error: 'Failed to delete user' });
+			}
+		}
+	);
+
+	/* Grant admin privileges to user by username (must be provided in body).
+	 * Protected - user trying to do must be authorized and must be an admin. */
+	fastify.post<{ Body: MakeOrUnmakeAdminBody }>(
+		'/users/admins',
+		{
+			preHandler: authenticateToken,
+			schema: makeAdminSchema
+		},
+		async (request: FastifyRequest<{ Body: MakeOrUnmakeAdminBody }>, reply: FastifyReply) => {
+			const { username } = request.body;
+
+			// This should NEVER happen.
+			if (request.user === undefined) {
+				fastify.log.error('"request.user" is undefined');
+				return reply.code(500).send({ error: `"request.user" is undefined` });
+			}
+			const ourUserId = request.user.userId;
+			try {
+				// Checking if our user has admin privileges.
+				const ourUser = await dbGetAdminByUserId(fastify, ourUserId);
+				if (!ourUser) {
+					return reply.code(403).send({ error: "You're not an admin" });
+				}
+
+				// Making `username` an admin.
+				const user = await dbGetUserByUsername(fastify, username);
+				if (!user) {
+					return reply.code(404).send({ error: "Provided username doesn't exist" });
+				}
+				const idToMakeAdmin = user.id;
+				// Checking if `username` is admin already.
+				const alreadyAdminCheck = await dbGetAdminByUserId(fastify, idToMakeAdmin);
+				if (alreadyAdminCheck) {
+					return reply.code(409).send({ error: "Provided username is already an admin" });
+				}
+
+				await new Promise<void>((resolve, reject) => {
+					fastify.sqlite.run(`
+							INSERT INTO admins (user_id) VALUES (?)
+						`, [idToMakeAdmin],
+						function (err: Error | null) {
+							if (err) {
+								reject(err);
+							}
+							else {
+								resolve();
+							}
+						}
+					);
+				});
+
+				return reply.code(200).send({ message: 'Successfully made user an admin' });
+			}
+			catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(500).send({ error: 'SQLite request failed' });
+			}
+		}
+	);
+
+	/* Revoke admin privileges of a user by username (must be provided in body).
+	 * Protected - user trying to do must be authorized and must be an admin. */
+	fastify.delete<{ Body: MakeOrUnmakeAdminBody }>(
+		'/users/admins',
+		{
+			preHandler: authenticateToken,
+			schema: unmakeAdminSchema
+		},
+		async (request: FastifyRequest<{ Body: MakeOrUnmakeAdminBody }>, reply: FastifyReply) => {
+			const { username } = request.body;
+
+			// This should NEVER happen.
+			if (request.user === undefined) {
+				fastify.log.error('"request.user" is undefined');
+				return reply.code(500).send({ error: `"request.user" is undefined` });
+			}
+			const ourUserId = request.user.userId;
+			try {
+				// Checking if our user has admin privileges.
+				const ourUser = await dbGetAdminByUserId(fastify, ourUserId);
+
+				if (!ourUser) {
+					return reply.code(403).send({ error: "You're not an admin" });
+				}
+
+				// Removing admin privileges of `username`.
+				const user = await dbGetUserByUsername(fastify, username);
+				if (!user) {
+					return reply.code(404).send({ error: "Provided username doesn't exist" });
+				}
+				const idToUnmakeAdmin = user.id;
+				// Checking if `username` is admin.
+				const isAdminCheck = await dbGetAdminByUserId(fastify, idToUnmakeAdmin);
+				if (!isAdminCheck) {
+					return reply.code(409).send({ error: "Provided username isn't an admin" });
+				}
+				else if (isAdminCheck.user_id === ourUserId) {
+					return reply.code(403).send({ error: "You can't remove admin privileges from yourself. Why would you?" });
+				}
+
+				await new Promise<void>((resolve, reject) => {
+					fastify.sqlite.run(`
+							DELETE FROM admins WHERE user_id = ?
+						`, [idToUnmakeAdmin],
+						function (err: Error | null) {
+							if (err) {
+								reject(err);
+							}
+							else {
+								resolve();
+							}
+						}
+					);
+				});
+
+				return reply.code(200).send({ message: 'Successfully unmade user an admin' });
+			}
+			catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(500).send({ error: 'SQLite request failed' });
+			}
+		}
+	);
+
+	/* Unified route to link 42 account to logged in user,
+	 * or log in with 42 account linked to the user
+	 * (in the latter case, JWT must be present in "Authorization: Bearer" header). */
+	fastify.post('/users/oauth/42',
+		{
+			schema: oauth42Schema
+		},
+		async (request: FastifyRequest, reply: FastifyReply) => {
+		const baseUrl = 'https://api.intra.42.fr/oauth/authorize';
+		let params = new URLSearchParams({
+			client_id: `${fastify.config.oauth42.uid}`,
+			redirect_uri: 'https://localhost/api/users/oauth/42/callback',
+			scope: 'public',
+			response_type: 'code'
+		});
+
+		if (request.headers.authorization) {
+			await authenticateToken(request, reply);
+			// Authentication failed and `authenticateToken()` replied with 401.
+			if (!request.user) {
+				return;
+			}
+
+			try {
+				const user = await dbGetUserById(fastify, request.user!.userId);
+
+				if (!user) {
+					return reply.code(403).send({ error: 'Unauthorized: User not found' });
+				}
+				else if (user.account_id_42) {
+					return reply.code(409).send({ error: 'This user has already linked some 42 account' });
+				}
+			}
+			catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(500).send({ error: 'SQLite request failed' });
+			}
+			params.append('state', request.headers.authorization);
+		}
+
+		return reply.redirect(`${baseUrl}?${params.toString()}`);
+	});
+
+	// A continuation of "POST" route on "/users/oauth/42".
+	fastify.get<{ Querystring: Oauth42CallbackQuerystring }>(
+		'/users/oauth/42/callback',
+		{
+			schema: oauth42CallbackSchema
+		},
+		async (request: FastifyRequest<{ Querystring: Oauth42CallbackQuerystring }>, reply: FastifyReply) => {
+			try {
+				const token = await exchange42CodeFor42Token(fastify, request);
+
+				const account42Data = await get42PublicData(token);
+
+				// Authorized user wants to link 42 account.
+				if (request.query.state) {
+					/* `authenticateToken()` awaits "Authorization: Bearer *TOKEN*"
+					 * in `request.headers.authorization`. */
+					request.headers.authorization = request.query.state;
+					await authenticateToken(request, reply);
+					// Authentication failed and `authenticateToken()` replied with 401.
+					if (!request.user) {
+						return;
+					}
+
+					const user = await dbGetUserById(fastify, request.user!.userId);
+					if (!user) {
+						return reply.code(403).send({ error: 'Unauthorized: User not found' });
+					}
+					else if (user.account_id_42) {
+						return reply.code(409).send({ error: 'This user is already linked to some 42 account' });
+					}
+
+					const account42Test = await dbGetUserByAccountId42(fastify, account42Data.id);
+					if (account42Test) {
+						fastify.log.info(JSON.stringify(account42Test));
+						return reply.code(409).send({ error: 'This 42 account is already linked to someone else' });
+					}
+
+					await dbUpdateUserAccountId42(fastify, user.id, account42Data.id);
+
+					return reply.code(200).send({ message: 'Successfully linked 42 account' });
+				}
+				// User wants to log in.
+				else {
+					const user = await dbGetUserByAccountId42(fastify, account42Data.id);
+					if (!user) {
+						return reply.code(404).send({ error: "This 42 account isn't linked to any user" });
+					}
+
+					// Generate JWT tokens
+					const accessToken = generateAccessToken(user.id, user.username);
+					const refreshToken = generateRefreshToken(user.id, user.username);
+
+					// Return tokens and user data (without password)
+					return reply.code(200).send({
+						message: 'Login successful',
+						accessToken,
+						refreshToken,
+						user: {
+							id: user.id,
+							username: user.username,
+							email: user.email,
+							display_name: user.display_name
+						}
+					});
+				}
+			}
+			catch (error: unknown) {
+				fastify.log.error(error);
+				if (error instanceof ApiError) {
+					return reply.code(error.replyHttpCode).send(error.message);
+				}
+				return reply.code(500).send({ error: 'An internal server error occurred' });
+			}
+		}
+	);
+
+	/* A route to unlink 42 account.
+	 * Protected: users can only unlink 42 account from their own profile, or they must be an admin. */
+	fastify.delete<{ Params: UserParams }>(
+		'/users/oauth/42/:id',
+		{
+			preHandler: authenticateToken,
+			schema: oauth42UnlinkSchema
+		},
+		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
+			const { id } = request.params;
+
+			/* Authorization check:
+			 * users can only unlink 42 account from their own profile,
+			 * OR they must be an admin. */
+			try {
+				const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
+
+				if (request.user!.userId !== parseInt(id) && !adminCheck) {
+					return reply.code(403).send({ error: 'You can only unlink 42 account from your own profile' });
+				}
+
+				const existenceCheck = await dbGetUserById(fastify, parseInt(id));
+				if (!existenceCheck) {
+					return reply.code(409).send({ error: "That user doesn't exist anymore" });
+				}
+				else if (!existenceCheck.account_id_42) {
+					return reply.code(404).send({ error: "That user doesn't have any linked 42 account" });
+				}
+
+				await dbUpdateUserAccountId42(fastify, request.user!.userId, null);
+
+				return reply.code(200).send({ message: 'Successfully unlinked 42 account' });
+			}
+			catch (error: unknown) {
+				fastify.log.error(error);
+				if (error instanceof ApiError) {
+					return reply.code(error.replyHttpCode).send(error.message);
+				}
+				return reply.code(500).send({ error: 'An internal server error occurred' });
+			}
+		}
+	);
+
+	fastify.get<{ Params: UserParams }>(
+		'/users/:id/avatar',
+		{
+			schema: getUserAvatarSchema
+		},
+		async(request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
+			const { id } = request.params;
+
+			// Check if user-specific avatar exists.
+			let avatarPath = path.join(fastify.config.avatarsPath.avatarsPath,
+				`${id}.webp`);
+			try {
+				await fsPromises.access(avatarPath, fsPromises.constants.R_OK);
+			}
+			catch {
+				avatarPath = fastify.config.avatarsPath.defaultAvatarPath;
+			}
+
+			try {
+				if (path.extname(avatarPath) !== '.webp') {
+					fastify.log.warn(`Avatar at: ${avatarPath} isn't "image/webp"`);
+				}
+				const avatar = await fsPromises.readFile(avatarPath);
+
+				reply.header('Content-Type', mime.getType(avatarPath));
+				return reply.code(200).send(avatar);
+			}
+			catch (err: any) {
+				fastify.log.error(err, 'Error while sending an avatar');
+				return reply.code(500).send({ error: "Couldn't read an avatar on server side" });
+			}
+		}
+	);
+
+	// TODO: update avatar route.
+
+	fastify.post<{ Params: UserParams }>(
+		'/users/:id/avatar/reset',
+		{
+			preHandler: authenticateToken,
+			schema: resetUserAvatarSchema
+		},
+		async(request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
+			const { id } = request.params;
+
+			// Checking if user at all still exists.
+			try {
+				const user = await dbGetUserById(fastify, parseInt(id));
+
+				if (!user) {
+					return reply.code(404).send({ error: "Your JWT token is valid, yet user doesn't exist" });
+				}
+			}
+			catch (error: unknown) {
+				fastify.log.error(error);
+				if (error instanceof ApiError) {
+					return reply.code(error.replyHttpCode).send(error.message);
+				}
+				return reply.code(500).send({ error: 'An internal server error occurred' });
+			}
+
+			const avatarPathToRemove = path.join(fastify.config.avatarsPath.avatarsPath,
+					`${id}.webp`);
+
+			// Checking if custom avatar exists.
+			try {
+				await fsPromises.access(avatarPathToRemove);
+			}
+			catch {
+				return reply.code(409).send({ error: "You don't have any custom avatar" });
+			}
+
+			// Removing the user's avatar.
+			try {
+				await fsPromises.rm(avatarPathToRemove);
+
+				return reply.code(200).send({ message: 'Successfully reset avatar to a default one' });
+			}
+			catch (err: any) {
+				fastify.log.error(err, "Couldn't remove avatar");
+				return reply.code(500).send({ error: "Couldn't remove avatar" });
 			}
 		}
 	);

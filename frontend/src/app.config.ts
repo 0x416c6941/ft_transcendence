@@ -2,12 +2,20 @@
  * @fileoverview App configuration - global constant variables.
  */
 
-import { PathToRegister } from "./router.js";
-import HomeView from "./views/HomeView.js";
-import LoginView from "./views/LoginView.js";
-import PongView from "./views/PongView.js";
 import RegisterView from "./views/RegisterView.js";
 import ProfileView from "./views/ProfileView.js";
+import { PathToRegister } from './router.js';
+import HomeView from './views/HomeView.js';
+import LoginView from './views/LoginView.js';
+// Pong-related views.
+import PongView from './views/PongView.js';
+import CreateRoomView from './views/CreateRoomView.js';
+import JoinRoomView from './views/JoinRoomView.js';
+import PongLocalView from './views/PongLocalView.js';
+// Tetris-related views.
+import TetrisView from './views/TetrisView.js';
+import TetrisAIView from './views/TetrisAIView.js';
+import TetrisRemoteView from './views/TetrisRemoteView.js';
 
 /**
  * @var {readonly string} DIV_ID
@@ -25,6 +33,12 @@ export const PATHS_TO_ROUTE: PathToRegister[] = [
 	{ path: "/login", constructor: LoginView, guard: 'guest' },
 	{ path: "/register", constructor: RegisterView, guard: 'guest' },
 	{ path: "/profile", constructor: ProfileView, guard: 'auth' },
+	{ path: '/rooms/new', constructor: CreateRoomView },
+	{ path: '/rooms/join', constructor: JoinRoomView },
+	{ path: '/pong-local', constructor: PongLocalView },
+	{ path: '/tetris', constructor: TetrisView },
+	{ path: '/tetris-ai', constructor: TetrisAIView },
+	{ path: '/tetris-remote', constructor: TetrisRemoteView }
 ] as const;
 
 /**

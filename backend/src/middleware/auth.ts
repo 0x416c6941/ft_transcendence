@@ -1,4 +1,4 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { verifyToken, extractTokenFromHeader, JwtPayload } from '../utils/jwt.js';
 import '@fastify/cookie';
 
@@ -11,6 +11,20 @@ declare module 'fastify' {
 	}
 }
 
+/**
+ * @enum UserExistenceCheckStatus
+ * Return value of checkUserExistence().
+ */
+export enum UserExistenceCheckStatus {
+	DoesntExist,
+	Exists,
+	DbFailure	///< The database query failed to execute.
+}
+
+/**
+ * Authentication middleware - verifies JWT token
+ * Adds user information to request object if token is valid
+ */
 export async function authenticateToken(
 	request: FastifyRequest,
 	reply: FastifyReply

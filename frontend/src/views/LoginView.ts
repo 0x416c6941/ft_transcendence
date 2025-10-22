@@ -6,16 +6,11 @@ import { login } from "../api/users.js";
 import { auth } from "../auth.js";
 
 export default class LoginView extends AbstractView {
-  private formEl: HTMLFormElement | null = null;
-  private submitBtn: HTMLButtonElement | null = null;
-  private onSubmit?: (e: Event) => void;
+  private isLoggedIn: boolean = false;
 
-  constructor(
-    router: Router,
-    pathParams: Map<string, string>,
-    queryParams: URLSearchParams
-  ) {
+  constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
     super(router, pathParams, queryParams);
+    this.isLoggedIn = this.checkIfLoggedIn();
   }
 
   setDocumentTitle(): void {
@@ -23,51 +18,27 @@ export default class LoginView extends AbstractView {
   }
 
   async getHtml(): Promise<string> {
+    const buttonClass = this.isLoggedIn
+      ? 'bg-red-500 hover:bg-red-600'
+      : 'bg-sky-500 hover:bg-sky-600';
+    const buttonText = this.isLoggedIn ? 'Logout' : 'Login';
+    const formDisplay = this.isLoggedIn ? 'hidden' : 'flex';
+
     return `
       <main class="h-screen flex flex-col justify-center items-center bg-neutral-100 dark:bg-neutral-900">
-        <h1 class="txt-light-dark-sans text-3xl mb-6">Login to ${APP_NAME}</h1>
-
-        <form id="login-form" class="flex flex-col gap-4 w-64">
-          <div>
-            <input
-              id="username"
-              name="username"
-              type="text"
-              placeholder="Username"
-              autocomplete="username"
-              spellcheck="false"
-              autocapitalize="none"
-              required
-              class="txt-light-dark-sans w-full p-2 rounded border"
-              aria-describedby="username-error"
-            />
-            <p id="username-error" class="text-red-500 text-sm mt-1" role="alert" aria-live="polite"></p>
-          </div>
-
-          <div>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="Password"
-              autocomplete="current-password"
-              spellcheck="false"
-              autocapitalize="none"
-              required
-              class="txt-light-dark-sans w-full p-2 rounded border"
-              aria-describedby="password-error"
-            />
-            <p id="password-error" class="text-red-500 text-sm mt-1" role="alert" aria-live="polite"></p>
-          </div>
-
-          <button id="login-submit" type="submit" class="bg-sky-500 text-white py-2 rounded shadow">
-            Login
+        <h1 class="txt-light-dark-sans text-3xl mb-6">${this.isLoggedIn ? 'Account' : 'Login to'} ${APP_NAME}</h1>
+        <form id="login-form" class="${formDisplay} flex-col gap-4 w-64" novalidate>
+          <input id="username" type="text" placeholder="Username" class="txt-light-dark-sans p-2 rounded border" />
+          <input id="password" type="password" placeholder="Password" class="txt-light-dark-sans p-2 rounded border" />
+          <button type="submit" id="auth-button" class="${buttonClass} text-white py-2 rounded shadow transition-colors">
+            ${buttonText}
           </button>
-
-          <p id="form-error" class="text-red-500 text-sm mt-2" role="alert" aria-live="polite"></p>
-          <p id="form-success" class="text-green-600 text-sm mt-2" role="status" aria-live="polite"></p>
         </form>
-
+        <button id="logout-button" class="${this.isLoggedIn ? 'block' : 'hidden'} ${buttonClass} text-white py-2 px-6 rounded shadow transition-colors">
+          ${buttonText}
+        </button>
+        <p id="error-msg" role="alert" aria-live="polite" class="text-red-500 mt-2" hidden></p>
+        <p id="success-msg" role="alert" aria-live="polite" class="text-green-500 mt-2" hidden></p>
         <div class="mt-6">
           <a href="/" data-link class="txt-light-dark-sans underline">Back to Home</a>
         </div>
@@ -76,98 +47,138 @@ export default class LoginView extends AbstractView {
   }
 
   setup(): void {
-    // If already authenticated (guest-only route), bounce out immediately
-    if (auth.isAuthed()) {
-      this.router.navigate("/");
-      return;
+    const form = document.getElementById('login-form') as HTMLFormElement | null;
+    const logoutButton = document.getElementById('logout-button') as HTMLButtonElement | null;
+    const usernameInput = document.getElementById('username') as HTMLInputElement | null;
+    const passwordInput = document.getElementById('password') as HTMLInputElement | null;
+    const errorMsg = document.getElementById('error-msg') as HTMLElement | null;
+    const successMsg = document.getElementById('success-msg') as HTMLElement | null;
+
+    if (!errorMsg || !successMsg) return;
+
+    // Setup login form handler
+    if (form && usernameInput && passwordInput && !this.isLoggedIn) {
+      const onSubmit = async (e: Event) => {
+        e.preventDefault();
+
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
+
+        if (!username || !password) {
+          this.showError('Please enter both username and password.', errorMsg, successMsg);
+          return;
+        }
+
+        // Call login API
+        await this.login(username, password, errorMsg, successMsg);
+      };
+
+      form.addEventListener('submit', onSubmit);
+      (form as any)._onSubmit = onSubmit;
     }
 
-    this.formEl = document.getElementById("login-form") as HTMLFormElement | null;
-    this.submitBtn = document.getElementById("login-submit") as HTMLButtonElement | null;
-    if (!this.formEl || !this.submitBtn) return;
+    // Setup logout button handler
+    if (logoutButton && this.isLoggedIn) {
+      const onLogout = async () => {
+        await this.logout(errorMsg, successMsg);
+      };
 
-    this.onSubmit = async (e: Event) => {
-      e.preventDefault();
-      if (!this.formEl || !this.submitBtn) return;
-
-      const username = nkfc(
-        (this.formEl.elements.namedItem("username") as HTMLInputElement)?.value.trim() ?? ""
-      );
-      const password = nkfc(
-        (this.formEl.elements.namedItem("password") as HTMLInputElement)?.value.trim() ?? ""
-      );
-
-      // clear messages
-      this.setText("form-error", "");
-      this.setText("form-success", "");
-      this.setText("username-error", "");
-      this.setText("password-error", "");
-      document.getElementById("username")?.removeAttribute("aria-invalid");
-      document.getElementById("password")?.removeAttribute("aria-invalid");
-
-      // basic presence and length checks
-      if (!username) {
-        this.setFieldError("username", "Username is required.");
-        return;
-      }
-      if (!password) {
-        this.setFieldError("password", "Password is required.");
-        return;
-      }
-      if (username.length > 128) {
-        this.setFieldError("username", "Username too long.");
-        return;
-      }
-      if (password.length > 1024) {
-        this.setFieldError("password", "Password too long.");
-        return;
-      }
-
-      this.setBusy(true);
-
-      try {
-        // Server will set HttpOnly cookies; response contains user info
-        const data = await login({ username, password });
-        // Server sets cookies; auth store bootstraps user & notifies header
-        await auth.signIn(username, password);
-        this.setText("form-success", "Login successful! Redirecting…");
-        setTimeout(() => this.router.navigate("/"), 500);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Invalid username or password.";
-        this.setText("form-error", msg);
-      } finally {
-        this.setBusy(false);
-      }
-    };
-
-    this.formEl.addEventListener("submit", this.onSubmit);
-  }
-
-  cleanup(): void {
-    if (this.formEl && this.onSubmit) {
-      this.formEl.removeEventListener("submit", this.onSubmit);
+      logoutButton.addEventListener('click', onLogout);
+      (logoutButton as any)._onLogout = onLogout;
     }
-    this.formEl = null;
-    this.submitBtn = null;
-    this.onSubmit = undefined;
   }
 
-  // ---------- helpers ----------
-  private setText(id: string, text: string): void {
-    const el = document.getElementById(id);
-    if (el) el.textContent = text;
+  private checkIfLoggedIn(): boolean {
+    // Check if access token cookie exists
+    return document.cookie.split(';').some(cookie => cookie.trim().startsWith('accessToken='));
   }
 
-  private setFieldError(name: "username" | "password", message: string): void {
-    const input = document.getElementById(name) as HTMLInputElement | null;
-    const el = document.getElementById(`${name}-error`);
-    if (input) input.setAttribute("aria-invalid", "true");
-    if (el) el.textContent = message;
+  private showError(message: string, errorMsg: HTMLElement, successMsg: HTMLElement): void {
+    errorMsg.textContent = message;
+    errorMsg.hidden = false;
+    successMsg.hidden = true;
   }
 
-  private setBusy(busy: boolean): void {
-    if (!this.submitBtn) return;
-    this.submitBtn.disabled = busy;
-    this.submitBtn.textContent = busy ? "Logging in…" : "Login";
+  private showSuccess(message: string, errorMsg: HTMLElement, successMsg: HTMLElement): void {
+    successMsg.textContent = message;
+    successMsg.hidden = false;
+    errorMsg.hidden = true;
+  }
+
+  private async login(username: string, password: string, errorMsg: HTMLElement, successMsg: HTMLElement): Promise<void> {
+    try {
+      const response = await fetch(`${window.location.origin}/api/users/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username, password }),
+        credentials: 'include' // Important: include cookies
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        this.showError(data.error || 'Login failed', errorMsg, successMsg);
+        return;
+      }
+
+      // Store tokens in HttpOnly cookies
+      if (data.accessToken) {
+        document.cookie = `accessToken=${data.accessToken}; path=/; secure; samesite=strict`;
+      }
+      if (data.refreshToken) {
+        document.cookie = `refreshToken=${data.refreshToken}; path=/; secure; samesite=strict`;
+      }
+
+      this.showSuccess(`Welcome, ${username}!`, errorMsg, successMsg);
+
+      // Connect to Socket.IO with JWT token for online presence
+      const socket = (window as any).io(window.location.origin, {
+        path: '/api/socket.io/',
+        auth: {
+          token: data.accessToken
+        }
+      });
+
+      socket.on('connect', () => {
+        console.log('Connected to Socket.IO as authenticated user');
+      });
+
+      socket.on('connect_error', (err: Error) => {
+        console.error('Socket.IO connection error:', err.message);
+      });
+
+      // Store socket globally for access from other components
+      (window as any).userSocket = socket;
+
+      // Reload page to show logout button
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      this.showError('Network error. Please try again.', errorMsg, successMsg);
+      console.error('Login error:', error);
+    }
+  }
+
+  private async logout(errorMsg: HTMLElement, successMsg: HTMLElement): Promise<void> {
+    // Disconnect Socket.IO if connected
+    const socket = (window as any).userSocket;
+    if (socket) {
+      socket.disconnect();
+      delete (window as any).userSocket;
+    }
+
+    // Clear cookies
+    document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = 'refreshToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+
+    this.showSuccess('Logged out successfully', errorMsg, successMsg);
+
+    // Reload page to show login form
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
   }
 }

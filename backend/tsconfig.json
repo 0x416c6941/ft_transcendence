@@ -9,7 +9,8 @@
 		"types": ["vitest/globals"]
 	},
 	"include": [
-		"src/types/fastify.d.ts"
+		"src/types/fastify.d.ts",
+		"src/types/users.d.ts"
 	],
 	"files": [
 		"src/main.ts",
