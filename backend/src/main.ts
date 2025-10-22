@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import fastifySqlite, { FastifySqliteOptions } from './fastifySqlite.js';
 import { Server } from "socket.io";
 import userRoutes from './routes/users.js';
+import gameRoutes from './routes/games.js';
 import { allSchemas } from './schemas/index.js';
 import { registerSwagger } from './swagger/config.js';
 import { setupPongGame } from './pongGame.js';
@@ -56,6 +57,9 @@ registerSwagger(fastify);
 
 // Register user routes
 fastify.register(userRoutes, { prefix: '/api' });
+
+// Register game routes
+fastify.register(gameRoutes, { prefix: '/api' });
 
 const start = async () => {
 	const port = Number(process.env.BACKEND_FASTIFY_PORT);
