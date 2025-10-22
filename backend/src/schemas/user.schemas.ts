@@ -154,7 +154,7 @@ export const loginUserSchema = {
 	response: {
 		200: {
 			description: 'Login successful',
-			$ref: 'LoginCookieResponse#'
+			$ref: 'MessageResponse#'
 		},
 		400: {
 			description: 'Bad request - missing required fields',
