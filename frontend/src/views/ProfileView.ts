@@ -89,8 +89,8 @@ export default class ProfileView extends AbstractView {
 
     // --- Load user data ---
     try {
-      const data = await getCurrentUser();
-      const { username, email, display_name } = data.user;
+      const user = await getCurrentUser();
+      const { username, email, display_name } = user;
       (document.getElementById("display_name") as HTMLInputElement).value = display_name ?? "";
       (document.getElementById("email") as HTMLInputElement).value = email;
       msg.textContent = `Logged in as ${username}`;

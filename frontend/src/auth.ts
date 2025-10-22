@@ -1,8 +1,8 @@
 // src/state/auth.ts
-import { getCurrentUser, login, logout, type UserById } from "./api/users.js";
+import { getCurrentUser, login, logout, type User } from "./api/users.js";
 
 type AuthStatus = "unknown" | "authenticated" | "unauthenticated";
-type AuthState = { status: AuthStatus; user?: UserById["user"] };
+type AuthState = { status: AuthStatus; user?: User };
 
 let state: AuthState = { status: "unknown" };
 const listeners = new Set<(s: AuthState) => void>();
@@ -12,7 +12,7 @@ const notify = () => listeners.forEach(fn => fn({ ...state }));
 let booting: Promise<void> | null = null;
 
 // Cheap shallow equality check for user objects
-function shallowEqualUser(a?: UserById["user"], b?: UserById["user"]) {
+function shallowEqualUser(a?: User, b?: User) {
   if (a === b) return true;
   if (!a || !b) return false;
   return a.id === b.id && a.username === b.username;
@@ -25,7 +25,7 @@ function setState(next: AuthState) {
   notify();
 }
 
-function setAuthenticated(user: UserById["user"]) {
+function setAuthenticated(user: User) {
   setState({ status: "authenticated", user });
 }
 
@@ -55,8 +55,8 @@ export const auth = {
     if (!booting) {
       booting = (async () => {
         try {
-          const data = await getCurrentUser(); // GET /api/users/me (cookies sent)
-          setAuthenticated(data.user);
+          const user = await getCurrentUser(); // GET /api/users/me (cookies sent)
+          setAuthenticated(user);
         } catch {
           setUnauthenticated();
         } finally {
