@@ -72,7 +72,11 @@ const start = async () => {
 		throw new Error("process.env.BACKEND_FASTIFY_PORT isn't a number.");
 	}
 	try {
-		await fastify.register(cookie) // secret: process.env.COOKIE_SECRET, // optionallly can be signed cookies
+		await fastify.register(cookie, {
+			parseOptions: {
+				sameSite: 'lax',
+			}
+		})
 		await fastify.register(cors, {
 			origin: ["https://localhost/"], // the frontend origin allowed
 			credentials: true, // allow sending cookies or Authorization headers
