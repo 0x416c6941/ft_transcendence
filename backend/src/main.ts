@@ -232,6 +232,9 @@ const start = async () => {
 			});
 		});
 
+		// Wait for all plugins to be registered (including SQLite)
+		await fastify.ready();
+
 		// Seed database with default users (if empty)
 		await seedDatabase(fastify);
 
