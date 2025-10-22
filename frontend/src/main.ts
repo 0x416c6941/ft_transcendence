@@ -1,9 +1,6 @@
 import { DIV_ID, PATHS_TO_ROUTE } from './app.config.js';
 import Router from "./router.js";
-/* Execute all code in './socket.js'.
- * To use sockets in other files, use this:
- * "import { io } from './socket.js';" */
-import './socket.js';
+import { io } from './socket.js';
 
 let router: Router | null = null;
 
@@ -22,29 +19,22 @@ document.addEventListener("DOMContentLoaded", (e) => {
 			?.split('=')[1];
 		
 		if (token) {
-			const socket = (window as any).io(window.location.origin, {
-				path: '/api/socket.io/',
-				auth: {
-					token: token
-				}
-			});
+			io.auth = { token };
+			io.connect();
 
-			socket.on('connect', () => {
+			io.on('connect', () => {
 				console.log('Connected to Socket.IO as authenticated user');
 			});
 
-			socket.on('connect_error', (err: Error) => {
+			io.on('connect_error', (err: Error) => {
 				console.error('Socket.IO connection error:', err.message);
 			});
 
 			// Store user info when received
-			socket.on('user_info', (data: { userId: number; username: string }) => {
-				socket.userId = data.userId;
-				socket.username = data.username;
+			io.on('user_info', (data: { userId: number; username: string }) => {
+				io.userId = data.userId;
+				io.username = data.username;
 			});
-
-			// Store socket globally for access from components
-			(window as any).userSocket = socket;
 		}
 	}
 });

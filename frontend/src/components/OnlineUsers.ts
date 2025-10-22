@@ -1,4 +1,5 @@
 import Router from '../router.js';
+import { io } from '../socket.js';
 
 interface OnlineUser {
   userId: number;
@@ -24,15 +25,13 @@ export default class OnlineUsers {
 
   constructor(router: Router) {
     this.router = router;
-    this.socket = (window as any).userSocket;
+    this.socket = io;
     
-    if (this.socket) {
-      // Check if userId is already available
-      if (this.socket.userId) {
-        this.currentUserId = this.socket.userId;
-      }
-      this.setupSocketListeners();
+    // Check if userId is already available
+    if (this.socket.userId) {
+      this.currentUserId = this.socket.userId;
     }
+    this.setupSocketListeners();
   }
 
   private setupSocketListeners(): void {

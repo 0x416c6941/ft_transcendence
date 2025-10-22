@@ -1,6 +1,7 @@
 import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
+import { io } from '../socket.js';
 
 export default class LoginView extends AbstractView {
   private isLoggedIn: boolean = false;
@@ -131,23 +132,16 @@ export default class LoginView extends AbstractView {
       this.showSuccess(`Welcome, ${username}!`, errorMsg, successMsg);
 
       // Connect to Socket.IO with JWT token for online presence
-      const socket = (window as any).io(window.location.origin, {
-        path: '/api/socket.io/',
-        auth: {
-          token: data.accessToken
-        }
-      });
+      io.auth = { token: data.accessToken };
+      io.connect();
 
-      socket.on('connect', () => {
+      io.on('connect', () => {
         console.log('Connected to Socket.IO as authenticated user');
       });
 
-      socket.on('connect_error', (err: Error) => {
+      io.on('connect_error', (err: Error) => {
         console.error('Socket.IO connection error:', err.message);
       });
-
-      // Store socket globally for access from other components
-      (window as any).userSocket = socket;
       
       // Reload page to show logout button
       setTimeout(() => {
@@ -161,10 +155,8 @@ export default class LoginView extends AbstractView {
 
   private async logout(errorMsg: HTMLElement, successMsg: HTMLElement): Promise<void> {
     // Disconnect Socket.IO if connected
-    const socket = (window as any).userSocket;
-    if (socket) {
-      socket.disconnect();
-      delete (window as any).userSocket;
+    if (io.connected) {
+      io.disconnect();
     }
 
     // Clear cookies
