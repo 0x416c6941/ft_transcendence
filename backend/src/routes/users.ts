@@ -7,8 +7,8 @@ import {
 	registerUserSchema,
 	loginUserSchema,
 	// refreshTokenSchema, // no longer needed; refresh uses cookie now
-	getAllUsersSchema,
-	getUserByIdSchema,
+	// getAllUsersSchema,
+	// getUserByIdSchema,
 	updateUserSchema,
 	deleteUserSchema,
 	makeAdminSchema,
@@ -199,37 +199,46 @@ export default async function userRoutes(fastify: FastifyInstance) {
       			reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
       			// clear both cookies via helper
       			clearAuthCookies(reply);
-			return reply.send({ message: "Logged out" });
+			return reply.code(200).send({ message: "Logged out" });
   	});
 
-	// // Get all users SHOULD BE PROTECTED -- ADMIN ONLY
-	// fastify.get('/users', {
-	// 	schema: getAllUsersSchema
-	// }, async (request: FastifyRequest, reply: FastifyReply) => {
-	// 	try {
-	// 		const users = await new Promise<any[]>((resolve, reject) => {
-	// 			fastify.sqlite.all(
-	// 				// Returning linked 42 account ID would be weird, hence not doing it.
-	// 				`SELECT id, username, email, display_name, created_at FROM users`,
-	// 				[],
-	// 				(err: Error | null, rows: any[]) => {
-	// 					if (err) {
-	// 						reject(err);
-	// 					} else {
-	// 						resolve(rows);
-	// 					}
-	// 				}
-	// 			);
-	// 		});
+	// Get own user info
+	fastify.get(
+		'/users/me',
+		{preHandler: authenticateToken},
+		async (request: FastifyRequest, reply: FastifyReply) => {
+			// Prevent caching personalized responses
+			reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
+			if (!request.user?.userId) {
+				return reply.code(401).send({ error: 'Unauthorized' });
+			}
+			try {
+				const userData = await dbGetUserById(fastify, request.user.userId);
 
-	// 		return reply.code(200).send({ users });
-	// 	} catch (err: any) {
-	// 		fastify.log.error(err);
-	// 		return reply.code(500).send({ error: 'Failed to retrieve users' });
-	// 	}
-	// });
+				if (!userData) {
+					return reply.code(404).send({ error: 'User not found' });
+				}
+				const user: PublicUserInfo = {
+					id: userData.id,
+					username: userData.username,
+					email: userData.email,
+					display_name: userData.display_name,
+					created_at: userData.created_at
+				};
 
-	// Update a user by ID (protected - must be the same user or admin)
+				return reply.code(200).send({ user });
+			} catch (err: any) {
+				if (err instanceof ApiError) {
+					request.log.error({ err: err.details }, err.message);
+					return reply.code(err.replyHttpCode).send({ error: err.message });
+				}
+				fastify.log.error({ err }, "Failed to retrieve user");
+				return reply.code(500).send({ error: 'Failed to retrieve user' });
+			}
+		}
+	);
+
+	// Update a user
 	fastify.put<{ Body: UpdateUserBody }>(
 		'/users/me',
 		{
@@ -303,7 +312,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
-	// Delete a user by ID (protected - must be the same user or admin)
+	// Delete a user by ID
 	fastify.delete<{ Params: UserParams }>(
 		'/users/me',
 		{
@@ -728,39 +737,5 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			}
 		}
 	);
-	// Get own user info
-	fastify.get(
-		'/users/me',
-		{preHandler: authenticateToken},
-		async (request: FastifyRequest, reply: FastifyReply) => {
-			// Prevent caching personalized responses
-			reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
-			if (!request.user?.userId) {
-				return reply.code(401).send({ error: 'Unauthorized' });
-			}
-			try {
-				const userData = await dbGetUserById(fastify, request.user.userId);
 
-				if (!userData) {
-					return reply.code(404).send({ error: 'User not found' });
-				}
-				const user: PublicUserInfo = {
-					id: userData.id,
-					username: userData.username,
-					email: userData.email,
-					display_name: userData.display_name,
-					created_at: userData.created_at
-				};
-
-				return reply.code(200).send({ user });
-			} catch (err: any) {
-				if (err instanceof ApiError) {
-					request.log.error({ err: err.details }, err.message);
-					return reply.code(err.replyHttpCode).send({ error: err.message });
-				}
-				fastify.log.error({ err }, "Failed to retrieve user");
-				return reply.code(500).send({ error: 'Failed to retrieve user' });
-			}
-		}
-	);
 }

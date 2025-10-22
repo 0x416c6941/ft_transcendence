@@ -50,20 +50,9 @@ export const userSchemas = [
 		}
 	},
 
-	// {
-	// 	$id: 'LoginResponse',
-	// 	type: 'object',
-	// 	properties: {
-	// 		message: { type: 'string', description: 'Success message' },
-	// 		accessToken: { type: 'string', description: 'JWT access token (expires in 24 hours)' },
-	// 		refreshToken: { type: 'string', description: 'JWT refresh token (expires in 7 days)' },
-	// 		user: { $ref: 'User#' }
-	// 	}
-	// },
 	{
 		$id: 'RefreshTokenRequest',
 		type: 'object',
-		required: ['refreshToken'],
 		properties: {
 			refreshToken: { type: 'string', description: 'Refresh token to exchange for new tokens' }
 		}
@@ -188,7 +177,7 @@ export const refreshTokenSchema = {
 	security: [{ cookieAuth: [] }],
 	response: {
 		200: {
-			description: 'New access token generated',
+			description: 'New access and refresh token generated',
 			$ref: 'MessageResponse#'
 		},
 		400: {
@@ -205,7 +194,7 @@ export const refreshTokenSchema = {
 export const logoutSchema = {
 	description: 'Clear auth cookies.',
   	tags: ['auth'],
-  	security: [{ cookieAuth: [] }],
+  	security: [],
   	response: {
     		200: { description: 'Logged out', $ref: 'MessageResponse#' }
   	}
@@ -236,13 +225,6 @@ export const getUserByIdSchema = {
 	description: 'Retrieve a specific user by ID (password excluded)',
 	tags: ['users'],
 	security: [{ cookieAuth: [] }],
-	params: {
-		type: 'object',
-		properties: {
-			id: { type: 'integer', description: 'User ID' }
-		},
-		required: ['id']
-	},
 	response: {
 		200: {
 			description: 'User details',
