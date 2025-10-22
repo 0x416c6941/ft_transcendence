@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import '@fastify/cookie';
 import bcrypt from 'bcrypt';
-import { generateAccessToken, generateRefreshToken } from '../utils/jwt.js';
+import { clearAuthCookies, generateAccessToken, generateRefreshToken, setAuthCookies, verifyToken } from '../utils/jwt.js';
 import { authenticateToken } from '../middleware/auth.js';
 import {
 	registerUserSchema,
@@ -38,26 +38,12 @@ import mime from 'mime';
    => more time is necessary and more difficult is brute-forcing. */
 const SALT_ROUNDS = 10;
 
-// centralize cookie options (adjust for your deployment)
-const ACCESS_MAX_AGE = 60 * 15;           // 15 minutes
-const REFRESH_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
-const sameSite: 'lax' | 'none' = 'lax';
-const secure = true;                       // keep true in production (HTTPS)
-
-const accessCookieOpts = {
-  httpOnly: true as const,
-  secure,
-  sameSite,
-  path: '/' as const,
-  maxAge: ACCESS_MAX_AGE
-};
-
-const refreshCookieOpts = {
-  httpOnly: true as const,
-  secure,
-  sameSite,
-  path: '/api/users/refresh' as const,
-  maxAge: REFRESH_MAX_AGE
+type PublicUserInfo = {
+	id: number;
+	username: string;
+	email: string;
+	display_name: string;
+	created_at: string;
 };
 
 interface CreateUserBody {
@@ -77,10 +63,6 @@ interface UpdateUserBody {
 interface LoginBody {
 	username: string;
 	password: string;
-}
-
-interface UserParams {
-	id: string;
 }
 
 export default async function userRoutes(fastify: FastifyInstance) {
@@ -135,19 +117,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
 			try {
 				// Get user from database
-				const user = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get(
-						`SELECT id, username, password, email, display_name FROM users WHERE username = ?`,
-						[username],
-						(err: Error | null, row: any) => {
-							if (err) {
-								reject(err);
-							} else {
-								resolve(row);
-							}
-						}
-					);
-				});
+				const user = await dbGetUserByUsername(fastify, username);
 
 				if (!user) {
 					return reply.code(401).send({
@@ -168,31 +138,21 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				const accessToken = generateAccessToken(user.id, user.username);
 				const refreshToken = generateRefreshToken(user.id, user.username);
 
+				// 4) Set HttpOnly cookies (scoped per your helpers)
+       				setAuthCookies(reply, accessToken, refreshToken);
+
 				// Set tokens in HttpOnly cookies
-				reply.setCookie('accessToken', accessToken, accessCookieOpts)
-					.setCookie('refreshToken', refreshToken, refreshCookieOpts)
+				return reply
 					.code(200)
 					.send({
 						message: 'Login successful',
-						user: {
-							id: user.id,
-							username: user.username,
-							email: user.email,
-							display_name: user.display_name
-						}
 					});
-				// return reply.code(200).send({
-				// 	message: 'Login successful',
-				// 	accessToken,
-				// 	refreshToken,
-				// 	user: {
-				// 		id: user.id,
-				// 		username: user.username,
-				// 		email: user.email,
-				// 		display_name: user.display_name
-				// 	}
-				// });
 			} catch (err: any) {
+				if (err instanceof ApiError) {
+        				request.log.error({ err: err.details }, err.message);
+					return reply.code(err.replyHttpCode).send({ error: err.message });
+				}
+
 				fastify.log.error(err);
 				return reply.code(500).send({ error: 'Failed to login' });
 			}
@@ -200,10 +160,10 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	);
 
 	// Refresh token endpoint
-	fastify.post<{ Body: { refreshToken: string } }>(
+	fastify.post(
 		'/users/refresh',
-		// { schema: refreshTokenSchema },  // remove schema because body is not used
 		async (request: FastifyRequest, reply: FastifyReply) => {
+			reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
     			const refreshToken = request.cookies?.refreshToken;
 
 			// Validate the refresh token
@@ -213,24 +173,19 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
 			try {
 				// Verify the refresh token
-				const { verifyToken } = await import('../utils/jwt.js');
 				const decoded = verifyToken(refreshToken);
 
 				// Generate new tokens
 				const newAccessToken = generateAccessToken(decoded.userId, decoded.username);
 				const newRefreshToken = generateRefreshToken(decoded.userId, decoded.username);
 
+				setAuthCookies(reply, newAccessToken, newRefreshToken);
 				// Set new tokens in HttpOnly cookies
-				reply.setCookie('accessToken', newAccessToken, accessCookieOpts)
-					.setCookie('refreshToken', newRefreshToken, refreshCookieOpts)
+				return reply
 					.code(200)
 					.send({	message: 'Tokens refreshed successfully'});
-				// return reply.code(200).send({
-				// 	accessToken: newAccessToken,
-				// 	refreshToken: newRefreshToken
-				// });
 			} catch (error) {
-				return reply.code(403).send({
+				return reply.code(401).send({
 					error: 'Invalid or expired refresh token'
 				});
 			}
@@ -238,109 +193,54 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	);
 
 	// Logout: clear cookies
-  	fastify.post('/users/logout', async (_req: FastifyRequest, reply: FastifyReply) => {
-    		reply.clearCookie('accessToken', { path: accessCookieOpts.path })
-      		.clearCookie('refreshToken', { path: refreshCookieOpts.path })
-      		.send({ message: 'Logged out' });
+  	fastify.post('/users/logout',
+		async (request: FastifyRequest, reply: FastifyReply) => {
+			// prevent caching of auth state
+      			reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
+      			// clear both cookies via helper
+      			clearAuthCookies(reply);
+			return reply.send({ message: "Logged out" });
   	});
 
-	// Get all users
-	fastify.get('/users', {
-		schema: getAllUsersSchema
-	}, async (request: FastifyRequest, reply: FastifyReply) => {
-		try {
-			const users = await new Promise<any[]>((resolve, reject) => {
-				fastify.sqlite.all(
-					// Returning linked 42 account ID would be weird, hence not doing it.
-					`SELECT id, username, email, display_name, created_at FROM users`,
-					[],
-					(err: Error | null, rows: any[]) => {
-						if (err) {
-							reject(err);
-						} else {
-							resolve(rows);
-						}
-					}
-				);
-			});
+	// // Get all users SHOULD BE PROTECTED -- ADMIN ONLY
+	// fastify.get('/users', {
+	// 	schema: getAllUsersSchema
+	// }, async (request: FastifyRequest, reply: FastifyReply) => {
+	// 	try {
+	// 		const users = await new Promise<any[]>((resolve, reject) => {
+	// 			fastify.sqlite.all(
+	// 				// Returning linked 42 account ID would be weird, hence not doing it.
+	// 				`SELECT id, username, email, display_name, created_at FROM users`,
+	// 				[],
+	// 				(err: Error | null, rows: any[]) => {
+	// 					if (err) {
+	// 						reject(err);
+	// 					} else {
+	// 						resolve(rows);
+	// 					}
+	// 				}
+	// 			);
+	// 		});
 
-			return reply.code(200).send({ users });
-		} catch (err: any) {
-			fastify.log.error(err);
-			return reply.code(500).send({ error: 'Failed to retrieve users' });
-		}
-	});
-
-	// Get a specific user by ID
-	fastify.get<{ Params: UserParams }>(
-		'/users/:id',
-		{ preHandler: authenticateToken, schema: getUserByIdSchema },
-		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
-			const { id } = request.params;
-
-			// Only allow the owner to read their own profile
-			if (request.user?.userId !== parseInt(id)) {
-				return reply.code(403).send({ error: 'Forbidden: You can only access your own profile' });
-			}
-
-			try {
-				const user = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get(
-						// Returning linked 42 account ID would be weird, hence not doing it.
-						`SELECT id, username, email, display_name, created_at FROM users WHERE id = ?`,
-						[id],
-						(err: Error | null, row: any) => {
-							if (err) {
-								reject(err);
-							} else {
-								resolve(row);
-							}
-						}
-					);
-				});
-
-				if (!user) {
-					return reply.code(404).send({ error: 'User not found' });
-				}
-
-				return reply.code(200).send({ user });
-			} catch (err: any) {
-				fastify.log.error(err);
-				return reply.code(500).send({ error: 'Failed to retrieve user' });
-			}
-		}
-	);
+	// 		return reply.code(200).send({ users });
+	// 	} catch (err: any) {
+	// 		fastify.log.error(err);
+	// 		return reply.code(500).send({ error: 'Failed to retrieve users' });
+	// 	}
+	// });
 
 	// Update a user by ID (protected - must be the same user or admin)
-	fastify.put<{ Params: UserParams; Body: UpdateUserBody }>(
-		'/users/:id',
+	fastify.put<{ Body: UpdateUserBody }>(
+		'/users/me',
 		{
 			preHandler: authenticateToken,
 			schema: updateUserSchema
-		},
-		async (
-			request: FastifyRequest<{ Params: UserParams; Body: UpdateUserBody }>,
+		}, async (
+			request: FastifyRequest<{ Body: UpdateUserBody }>,
 			reply: FastifyReply
 		) => {
-			const { id } = request.params;
+			const userId = request.user!.userId;
 			const { username, password, email, display_name } = request.body;
-
-			/* Authorization check: users can only update their own profile,
-			 * OR they must be an admin. */
-			try {
-				const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
-
-				if (request.user?.userId !== parseInt(id) && !adminCheck) {
-					return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
-				}
-			}
-			catch (error: unknown) {
-				fastify.log.error(error);
-				if (error instanceof ApiError) {
-					return reply.code(error.replyHttpCode).send(error.message);
-				}
-				return reply.code(500).send({ error: 'An internal server error occurred' });
-			}
 
 			// Build dynamic update query
 			const updates: string[] = [];
@@ -350,7 +250,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				updates.push('username = ?');
 				values.push(username);
 			}
-			if (password) {
+			if (typeof password === "string" && password.length > 0) {
 				const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 				updates.push('password = ?');
 				values.push(hashedPassword);
@@ -368,7 +268,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				return reply.code(400).send({ error: 'No fields to update' });
 			}
 
-			values.push(id);
+			values.push(userId);
 
 			try {
 				const result = await new Promise<any>((resolve, reject) => {
@@ -405,36 +305,19 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
 	// Delete a user by ID (protected - must be the same user or admin)
 	fastify.delete<{ Params: UserParams }>(
-		'/users/:id',
+		'/users/me',
 		{
 			preHandler: authenticateToken,
 			schema: deleteUserSchema
 		},
 		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
-			const { id } = request.params;
-
-			/* Authorization check: users can only update their own profile,
-			 * OR they must be an admin. */
-			try {
-				const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
-
-				if (request.user?.userId !== parseInt(id) && !adminCheck) {
-					return reply.code(403).send({ error: 'Forbidden: You can only update your own profile' });
-				}
-			}
-			catch (error: unknown) {
-				fastify.log.error(error);
-				if (error instanceof ApiError) {
-					return reply.code(error.replyHttpCode).send(error.message);
-				}
-				return reply.code(500).send({ error: 'An internal server error occurred' });
-			}
+			const userId = request.user!.userId;
 
 			try {
 				const result = await new Promise<any>((resolve, reject) => {
 					fastify.sqlite.run(
 						`DELETE FROM users WHERE id = ?`,
-						[id],
+						[userId],
 						function (err: Error | null) {
 							if (err) {
 								reject(err);
@@ -450,13 +333,26 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				}
 
 				// Removing custom user avatar, if exists.
-				await fsPromises.rm(
-					path.join(fastify.config.avatarsPath.avatarsPath, `${id}.webp`),
-					{ force: true });
+				try {
+					await fsPromises.rm(
+						path.join(fastify.config.avatarsPath.avatarsPath, `${userId}.webp`),
+						{ force: true }
+					);
+				} catch (err) {
+					fastify.log.error({ err }, "Failed to remove avatar on delete");
+				}
+				// Clear cookies on account deletion
+				clearAuthCookies(reply);
 
-				return reply.code(200).send({ message: 'User deleted successfully' });
+				return reply
+					.code(200)
+					.send({ message: 'User deleted successfully' });
 			} catch (err: any) {
-				fastify.log.error(err);
+				if (err instanceof ApiError) {
+					request.log.error({ err: err.details }, err.message);
+					return reply.code(err.replyHttpCode).send({ error: err.message });
+				}
+				fastify.log.error({ err }, "Failed to delete user");
 				return reply.code(500).send({ error: 'Failed to delete user' });
 			}
 		}
@@ -832,177 +728,39 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			}
 		}
 	);
-	// Current user (from cookie/header JWT)
+	// Get own user info
 	fastify.get(
 		'/users/me',
 		{preHandler: authenticateToken},
 		async (request: FastifyRequest, reply: FastifyReply) => {
+			// Prevent caching personalized responses
+			reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
+			if (!request.user?.userId) {
+				return reply.code(401).send({ error: 'Unauthorized' });
+			}
 			try {
-				if (!request.user) {
-					return reply.code(401).send({ error: 'Unauthorized' });
-				}
+				const userData = await dbGetUserById(fastify, request.user.userId);
 
-				const user = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get(
-						`SELECT id, username, email, display_name, created_at FROM users WHERE id = ?`,
-						[request.user!.userId],
-						(err: Error | null, row: any) => {
-							if (err) {
-								reject(err);
-							} else {
-								resolve(row);
-							}
-						}
-					);
-				});
-
-				if (!user) {
+				if (!userData) {
 					return reply.code(404).send({ error: 'User not found' });
 				}
+				const user: PublicUserInfo = {
+					id: userData.id,
+					username: userData.username,
+					email: userData.email,
+					display_name: userData.display_name,
+					created_at: userData.created_at
+				};
 
 				return reply.code(200).send({ user });
 			} catch (err: any) {
-				fastify.log.error(err);
+				if (err instanceof ApiError) {
+					request.log.error({ err: err.details }, err.message);
+					return reply.code(err.replyHttpCode).send({ error: err.message });
+				}
+				fastify.log.error({ err }, "Failed to retrieve user");
 				return reply.code(500).send({ error: 'Failed to retrieve user' });
 			}
 		}
 	);
-	fastify.put('/users/me', {
-		preHandler: authenticateToken
-	}, async (request: FastifyRequest, reply: FastifyReply) => {
-		if (!request.user) return reply.code(401).send({ error: 'Unauthorized' });
-
-		const body = (request.body as UpdateUserBody) || {};
-  		const username = typeof body.username === 'string' ? body.username.trim() : undefined;
-  		const password = typeof body.password === 'string' ? body.password.trim() : undefined;
-  		const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : undefined;
-  		const display_name = typeof body.display_name === 'string' ? body.display_name.trim() : undefined;
-
-		// Basic validations (extend as needed)
-  		if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    			return reply.code(400).send({ error: 'Invalid email format' });
-  		}
-
-		const updates: string[] = [];
-		const values: any[] = [];
-
-		if (username && username.length > 0) {
-    			updates.push('username = ?');
-    			values.push(username);
-		}
-		if (password && password.length > 0) {
-		    	const hashed = await bcrypt.hash(password, SALT_ROUNDS);
-		    	updates.push('password = ?');
-		    	values.push(hashed);
-		}
-		if (email && email.length > 0) {
-		    	updates.push('email = ?');
-		    	values.push(email);
-		}
-		if (display_name && display_name.length > 0) {
-		    	updates.push('display_name = ?');
-		    	values.push(display_name);
-		}
-		if (updates.length === 0) {
-			return reply.code(400).send({ error: 'No fields to update' });
-		}
-
-		values.push(request.user.userId);
-
-		try {
-			const result = await new Promise<any>((resolve, reject) => {
-				fastify.sqlite.run(
-					`UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
-					values,
-					function (err: Error | null) {
-						if (err) {
-							reject(err);
-						} else {
-							resolve(this);
-						}
-					}
-				);
-			});
-			// If no rows changed, user may still exist (values identical). Check existence.
-			if (result.changes === 0) {
-				const existing = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get(
-						`SELECT id FROM users WHERE id = ?`,
-						[request.user!.userId],
-						(err: Error | null, row: any) => {
-							if (err) {
-								reject(err);
-							} else {
-								resolve(row);
-							}
-						}
-					);
-				});
-				if (!existing) {
-					return reply.code(404).send({ error: 'User not found' });
-				}
-			}
-
-			const updated = await new Promise<any>((resolve, reject) => {
-      				fastify.sqlite.get(
-        				`SELECT id, username, email, display_name, created_at FROM users WHERE id = ?`,
-        				[request.user!.userId],
-        				(err: Error | null, row: any) => (err ? reject(err) : resolve(row))
-      				);
-    			});
-
-// Optional: rotate tokens if username changed (uncomment if you want this behavior)
-    // if (username && username !== request.user.username) {
-    //   const newAccess = generateAccessToken(updated.id, updated.username);
-    //   const newRefresh = generateRefreshToken(updated.id, updated.username);
-    //   reply.setCookie('accessToken', newAccess, accessCookieOpts)
-    //        .setCookie('refreshToken', newRefresh, refreshCookieOpts);
-    // }
-			return reply.code(200).send({
-      				message: result.changes === 0 ? 'No changes' : 'Profile updated successfully',
-      				user: updated
-    			});
-  		} catch (err: any) {
-  			if (typeof err?.message === 'string' && err.message.includes('UNIQUE constraint failed')) {
-  			  	return reply.code(409).send({ error: 'Username or email already exists' });
-  			}
-  			fastify.log.error(err);
-  			return reply.code(500).send({ error: 'Failed to update profile' });
-		}
-	});
-
-	fastify.delete('/users/me', {
-		preHandler: authenticateToken
-	}, async (request: FastifyRequest, reply: FastifyReply) => {
-		if (!request.user) return reply.code(401).send({ error: 'Unauthorized' });
-
-		try {
-			const result = await new Promise<any>((resolve, reject) => {
-				fastify.sqlite.run(
-					`DELETE FROM users WHERE id = ?`,
-					[request.user!.userId],
-					function (err: Error | null) {
-						if (err) {
-							reject(err);
-						} else {
-							resolve(this);
-						}
-					}
-				);
-			});
-
-			if (result.changes === 0) {
-				return reply.code(404).send({ error: 'User not found' });
-			}
-
-			// Clear cookies on account deletion
-			reply.clearCookie('accessToken', { path: accessCookieOpts.path })
-				.clearCookie('refreshToken', { path: refreshCookieOpts.path })
-				.code(200)
-				.send({ message: 'User deleted successfully' });
-		} catch (err: any) {
-			fastify.log.error(err);
-			return reply.code(500).send({ error: 'Failed to delete user' });
-		}
-	});
 }
