@@ -6,6 +6,7 @@ import {
   getCurrentUser,
   logout as apiLogout,
   deleteUser as apiDeleteUser,
+  updateUser,
 } from "../api/users.js";
 import { auth } from "../auth.js";
 
@@ -75,6 +76,7 @@ export default class ProfileView extends AbstractView {
   }
 
   async setup(): Promise<void> {
+    await auth.bootstrap();
     if (!auth.isAuthed()) {
       this.router.navigate("/login");
       return;
@@ -120,14 +122,7 @@ export default class ProfileView extends AbstractView {
       updateBtn.textContent = "Saving…";
 
       try {
-        const res = await fetch("/api/users/me", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ display_name, email, ...(password ? { password } : {}) }),
-        });
-
-        if (!res.ok) throw new Error(`Update failed (${res.status})`);
+        await updateUser({ display_name, email, ...(password ? { password } : {}) });
         msg.textContent = "Profile updated successfully!";
         msg.className = "text-green-600 text-sm text-center mt-2";
       } catch (err) {
@@ -142,13 +137,14 @@ export default class ProfileView extends AbstractView {
     // --- Logout ---
     logoutBtn.addEventListener("click", async () => {
       logoutBtn.disabled = true;
+      const prev = logoutBtn.textContent;
       logoutBtn.textContent = "Logging out…";
       try {
-        await apiLogout();
-        await auth.signOut();
+        await auth.signOut(); // central: calls API and clears state
         this.router.navigate("/login");
-      } catch {
-        this.router.navigate("/login");
+      } finally {
+        logoutBtn.disabled = false;
+        logoutBtn.textContent = prev || "Logout";
       }
     });
 
@@ -158,6 +154,7 @@ export default class ProfileView extends AbstractView {
       if (!confirmed) return;
 
       deleteBtn.disabled = true;
+      const prev = deleteBtn.textContent;
       deleteBtn.textContent = "Deleting…";
       try {
         await apiDeleteUser();
@@ -169,7 +166,7 @@ export default class ProfileView extends AbstractView {
         msg.textContent = err instanceof Error ? err.message : "Deletion failed.";
         msg.className = "text-red-500 text-sm text-center mt-2";
         deleteBtn.disabled = false;
-        deleteBtn.textContent = "Delete Account";
+        deleteBtn.textContent = prev || "Delete Account";
       }
     });
   }
