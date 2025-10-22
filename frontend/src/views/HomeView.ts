@@ -20,17 +20,14 @@ async getHtml(): Promise<string> {
     : 'bg-blue-600 hover:bg-blue-700';
   const buttonText = this.isLoggedIn ? 'Logout' : 'Login';
   const authControl = this.isLoggedIn
-      ? `<button id="logout-btn" class="${buttonClass} text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">Logout</button>`
-      : `<a href="/login" data-link class="${buttonClass} text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">Login</a>`;
+    ? `<button id="logout-btn" class="${buttonClass} text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">Logout</button>`
+    : `<a href="/login" data-link class="${buttonClass} text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">Login</a>`;
 
   return `
     <main class="h-screen flex justify-center items-center flex-col bg-gray-800">
       <h1 class="text-5xl font-bold text-white mb-8 tracking-wide">Welcome to ${APP_NAME}</h1>
       <div class="flex flex-col gap-4 w-64">
         ${authControl}
-           class="${buttonClass} text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
-          ${buttonText}
-        </a>
         <a href="/rooms/new" data-link
            class="bg-green-600 text-white px-4 py-2 rounded shadow text-center">
           Create Room
@@ -66,9 +63,9 @@ async getHtml(): Promise<string> {
     document.title = `${APP_NAME} - Home`;
   }
 
-  setup(): void {
+  async setup(): Promise<void> {
     // hydrate auth; initial state
-    void auth.bootstrap();
+    await auth.bootstrap();
     this.isLoggedIn = auth.isAuthed();
 
     const logoutBtn = document.getElementById("logout-btn");
