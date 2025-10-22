@@ -4,42 +4,80 @@ import { getCurrentUser, login, logout, type UserById } from "./api/users.js";
 type AuthStatus = "unknown" | "authenticated" | "unauthenticated";
 type AuthState = { status: AuthStatus; user?: UserById["user"] };
 
-const state: AuthState = { status: "unknown" };
+let state: AuthState = { status: "unknown" };
 const listeners = new Set<(s: AuthState) => void>();
 const notify = () => listeners.forEach(fn => fn({ ...state }));
 
-function setAuthenticated(user: UserById["user"]) {
-  state.status = "authenticated";
-  state.user = user;
+// Serialize bootstraps so simultaneous callers share one network hit
+let booting: Promise<void> | null = null;
+
+// Cheap shallow equality check for user objects
+function shallowEqualUser(a?: UserById["user"], b?: UserById["user"]) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.id === b.id && a.username === b.username;
+}
+
+function setState(next: AuthState) {
+  const changed = next.status !== state.status || !shallowEqualUser(next.user, state.user);
+  if (!changed) return;
+  state = next;
   notify();
 }
+
+function setAuthenticated(user: UserById["user"]) {
+  setState({ status: "authenticated", user });
+}
+
 function setUnauthenticated() {
-  state.status = "unauthenticated";
-  state.user = undefined;
-  notify();
+  setState({ status: "unauthenticated", user: undefined });
 }
 
 export const auth = {
-  subscribe(fn: (s: AuthState) => void) { listeners.add(fn); return () => listeners.delete(fn); },
-  get(): AuthState { return { ...state }; },
-  isAuthed(): boolean { return state.status === "authenticated"; },
+  subscribe(fn: (s: AuthState) => void) {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  },
 
-  async bootstrap() {
-    if (state.status !== "unknown") return; // run once
-    try {
-      const data = await getCurrentUser(); // GET /api/users/me (cookies sent)
-      setAuthenticated(data.user);
-    } catch {
-      setUnauthenticated();
+  get(): AuthState {
+    return { ...state };
+  },
+
+  isAuthed(): boolean {
+    return state.status === "authenticated";
+  },
+
+  // By default runs once; pass force=true to refresh even after first run.
+  async bootstrap(force = false) {
+    if (!force && state.status !== "unknown") return;
+
+    // Share a single in-flight bootstrap
+    if (!booting) {
+      booting = (async () => {
+        try {
+          const data = await getCurrentUser(); // GET /api/users/me (cookies sent)
+          setAuthenticated(data.user);
+        } catch {
+          setUnauthenticated();
+        } finally {
+          booting = null;
+        }
+      })();
     }
+    await booting;
   },
 
   async signIn(username: string, password: string) {
-    await login({ username, password });
-    await this.bootstrap();
+    await login({ username, password }); // throws on failure
+    // Force refresh of user state even if bootstrap ran before
+    await this.bootstrap(true);
   },
 
   async signOut() {
-    try { await logout(); } finally { setUnauthenticated(); }
+    try {
+      await logout(); // POST /api/users/logout (server revokes session/refresh)
+    } finally {
+      setUnauthenticated();
+    }
   },
 };
