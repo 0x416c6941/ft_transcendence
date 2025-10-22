@@ -49,14 +49,7 @@ export const userSchemas = [
 			password: { type: 'string', format: 'password', description: 'User password' }
 		}
 	},
-	{
-		$id: 'LoginCookieResponse',
-		type: 'object',
-		properties: {
-			message: { type: 'string', description: 'Success message' },
-			user: { $ref: 'User#' }
-		}
-	},
+
 	// {
 	// 	$id: 'LoginResponse',
 	// 	type: 'object',
@@ -273,13 +266,6 @@ export const updateUserSchema = {
 	description: 'Update user information (authentication required, can only update own profile)',
 	tags: ['users'],
 	security: [{ cookieAuth: [] }],
-	params: {
-		type: 'object',
-		properties: {
-			id: { type: 'integer', description: 'User ID' }
-		},
-		required: ['id']
-	},
 	body: {
 		$ref: 'UpdateUserRequest#'
 	},
@@ -319,16 +305,9 @@ export const updateUserSchema = {
 };
 
 export const deleteUserSchema = {
-	description: 'Delete a user by ID',
+	description: 'Delete the current user (authentication required)',
 	tags: ['users'],
 	security: [{ cookieAuth: [] }],
-	params: {
-		type: 'object',
-		properties: {
-			id: { type: 'integer', description: 'User ID' }
-		},
-		required: ['id']
-	},
 	response: {
 		200: {
 			description: 'User deleted successfully',
@@ -339,10 +318,6 @@ export const deleteUserSchema = {
 		},
 		401: {
 			description: 'Unauthorized - missing or invalid token',
-			$ref: 'Error#'
-		},
-		403: {
-			description: 'Forbidden - cannot delete other users',
 			$ref: 'Error#'
 		},
 		404: {
