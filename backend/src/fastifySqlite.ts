@@ -62,6 +62,29 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 		});
 	});
 
+	// Create `games` table if it doesn't exist yet
+	await new Promise<void>((resolve, reject) => {
+		db.run(`
+			CREATE TABLE IF NOT EXISTS games (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				started_at DATETIME,
+				finished_at DATETIME,
+				player1_name TEXT NOT NULL,
+				player1_is_user BOOLEAN NOT NULL DEFAULT 0,
+				player2_name TEXT NOT NULL,
+				player2_is_user BOOLEAN NOT NULL DEFAULT 0,
+				winner TEXT,
+				data TEXT
+			)
+		`, (err: Error | null) => {
+			if (err) {
+				reject(err);
+			} else {
+				resolve();
+			}
+		});
+	});
+
 	fastify.decorate('sqlite', db);
 	fastify.addHook('onClose', (fastify: FastifyInstance, done) => {
 		db.close((err: Error | null) => {
