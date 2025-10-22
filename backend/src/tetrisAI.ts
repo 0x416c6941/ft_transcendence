@@ -22,6 +22,7 @@ import {
     createPlayerSnapshot,
     updatePlayer as updatePlayerShared
 } from './tetrisShared.js';
+import { saveGameRecord, isSocketAuthenticated, GameRecord } from './utils/gameStats.js';
 
 // AI constants - simulate human reaction times and delays
 const AI_THINK_DELAY = 15; // Delay before AI starts moving a new piece (~0.25 seconds)
@@ -335,6 +336,7 @@ const state: GameState = {
 };
 
 let gameInterval: NodeJS.Timeout | null = null;
+let currentGameRecord: Partial<GameRecord> | null = null;
 
 // Helper to reset AI-specific state
 function resetAIState(aiState: AIState): void {
@@ -370,7 +372,7 @@ export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
         
         socket.emit('role', { side: 'player' });
         
-        socket.on('set_alias', (data: { alias: string }) => {
+        socket.on('set_alias', async (data: { alias: string }) => {
             const alias = data.alias.trim();
             if (!alias) return;
             
@@ -380,6 +382,17 @@ export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
                 state.started = true;
                 spawnNewPiece(state.player);
                 spawnNewPiece(state.ai);
+                
+                // Initialize game record
+                const player1IsUser = isSocketAuthenticated(socket);
+                currentGameRecord = {
+                    game_name: 'Tetris AI',
+                    started_at: new Date().toISOString(),
+                    player1_name: state.player.alias,
+                    player1_is_user: player1IsUser,
+                    player2_name: state.ai.alias,
+                    player2_is_user: false // AI is not a registered user
+                };
                 
                 tetrisAINamespace.emit('game_started', {
                     playerAlias: state.player.alias,
@@ -396,10 +409,30 @@ export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
             if (data.keys.drop !== undefined) state.player.input.drop = data.keys.drop;
         });
         
-        socket.on('disconnect', () => {
+        socket.on('disconnect', async () => {
             fastify.log.info(`Tetris AI player disconnected: ${socket.id}`);
             
-            if (state.started) {
+            if (state.started && currentGameRecord) {
+                // Save game record on disconnect
+                currentGameRecord.finished_at = new Date().toISOString();
+                currentGameRecord.winner = undefined; // No winner on disconnect
+                currentGameRecord.data = JSON.stringify({
+                    reason: 'player_disconnected',
+                    player: {
+                        alias: state.player.alias,
+                        score: state.player.score,
+                        linesCleared: state.player.linesCleared
+                    },
+                    ai: {
+                        alias: state.ai.alias,
+                        score: state.ai.score,
+                        linesCleared: state.ai.linesCleared
+                    }
+                });
+                
+                await saveGameRecord(fastify, currentGameRecord as GameRecord);
+                currentGameRecord = null;
+                
                 resetGame();
                 tetrisAINamespace.emit('game_ended', { reason: 'player_disconnected' });
             }
@@ -407,7 +440,7 @@ export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
     });
     
     if (!gameInterval) {
-        gameInterval = setInterval(() => {
+        gameInterval = setInterval(async () => {
             step();
             
             const snapshot = {
@@ -420,6 +453,32 @@ export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
             
             if (state.started && (state.player.gameOver || state.ai.gameOver)) {
                 const winner = state.player.gameOver ? state.ai.alias : state.player.alias;
+                
+                // Save game record
+                if (currentGameRecord) {
+                    currentGameRecord.finished_at = new Date().toISOString();
+                    currentGameRecord.winner = winner;
+                    currentGameRecord.data = JSON.stringify({
+                        reason: 'game_over',
+                        winner: winner,
+                        player: {
+                            alias: state.player.alias,
+                            score: state.player.score,
+                            linesCleared: state.player.linesCleared,
+                            gameOver: state.player.gameOver
+                        },
+                        ai: {
+                            alias: state.ai.alias,
+                            score: state.ai.score,
+                            linesCleared: state.ai.linesCleared,
+                            gameOver: state.ai.gameOver
+                        }
+                    });
+                    
+                    await saveGameRecord(fastify, currentGameRecord as GameRecord);
+                    currentGameRecord = null;
+                }
+                
                 tetrisAINamespace.emit('game_ended', { reason: 'game_over', winner });
                 resetGame();
             }

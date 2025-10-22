@@ -174,25 +174,23 @@ const start = async () => {
 			fastify.sqlite.get('SELECT display_name FROM users WHERE id = ?', [userId], (err: Error | null, row: any) => {
 				if (err || !row) return fastify.log.error(`Failed to get display name for user ${userId}`);
 
-				onlineUsers.set(userId, { socketId: socket.id, username, displayName: row.display_name });
+			onlineUsers.set(userId, { socketId: socket.id, username, displayName: row.display_name });
 
-				// Broadcast updated online users list
-				const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
-					userId: id, username: data.username, displayName: data.displayName
-				}));
-				io.emit('online_users_updated', usersList);
-				fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
-			});
+			// Broadcast updated online users list
+			const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
+				userId: id, username: data.username, displayName: data.displayName
+			}));
+			io.emit('online_users_updated', usersList);
+			fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
+		});
 
-			// Handle request for current online users list
-			socket.on('request_online_users', () => {
-				const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
-					userId: id, username: data.username, displayName: data.displayName
-				}));
-				socket.emit('online_users_updated', usersList);
-			});
-
-			// Handle game invites
+		// Handle request for current online users list
+		socket.on('request_online_users', () => {
+			const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
+				userId: id, username: data.username, displayName: data.displayName
+			}));
+			socket.emit('online_users_updated', usersList);
+		});			// Handle game invites
 			socket.on('game:invite', (data: { targetUserId: number }) => {
 				const targetUser = onlineUsers.get(data.targetUserId);
 				if (!targetUser) return;
@@ -223,17 +221,17 @@ const start = async () => {
 				fastify.log.info(`${username} declined game invite from ${inviterUser.username}`);
 			});
 
-			socket.on('disconnect', () => {
-				fastify.log.info(`User ${username} (${userId}) disconnected: ${socket.id}`);
-				onlineUsers.delete(userId);
+		socket.on('disconnect', () => {
+			fastify.log.info(`User ${username} (${userId}) disconnected: ${socket.id}`);
+			onlineUsers.delete(userId);
 
-				// Broadcast updated online users list
-				const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
-					userId: id, username: data.username, displayName: data.displayName
-				}));
-				io.emit('online_users_updated', usersList);
-				fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
-			});
+			// Broadcast updated online users list
+			const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
+				userId: id, username: data.username, displayName: data.displayName
+			}));
+			io.emit('online_users_updated', usersList);
+			fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
+		});
 		});
 
 		// Wait for all plugins to be registered (including SQLite)

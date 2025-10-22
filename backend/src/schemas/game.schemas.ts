@@ -6,6 +6,7 @@ export const gameSchema = {
 	type: 'object',
 	properties: {
 		id: { type: 'integer', description: 'Unique game ID' },
+		game_name: { type: 'string', description: 'Name of the game (e.g., Tetris AI, Tetris Remote, Pong)' },
 		started_at: { type: 'string', format: 'date-time', description: 'When the game started' },
 		finished_at: { type: ['string', 'null'], format: 'date-time', description: 'When the game finished' },
 		player1_name: { type: 'string', description: 'Name/alias of player 1' },
@@ -17,26 +18,11 @@ export const gameSchema = {
 	}
 };
 
-export const createGameRequestSchema = {
-	$id: 'CreateGameRequest',
-	type: 'object',
-	required: ['player1_name', 'player1_is_user', 'player2_name', 'player2_is_user'],
-	properties: {
-		started_at: { type: 'string', format: 'date-time', description: 'When the game started (optional, defaults to current timestamp)' },
-		finished_at: { type: 'string', format: 'date-time', description: 'When the game finished (optional)' },
-		player1_name: { type: 'string', description: 'Name/alias of player 1' },
-		player1_is_user: { type: 'boolean', description: 'Whether player 1 is a registered user' },
-		player2_name: { type: 'string', description: 'Name/alias of player 2' },
-		player2_is_user: { type: 'boolean', description: 'Whether player 2 is a registered user' },
-		winner: { type: 'string', description: 'Name of the winner (optional)' },
-		data: { type: 'string', description: 'JSON string with game statistics (optional)' }
-	}
-};
-
 export const updateGameRequestSchema = {
 	$id: 'UpdateGameRequest',
 	type: 'object',
 	properties: {
+		game_name: { type: 'string', description: 'Name of the game' },
 		finished_at: { type: 'string', format: 'date-time', description: 'When the game finished' },
 		player1_name: { type: 'string', description: 'Name/alias of player 1' },
 		player1_is_user: { type: 'boolean', description: 'Whether player 1 is a registered user' },
@@ -57,39 +43,6 @@ export const gameIdParamSchema = {
 };
 
 // Route schemas
-export const createGameSchema = {
-	description: 'Create a new game record (only gamemaster can create)',
-	tags: ['games'],
-	security: [{ bearerAuth: [] }],
-	body: {
-		$ref: 'CreateGameRequest#'
-	},
-	response: {
-		201: {
-			description: 'Game record created successfully',
-			type: 'object',
-			properties: {
-				message: { type: 'string' },
-				gameId: { type: 'integer' }
-			}
-		},
-		403: {
-			description: 'Forbidden - only gamemaster can create game records',
-			type: 'object',
-			properties: {
-				error: { type: 'string' }
-			}
-		},
-		500: {
-			description: 'Internal server error',
-			type: 'object',
-			properties: {
-				error: { type: 'string' }
-			}
-		}
-	}
-};
-
 export const getAllGamesSchema = {
 	description: 'Get all game records (requires authentication)',
 	tags: ['games'],

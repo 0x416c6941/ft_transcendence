@@ -62,12 +62,13 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 		});
 	});
 
-	// Create `games` table if it doesn't exist yet
+	// Create games table
 	await new Promise<void>((resolve, reject) => {
 		db.run(`
 			CREATE TABLE IF NOT EXISTS games (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				started_at DATETIME,
+				game_name TEXT NOT NULL,
+				started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 				finished_at DATETIME,
 				player1_name TEXT NOT NULL,
 				player1_is_user BOOLEAN NOT NULL DEFAULT 0,
@@ -78,8 +79,10 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 			)
 		`, (err: Error | null) => {
 			if (err) {
+				fastify.log.error(`Failed to create games table: ${err.message}`);
 				reject(err);
 			} else {
+				fastify.log.info('Games table ready');
 				resolve();
 			}
 		});

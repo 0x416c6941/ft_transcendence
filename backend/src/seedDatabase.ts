@@ -13,13 +13,6 @@ interface SeedUser {
 
 const SEED_USERS: SeedUser[] = [
     {
-        username: 'gamemaster',
-        password: 'gamemaster',
-        email: 'gm@gm.not',
-        display_name: 'Game Master',
-        isAdmin: true
-    },
-    {
         username: 'bob',
         password: 'bob',
         email: 'bob@transcendence.local',

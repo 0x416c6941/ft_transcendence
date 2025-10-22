@@ -9,14 +9,12 @@ export * from './game.schemas.js';
 import { userSchemas } from './user.schemas.js';
 import {
 	gameSchema,
-	createGameRequestSchema,
 	updateGameRequestSchema,
 	gameIdParamSchema
 } from './game.schemas.js';
 
 export const gameSchemas = [
 	gameSchema,
-	createGameRequestSchema,
 	updateGameRequestSchema,
 	gameIdParamSchema
 ];

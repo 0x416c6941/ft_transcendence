@@ -2,25 +2,14 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { authenticateToken } from '../middleware/auth.js';
 import { dbGetAdminByUserId } from '../utils/users.js';
 import {
-	createGameSchema,
 	getAllGamesSchema,
 	getGameByIdSchema,
 	updateGameSchema,
 	deleteGameSchema
 } from '../schemas/game.schemas.js';
 
-interface CreateGameBody {
-	started_at?: string;
-	finished_at?: string;
-	player1_name: string;
-	player1_is_user: boolean;
-	player2_name: string;
-	player2_is_user: boolean;
-	winner?: string;
-	data?: string;
-}
-
 interface UpdateGameBody {
+	game_name?: string;
 	finished_at?: string;
 	player1_name?: string;
 	player1_is_user?: boolean;
@@ -35,66 +24,6 @@ interface GameParams {
 }
 
 export default async function gameRoutes(fastify: FastifyInstance) {
-	// Create a new game record (only gamemaster with id 1 can create)
-	fastify.post<{ Body: CreateGameBody }>(
-		'/games',
-		{
-			preHandler: authenticateToken,
-			schema: createGameSchema
-		},
-		async (request: FastifyRequest<{ Body: CreateGameBody }>, reply: FastifyReply) => {
-			// Only gamemaster (user id 1) can create game records
-			if (request.user?.userId !== 1) {
-				return reply.code(403).send({
-					error: 'Forbidden: Only gamemaster can create game records'
-				});
-			}
-
-			const {
-				started_at,
-				finished_at,
-				player1_name,
-				player1_is_user,
-				player2_name,
-				player2_is_user,
-				winner,
-				data
-			} = request.body;
-
-			try {
-				const gameId = await new Promise<number>((resolve, reject) => {
-					const query = started_at
-						? 'INSERT INTO games (started_at, finished_at, player1_name, player1_is_user, player2_name, player2_is_user, winner, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-						: 'INSERT INTO games (finished_at, player1_name, player1_is_user, player2_name, player2_is_user, winner, data) VALUES (?, ?, ?, ?, ?, ?, ?)';
-					
-					const params = started_at
-						? [started_at, finished_at || null, player1_name, player1_is_user ? 1 : 0, player2_name, player2_is_user ? 1 : 0, winner || null, data || null]
-						: [finished_at || null, player1_name, player1_is_user ? 1 : 0, player2_name, player2_is_user ? 1 : 0, winner || null, data || null];
-
-					fastify.sqlite.run(
-						query,
-						params,
-						function (err: Error | null) {
-							if (err) {
-								reject(err);
-							} else {
-								resolve(this.lastID);
-							}
-						}
-					);
-				});
-
-				return reply.code(201).send({
-					message: 'Game record created successfully',
-					gameId
-				});
-			} catch (err: any) {
-				fastify.log.error(err);
-				return reply.code(500).send({ error: 'Failed to create game record' });
-			}
-		}
-	);
-
 	// Get all games (only authenticated users can view)
 	fastify.get(
 		'/games',
@@ -189,6 +118,7 @@ export default async function gameRoutes(fastify: FastifyInstance) {
 			}
 
 			const {
+				game_name,
 				finished_at,
 				player1_name,
 				player1_is_user,
@@ -202,6 +132,10 @@ export default async function gameRoutes(fastify: FastifyInstance) {
 			const updates: string[] = [];
 			const values: any[] = [];
 
+			if (game_name !== undefined) {
+				updates.push('game_name = ?');
+				values.push(game_name);
+			}
 			if (finished_at !== undefined) {
 				updates.push('finished_at = ?');
 				values.push(finished_at);
