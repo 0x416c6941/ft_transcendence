@@ -1,6 +1,5 @@
-import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
-import { verifyToken, extractTokenFromHeader, JwtPayload } from '../utils/jwt.js';
-import '@fastify/cookie';
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { verifyToken, JwtPayload } from '../utils/jwt.js';
 
 /**
  * Extend FastifyRequest to include user information
@@ -29,38 +28,33 @@ export async function authenticateToken(
 	request: FastifyRequest,
 	reply: FastifyReply
 ): Promise<void> {
-	try {
-		// Prefer JWT from HttpOnly cookie
-		const cookieToken = request.cookies?.accessToken;
-		// Fallback: Authorization: Bearer <token>
-		const headerToken = extractTokenFromHeader(request.headers.authorization as string | undefined);
-		const token = cookieToken ?? headerToken;
-		if (!token) {
-			return reply.code(401).send({
-				error: 'Access token required'
-			});
-		}
+	// prevent caches from storing personalized responses
+	reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
+	const token = request.cookies?.accessToken;
+	if (!token) {
+    		return reply.code(401).send({ error: "Access token required" });
+  	}
 
-		const decoded = verifyToken(token);
-		request.user = decoded;
+	try {
+		request.user = verifyToken(token);
 	} catch (error) {
-		return reply.code(403).send({
+		return reply.code(401).send({
 			error: 'Invalid or expired token'
 		});
 	}
 }
 
-export async function optionalAuth(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
-	try {
-    		const cookieToken = (request.cookies as Record<string, string> | undefined)?.accessToken;
-    		const headerToken = extractTokenFromHeader(request.headers.authorization as string | undefined);
-    		const token = cookieToken ?? headerToken;
-    		if (token) request.user = verifyToken(token);
-  	} catch {
-    		// Token is invalid but we don't reject the request
- 		// User info just won't be available
-  	}
-}
+// export async function optionalAuth(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
+// 	try {
+//     		const cookieToken = (request.cookies as Record<string, string> | undefined)?.accessToken;
+//     		const headerToken = extractTokenFromHeader(request.headers.authorization as string | undefined);
+//     		const token = cookieToken ?? headerToken;
+//     		if (token) request.user = verifyToken(token);
+//   	} catch {
+//     		// Token is invalid but we don't reject the request
+//  		// User info just won't be available
+//   	}
+// }
 
 
 // /**
