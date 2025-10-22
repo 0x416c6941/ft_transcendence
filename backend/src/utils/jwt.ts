@@ -21,7 +21,7 @@ export interface JwtPayload {
  */
 export function generateAccessToken(userId: number, username: string): string {
 	const payload: JwtPayload = { userId, username };
-	return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+	return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN, algorithm: "HS256" });
 }
 
 /**
