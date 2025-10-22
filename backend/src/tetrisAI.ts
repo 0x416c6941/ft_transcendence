@@ -233,92 +233,6 @@ function updateAI(aiState: AIState): void {
     }
 }
 
-function updatePlayer(playerState: PlayerState, input: PlayerState['input']): void {
-    if (playerState.gameOver || !playerState.currentPiece) return;
-    
-    const piece = playerState.currentPiece;
-    
-    // Handle rotation
-    if (input.rotate && !playerState.lastRotateState) {
-        const rotated = rotatePiece(piece);
-        if (!checkCollision(playerState.board, rotated)) {
-            playerState.currentPiece = rotated;
-        }
-    }
-    playerState.lastRotateState = input.rotate;
-    
-    // Handle horizontal movement with delay
-    const currentDirection = input.left ? 'left' : input.right ? 'right' : null;
-    
-    if (currentDirection) {
-        if (currentDirection !== playerState.lastMoveDirection) {
-            playerState.moveCounter = 0;
-            playerState.lastMoveDirection = currentDirection;
-        }
-        
-        const shouldMove = playerState.moveCounter === 0 || 
-                          (playerState.moveCounter >= MOVE_DELAY_INITIAL && 
-                           (playerState.moveCounter - MOVE_DELAY_INITIAL) % MOVE_DELAY_REPEAT === 0);
-        
-        if (shouldMove) {
-            if (currentDirection === 'left' && !checkCollision(playerState.board, piece, -1, 0)) {
-                piece.x--;
-            } else if (currentDirection === 'right' && !checkCollision(playerState.board, piece, 1, 0)) {
-                piece.x++;
-            }
-        }
-        
-        playerState.moveCounter++;
-    } else {
-        playerState.moveCounter = 0;
-        playerState.lastMoveDirection = null;
-    }
-    
-    // Handle drop
-    if (input.drop && !playerState.dropPressed) {
-        while (!checkCollision(playerState.board, piece, 0, 1)) {
-            piece.y++;
-        }
-        playerState.dropPressed = true;
-        mergePiece(playerState.board, piece);
-        clearLines(playerState);
-        spawnNewPiece(playerState);
-        playerState.gravityCounter = 0;
-        return;
-    } else if (!input.drop) {
-        playerState.dropPressed = false;
-    }
-    
-    // Handle soft drop
-    if (input.down) {
-        if (!checkCollision(playerState.board, piece, 0, 1)) {
-            piece.y++;
-            playerState.score += 1;
-            playerState.gravityCounter = 0;
-        } else {
-            mergePiece(playerState.board, piece);
-            clearLines(playerState);
-            spawnNewPiece(playerState);
-            playerState.gravityCounter = 0;
-        }
-        return;
-    }
-    
-    // Normal gravity
-    playerState.gravityCounter++;
-    if (playerState.gravityCounter >= GRAVITY_TICKS) {
-        playerState.gravityCounter = 0;
-        
-        if (!checkCollision(playerState.board, piece, 0, 1)) {
-            piece.y++;
-        } else {
-            mergePiece(playerState.board, piece);
-            clearLines(playerState);
-            spawnNewPiece(playerState);
-        }
-    }
-}
-
 const state: GameState = {
     player: createPlayerState(),
     ai: {
@@ -360,7 +274,7 @@ function resetGame(): void {
 function step(): void {
     if (!state.started) return;
     
-    updatePlayer(state.player, state.player.input);
+    updatePlayerShared(state.player);
     updateAI(state.ai);
 }
 

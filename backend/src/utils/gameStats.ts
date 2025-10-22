@@ -10,7 +10,7 @@ export interface GameRecord {
 	player2_name: string;
 	player2_is_user: boolean;
 	winner?: string;
-	data?: string;
+	data?: string;  // SQLite does have JSON type, unfortunately
 }
 
 /**
