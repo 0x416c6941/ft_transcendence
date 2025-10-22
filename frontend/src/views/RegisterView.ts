@@ -136,7 +136,8 @@ export default class RegisterView extends AbstractView {
     `;
   }
 
-  setup(): void {
+  async setup(): Promise<void> {
+    await auth.bootstrap();
     if (auth.isAuthed()){
       this.router.navigate("/");
       return;
