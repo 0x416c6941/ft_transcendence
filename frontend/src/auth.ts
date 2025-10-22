@@ -1,4 +1,4 @@
-// src/state/auth.ts
+// src/auth.ts
 import { getCurrentUser, login, logout, type User } from "./api/users.js";
 
 type AuthStatus = "unknown" | "authenticated" | "unauthenticated";
