@@ -15,93 +15,96 @@ export type User = {
   username: string;
   email: string;
   display_name: string;
-  created_at: string;
+  created_at?: string;
 };
 
-export type LoginResponse = {
-  message: string;
-  user: Omit<User, 'created_at'> & { created_at?: string };
-};
-
-
+export type CreateUserInput = Omit<User, "id" | "created_at"> & { password: string };
+export type UpdateUserInput = Partial<CreateUserInput>;
 
 export class ApiError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
+  constructor(public message: string, public status: number) {
     super(message);
-    this.status = status;
   }
+}
+
+async function safeMsg(res: Response): Promise<string | undefined> {
+  try {
+    const data = await res.clone().json();
+    return (data && (data.error || data.message)) as string | undefined;
+  } catch {}
+  try {
+    const txt = await res.clone().text();
+    return txt?.trim() || undefined;
+  } catch {}
+  return undefined;
 }
 
 async function safeApiError(res: Response): Promise<never> {
-  try {
-    const data = await res.json();
-    const msg = (data && (data.error || data.message)) as string | undefined;
-    throw new ApiError(msg || `HTTP ${res.status}`, res.status);
-  } catch {
-    throw new ApiError(`HTTP ${res.status}`, res.status);
-  }
+  const msg = (await safeMsg(res)) || `HTTP ${res.status}`;
+  throw new ApiError(msg, res.status);
+}
+
+async function parseJsonIfAny<T>(res: Response): Promise<T> {
+  const ct = res.headers.get("content-type") ?? "";
+  const empty =
+    res.status === 204 ||
+    res.headers.get("content-length") === "0" ||
+    !ct.includes("application/json");
+  if (empty) return undefined as unknown as T;
+  return res.json() as Promise<T>;
 }
 
 /**
- * Centralized fetch with:
- *  - credentials: 'include' (so cookies are sent)
- *  - one-shot 401 auto-refresh (POST /api/users/refresh), then retry
+ * Centralized fetch:
+ *  - sends cookies
+ *  - retries once on 401 via /api/users/refresh
  */
 async function request<T>(
   input: RequestInfo | URL,
   init: RequestInit & { retryOn401?: boolean } = {}
 ): Promise<T> {
-  // ⬇️ pull out the custom flag so it doesn't get passed to fetch
   const { retryOn401 = true, ...fetchInit } = init;
 
-  const res = await fetch(input, {
-    ...fetchInit,
-    credentials: "include", // IMPORTANT for cookie auth
-  });
-
-  if (res.ok) {
-    // Some endpoints may return 204/empty; guard for that
-    const isEmpty = res.status === 204 || (res.headers.get("content-length") === "0");
-    const ct = res.headers.get("content-type") || "";
-    if (!isEmpty && ct.includes("application/json")) {
-      return res.json() as Promise<T>;
-    }
-    // If the caller expects JSON but server returns empty, we coerce to T.
-    // You can change the function signature to Promise<T | undefined> instead.
-    return undefined as unknown as T;
-  }
-
-  // Optional auto-refresh logic
-  if (res.status === 401 && retryOn401) {
-    const refreshed = await fetch("/api/users/refresh", {
-      method: "POST",
+  let res: Response;
+  try {
+    res = await fetch(input, {
+      ...fetchInit,
+      headers: { Accept: "application/json", ...(fetchInit.headers || {}) },
       credentials: "include",
     });
+  } catch {
+    throw new ApiError("Network error", 0);
+  }
 
-    if (refreshed.ok) {
-      // ⬇retry ONCE, without retryOn401 (already extracted above)
-      const retryRes = await fetch(input, {
-        ...fetchInit,
+  if (res.ok) return parseJsonIfAny<T>(res);
+
+  if (res.status === 401 && retryOn401) {
+    try {
+      const refreshed = await fetch("/api/users/refresh", {
+        method: "POST",
         credentials: "include",
+        headers: { Accept: "application/json" },
       });
 
-      if (retryRes.ok) {
-        const isEmpty = retryRes.status === 204 || (retryRes.headers.get("content-length") === "0");
-        const ct = retryRes.headers.get("content-type") || "";
-        if (!isEmpty && ct.includes("application/json")) {
-          return retryRes.json() as Promise<T>;
-        }
-        return undefined as unknown as T;
-      }
-      await safeApiError(retryRes);
-    }
+      if (refreshed.ok) {
+        const retryRes = await fetch(input, {
+          ...fetchInit,
+          headers: { Accept: "application/json", ...(fetchInit.headers || {}) },
+          credentials: "include",
+        });
 
-    await safeApiError(res); // refresh failed
+        if (retryRes.ok) return parseJsonIfAny<T>(retryRes);
+        await safeApiError(retryRes);
+      }
+
+      await safeApiError(refreshed);
+    } catch {
+      throw new ApiError("Network error during refresh", 0);
+    }
   }
 
   await safeApiError(res);
-  throw new Error("Unreachable: safeApiError should have thrown");
+  throw new Error("Unreachable");
 }
 
 
@@ -109,12 +112,7 @@ async function request<T>(
  * Registers a new user
  * POST /api/users
  */
-export async function createUser(payload: {
-  username: string;
-  password: string;
-  email: string;
-  display_name: string;
-}) {
+export async function createUser(payload: CreateUserInput) {
   return request<{ message: string; username: string }>("/api/users", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -127,73 +125,42 @@ export async function createUser(payload: {
  * POST /api/users/login
  * Server sets HttpOnly cookies; we just read the user payload.
  */
-export async function login(payload: {
-  username: string;
-  password: string;
-}): Promise<LoginResponse> {
-  return request<LoginResponse>("/api/users/login", {
+export async function login(payload: { username: string; password: string }): Promise<void> {
+  return request<void>("/api/users/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 }
 
-export type UserById = {
-  user: {
-    id: number;
-    username: string;
-    email: string;
-    display_name: string;
-    created_at: string;
-  };
-};
-
-/**
- * Reads user by id
- * GET /api/users/:id
- * Cookies are sent automatically; no Authorization header needed.
- * Will auto-refresh once on 401, then retry.
- */
-export async function getUserById(id: number): Promise<UserById> {
-  return request<UserById>(`/api/users/${id}`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  });
-}
+// export type UserById = {
+//   user: {
+//     id: number;
+//     username: string;
+//     email: string;
+//     display_name: string;
+//     created_at: string;
+//   };
+// };
 
 /**
  * Optional helpers
  */
-export async function logout(): Promise<{ message: string }> {
-  return request<{ message: string }>("/api/users/logout", {
-    method: "POST",
-  });
+export async function logout(): Promise<void> {
+  return request<void>("/api/users/logout", { method: "POST" });
 }
 
-// If you want explicit manual refresh (usually not needed because request() handles it)
-export async function refresh(): Promise<{ message: string }> {
-  return request<{ message: string }>("/api/users/refresh", {
-    method: "POST",
-    // Do not retry refresh recursively
-    retryOn401: false,
-  });
+// For manual refresh (usually not needed because request() handles it)
+export async function refresh(): Promise<void> {
+  return request<void>("/api/users/refresh", { method: "POST", retryOn401: false });
 }
 
-// add near other exports
-export async function getCurrentUser(): Promise<UserById> {
-  return request<UserById>("/api/users/me", {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  });
+export async function getCurrentUser(): Promise<User> {
+  const data = await request<{ user: User }>("/api/users/me", { method: "GET" });
+  return data.user;
 }
 
-
-export async function updateUser(payload: {
-  username?: string;
-  email?: string;
-  display_name?: string;
-  password?: string;
-}): Promise<{ message : string }> {
+export async function updateUser(payload: UpdateUserInput): Promise<{ message: string }> {
   return request<{ message: string }>("/api/users/me", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -202,7 +169,5 @@ export async function updateUser(payload: {
 }
 
 export async function deleteUser(): Promise<{ message: string }> {
-  return request<{ message: string }>("/api/users/me", {
-    method: "DELETE",
-  });
+  return request<{ message: string }>("/api/users/me", { method: "DELETE" });
 }
