@@ -33,12 +33,12 @@ export const PATHS_TO_ROUTE: PathToRegister[] = [
 	{ path: "/login", constructor: LoginView, guard: 'guest' },
 	{ path: "/register", constructor: RegisterView, guard: 'guest' },
 	{ path: "/profile", constructor: ProfileView, guard: 'auth' },
-	{ path: '/rooms/new', constructor: CreateRoomView },
-	{ path: '/rooms/join', constructor: JoinRoomView },
+	{ path: '/rooms/new', constructor: CreateRoomView, guard: 'auth' },
+	{ path: '/rooms/join', constructor: JoinRoomView, guard: 'auth' },
 	{ path: '/pong-local', constructor: PongLocalView },
 	{ path: '/tetris', constructor: TetrisView },
 	{ path: '/tetris-ai', constructor: TetrisAIView },
-	{ path: '/tetris-remote', constructor: TetrisRemoteView }
+	{ path: '/tetris-remote', constructor: TetrisRemoteView, guard: 'auth' },
 ] as const;
 
 /**
