@@ -9,6 +9,7 @@ import gameRoutes from './routes/games.js';
 import { allSchemas } from './schemas/index.js';
 import { registerSwagger } from './swagger/config.js';
 import { setupPongGame } from './pongGame.js';
+import { setupPongGameLocal } from './pongGameLocal.js';
 import { setupTetrisGame } from './tetrisGame.js';
 import { setupTetrisAI } from './tetrisAI.js';
 import { setupTetrisRemote } from './tetrisRemote.js';
@@ -247,6 +248,9 @@ const start = async () => {
 
 		// Set up Pong game server
 		setupPongGame(fastify, io);
+
+		// Set up Pong Local game server
+		setupPongGameLocal(fastify, io);
 
 		/* IPv4 only here.
 		 * We don't need to take care of IPv6, since we'll either way
