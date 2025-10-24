@@ -10,7 +10,6 @@ export function mountHeader(router: Router) {
 
   if (!$login || !$register || !$profile || !$logout) return () => {};
 
-  // ensure auth state is hydrated (no-op if already bootstrapped)
   void auth.bootstrap();
 
   const render = (s = auth.get()) => {
@@ -57,7 +56,7 @@ export function mountHeader(router: Router) {
   };
   $logout.addEventListener("click", onLogout);
 
-  // optional cleanup for SPA route changes / re-mounts
+
   return () => {
     unsubscribe?.();
     $logout.removeEventListener("click", onLogout);

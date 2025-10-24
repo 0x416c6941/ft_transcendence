@@ -64,18 +64,16 @@ header div {
   gap: 1rem;
 }
 
-/* Footer */
-footer {
-  padding: 2rem;
-  background-color: var(--primaryColor);
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 2rem;
+/* scope to header to avoid global clashes */
+.site-header nav a,
+.site-header nav button {
+  color: var(--secondaryColor);
+  text-decoration: none;
+  font-size: 1.5rem;   /* matches Tailwind text-base */
+  line-height: 1;    /* matches leading-none */
 }
 
-footer p {
-  font-size: 0.9rem;
+.site-header nav a:hover,
+.site-header nav button:hover {
   color: var(--highlightColor);
-  align-self: flex-end;
 }
