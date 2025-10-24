@@ -8,7 +8,7 @@ import {
 	loginUserSchema,
 	// refreshTokenSchema, // no longer needed; refresh uses cookie now
 	// getAllUsersSchema,
-	// getUserByIdSchema,
+	getUserByIdSchema,
 	updateUserSchema,
 	deleteUserSchema,
 	makeAdminSchema,
@@ -201,6 +201,42 @@ export default async function userRoutes(fastify: FastifyInstance) {
       			clearAuthCookies(reply);
 			return reply.code(200).send({ message: "Logged out" });
   	});
+
+	// Get a specific user by ID
+	fastify.get<{ Params: UserParams }>(
+		'/users/:id',
+		{ schema: getUserByIdSchema },
+		async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
+			const { id } = request.params;
+
+			try {
+				const user = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(
+						// Returning linked 42 account ID would be weird, hence not doing it.
+						`SELECT id, username, email, display_name, created_at FROM users WHERE id = ?`,
+						[id],
+						(err: Error | null, row: any) => {
+							if (err) {
+								reject(err);
+							} else {
+								resolve(row);
+							}
+						}
+					);
+				});
+
+				if (!user) {
+					return reply.code(404).send({ error: 'User not found' });
+				}
+
+				return reply.code(200).send({ user });
+			} catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(500).send({ error: 'Failed to retrieve user' });
+			}
+		}
+	);
+
 
 	// Get own user info
 	fastify.get(
