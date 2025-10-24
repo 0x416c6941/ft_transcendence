@@ -2,7 +2,6 @@ import AbstractView from "./AbstractView.js";
 import Router from "../router.js";
 import { APP_NAME } from "../app.config.js";
 import { nkfc } from "../utils/sanitize.js";
-import { login } from "../api/users.js";
 import { auth } from "../auth.js";
 
 export default class LoginView extends AbstractView {

@@ -14,6 +14,8 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import gameRoutes from './routes/games.js';
+import { setupPongGameLocal } from './pongGameLocal.js';
 import { setupTetrisGame } from './tetrisGame.js';
 import { setupTetrisAI } from './tetrisAI.js';
 import { setupTetrisRemote } from './tetrisRemote.js';
@@ -64,6 +66,9 @@ registerSwagger(fastify);
 
 // Register user routes
 fastify.register(userRoutes, { prefix: "/api" });
+
+// Register game routes
+fastify.register(gameRoutes, { prefix: '/api' });
 
 const start = async () => {
   const port = Number(process.env.BACKEND_FASTIFY_PORT);
@@ -187,25 +192,23 @@ const start = async () => {
 			fastify.sqlite.get('SELECT display_name FROM users WHERE id = ?', [userId], (err: Error | null, row: any) => {
 				if (err || !row) return fastify.log.error(`Failed to get display name for user ${userId}`);
 
-				onlineUsers.set(userId, { socketId: socket.id, username, displayName: row.display_name });
+			onlineUsers.set(userId, { socketId: socket.id, username, displayName: row.display_name });
 
-				// Broadcast updated online users list
-				const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
-					userId: id, username: data.username, displayName: data.displayName
-				}));
-				io.emit('online_users_updated', usersList);
-				fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
-			});
+			// Broadcast updated online users list
+			const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
+				userId: id, username: data.username, displayName: data.displayName
+			}));
+			io.emit('online_users_updated', usersList);
+			fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
+		});
 
-			// Handle request for current online users list
-			socket.on('request_online_users', () => {
-				const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
-					userId: id, username: data.username, displayName: data.displayName
-				}));
-				socket.emit('online_users_updated', usersList);
-			});
-
-			// Handle game invites
+		// Handle request for current online users list
+		socket.on('request_online_users', () => {
+			const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
+				userId: id, username: data.username, displayName: data.displayName
+			}));
+			socket.emit('online_users_updated', usersList);
+		});			// Handle game invites
 			socket.on('game:invite', (data: { targetUserId: number }) => {
 				const targetUser = onlineUsers.get(data.targetUserId);
 				if (!targetUser) return;
@@ -236,17 +239,17 @@ const start = async () => {
 				fastify.log.info(`${username} declined game invite from ${inviterUser.username}`);
 			});
 
-			socket.on('disconnect', () => {
-				fastify.log.info(`User ${username} (${userId}) disconnected: ${socket.id}`);
-				onlineUsers.delete(userId);
+		socket.on('disconnect', () => {
+			fastify.log.info(`User ${username} (${userId}) disconnected: ${socket.id}`);
+			onlineUsers.delete(userId);
 
-				// Broadcast updated online users list
-				const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
-					userId: id, username: data.username, displayName: data.displayName
-				}));
-				io.emit('online_users_updated', usersList);
-				fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
-			});
+			// Broadcast updated online users list
+			const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
+				userId: id, username: data.username, displayName: data.displayName
+			}));
+			io.emit('online_users_updated', usersList);
+			fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
+		});
 		});
 
 		// Wait for all plugins to be registered (including SQLite)
@@ -262,6 +265,9 @@ const start = async () => {
 
 		// Set up Pong game server
 		setupPongGame(fastify, io);
+
+		// Set up Pong Local game server
+		setupPongGameLocal(fastify, io);
 
 		/* IPv4 only here.
 		 * We don't need to take care of IPv6, since we'll either way

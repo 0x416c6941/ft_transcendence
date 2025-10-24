@@ -10,8 +10,8 @@ export const swaggerConfig = {
 	openapi: {
 		openapi: '3.0.0',
 		info: {
-			title: 'ft_transcendence User API',
-			description: 'API documentation for user management with secure authentication',
+			title: 'ft_transcendence API',
+			description: 'API documentation for user management and game statistics tracking',
 			version: '0.0.1'
 		},
 		servers: [
@@ -22,7 +22,8 @@ export const swaggerConfig = {
 		],
 		tags: [
 			{ name: 'users', description: 'User management endpoints' },
-			{ name: 'auth', description: 'Authentication endpoints' }
+			{ name: 'auth', description: 'Authentication endpoints' },
+			{ name: 'games', description: 'Game statistics and records endpoints' }
 		],
 		components: {
 			securitySchemes: {

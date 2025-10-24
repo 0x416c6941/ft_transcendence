@@ -2,6 +2,7 @@ import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 import OnlineUsers from '../components/OnlineUsers.js';
+import { io } from '../socket.js';
 
 /**
  * @class TetrisView
@@ -188,7 +189,7 @@ export default class TetrisView extends AbstractView {
 
         // Mount OnlineUsers component if user is logged in
         const hasAccessToken = document.cookie.split(';').some(cookie => cookie.trim().startsWith('accessToken='));
-        if (hasAccessToken && (window as any).userSocket) {
+        if (hasAccessToken && io.connected) {
             this.onlineUsersComponent = new OnlineUsers(this.router);
             const mainElement = document.querySelector('main');
             if (mainElement) {

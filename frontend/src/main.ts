@@ -1,10 +1,7 @@
 import { DIV_ID, PATHS_TO_ROUTE } from './app.config.js';
 import Router from "./router.js";
-/* Execute all code in './socket.js'.
- * To use sockets in other files, use this:
- * "import { io } from './socket.js';" */
-import './socket.js';
 import { auth } from './auth.js';
+import { io } from './socket.js';
 
 let router: Router | null = null;
 
@@ -14,37 +11,43 @@ document.addEventListener("DOMContentLoaded", (e) => {
 	}
 	router = new Router(DIV_ID, PATHS_TO_ROUTE);
 
-	// ensure auth state is hydrated (cookies sent automatically)
-	void auth.bootstrap();
+	let handlersAttached = false;
 
-	const connectIfNeeded = () => {
-		if (!auth.isAuthed()) return;
+	const attachHandlers = () => {
+		if (handlersAttached) return;
+		handlersAttached = true;
 
-		if((window as any).userSocket?.connected) return; // already connected
-
-		const socket = (window as any).io(window.location.origin, {
-			path: '/api/socket.io/',
-			withCredentials: true, // send cookies
-		});
-
-		socket.on('connect', () => {
+		io.on('connect', () => {
 			console.log('Connected to Socket.IO as authenticated user');
 		});
 
-		socket.on('connect_error', (err: Error) => {
+		io.on('connect_error', (err: Error) => {
 			console.error('Socket.IO connection error:', err.message);
 		});
 
-		(window as any).userSocket = socket;
+		// Store user info when received
+		io.on('user_info', (data: { userId: number; username: string }) => {
+			io.userId = data.userId;
+			io.username = data.username;
+		});
 	};
 
+
+	const connectIfNeeded = () => {
+		if (!auth.isAuthed()) return;
+		if (io.connected) return;
+
+		attachHandlers();
+		io.connect(); 	// cookies are sent via withCredentials
+		(window as any).userSocket = io;
+	}
+
 	const disconnectIfNeeded = () => {
-		const socket = (window as any).userSocket;
-		if (socket && socket.connected) {
-			socket.disconnect();
-			(window as any).userSocket = null;
+		if (io.connected) {
+			io.disconnect();
 			console.log('Disconnected from Socket.IO');
 		}
+			(window as any).userSocket = null;
 	};
 
 	// React to auth state changes

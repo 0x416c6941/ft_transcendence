@@ -3,6 +3,7 @@ import Router from "../router.js";
 import { APP_NAME } from "../app.config.js";
 import OnlineUsers from '../components/OnlineUsers.js';
 import { auth } from "../auth.js";
+import { io } from '../socket.js';
 
 export default class HomeView extends AbstractView {
   private isLoggedIn: boolean = false;
@@ -77,7 +78,7 @@ async getHtml(): Promise<string> {
     }
 
     // Mount OnlineUsers component if user is logged in
-    if (this.isLoggedIn && (window as any).userSocket) {
+    if (this.isLoggedIn && io.connected) {
       this.onlineUsersComponent = new OnlineUsers(this.router);
       const mainElement = document.querySelector('main');
       if (mainElement) {
