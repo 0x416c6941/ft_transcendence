@@ -12,5 +12,4 @@ const SOCKET_PATH = '/api/socket.io/';
 export const io: any = (window as any).io(window.location.origin, {
 	path: SOCKET_PATH,
 	withCredentials: true, // send cookies
-	autoConnect: false, // do not connect automatically -> auth should handled it and trigger connection
 });
