@@ -506,6 +506,40 @@ export const getUserAvatarSchema = {
 	}
 };
 
+export const updateUserAvatarSchema = {
+	description: 'Update avatar of a user',
+	tags: ['users'],
+	security: [{ bearerAuth: [] }],
+	params: {
+		$ref: 'GenericParamIdUserRequest#'
+	},
+	response: {
+		200: {
+			description: 'Successfully updated avatar',
+			type: 'object',
+			properties: {
+				message: { type: 'string' }
+			}
+		},
+		400: {
+			description: 'Bad request - avatar is either not present, or borked image file',
+			$ref: 'Error#'
+		},
+		403: {
+			description: 'Forbidden - user tried to update avatar of another user without sufficient privileges',
+			$ref: 'Error#'
+		},
+		404: {
+			description: 'Not found - JWT was valid, but user was already deleted from our data base',
+			$ref: 'Error#'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
+
 export const resetUserAvatarSchema = {
 	description: "Reset user's avatar to a default one",
 	tags: ['users'],

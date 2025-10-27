@@ -17,6 +17,7 @@ import {
 	oauth42CallbackSchema,
 	oauth42UnlinkSchema,
 	getUserAvatarSchema,
+	updateUserAvatarSchema,
 	resetUserAvatarSchema
 } from '../schemas/user.schemas.js';
 import {
@@ -29,10 +30,12 @@ import {
 	exchange42CodeFor42Token,
 	get42PublicData
 } from '../utils/users.js';
+import { AVATAR_IMAGE_SIZE_LIMIT } from '../app.config.js'
 import { URLSearchParams } from 'url';
 import path from 'node:path';
 import fsPromises from 'node:fs/promises';
 import mime from 'mime';
+import sharp from 'sharp';
 
 /* Higher number => more Bcrypt hashing rounds
    => more time is necessary and more difficult is brute-forcing. */
@@ -723,7 +726,59 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
-	// TODO: update avatar route.
+	fastify.put<{ Params: UserParams }>(
+		'/users/:id/avatar', {
+		bodyLimit: AVATAR_IMAGE_SIZE_LIMIT,
+		preHandler: authenticateToken,
+		schema: updateUserAvatarSchema
+	}, async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
+		const { id } = request.params;
+
+		if (request.user!.userId !== parseInt(id)) {
+			return reply.code(403).send({ message: "Requested user isn't you." });
+		}
+		// Checking if user still exists.
+		try {
+			const user = await dbGetUserById(fastify, parseInt(id));
+
+			if (!user) {
+				return reply.code(404).send({ error: "Your JWT token is valid, yet user doesn't exist" });
+			}
+		}
+		catch (error: unknown) {
+			fastify.log.error(error);
+			if (error instanceof ApiError) {
+				return reply.code(error.replyHttpCode).send(error.message);
+			}
+			return reply.code(500).send({ error: 'An internal server error occurred' });
+		}
+
+		const data = await request.file();
+		if (!data) {
+			return reply.code(400).send({ error: 'No file' });
+		}
+		else if (!data.mimetype.startsWith('image/')) {
+			return reply.code(400).send({ error: 'Uploaded file must be an image' });
+		}
+		const chunks: Buffer[] = [];
+		for await (const chunk of data.file) {
+			chunks.push(chunk);
+		}
+		const buffer = Buffer.concat(chunks);
+
+		const outputPath = path.join(fastify.config.avatarsPath.avatarsPath, `${id}.webp`);
+		try {
+			sharp(buffer)
+				.resize(256, 256)
+				.webp()
+				.toFile(outputPath);
+
+			return reply.code(200).send({ message: 'Successfully updated an avatar' });
+		}
+		catch (err: unknown) {
+			return reply.code(400).send({ error: 'Received borked image' });
+		}
+	});
 
 	fastify.post<{ Params: UserParams }>(
 		'/users/:id/avatar/reset',
@@ -734,7 +789,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		async(request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
 			const { id } = request.params;
 
-			// Checking if user at all still exists.
+			// Checking if user still exists at all.
 			try {
 				const user = await dbGetUserById(fastify, parseInt(id));
 
