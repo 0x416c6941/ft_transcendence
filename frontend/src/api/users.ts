@@ -157,6 +157,7 @@ export async function login(payload: { username: string; password: string }): Pr
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
+                retryOn401: false
         });
 }
 
