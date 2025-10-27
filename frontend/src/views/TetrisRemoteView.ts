@@ -118,18 +118,7 @@ export default class TetrisRemoteView extends AbstractView {
     }
 
     private setupSocket(): void {
-        const token = document.cookie.split(';')
-            .find(c => c.trim().startsWith('accessToken='))?.split('=')[1];
-        
-        this.socket = (window as any).io(window.location.origin + '/tetris-remote', {
-            path: '/api/socket.io/',
-            auth: {
-                token: token
-            }
-        });
-
-        // Explicitly connect the namespace socket
-        this.socket.connect();
+        this.socket = io.of('/tetris-remote');
 
         this.socket.on('role_assigned', (data: { side: 'player1' | 'player2' | null }) => {
             this.mySide = data.side;
