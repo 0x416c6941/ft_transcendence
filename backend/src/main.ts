@@ -7,13 +7,13 @@ import fs from "node:fs";
 import fastifySqlite, { FastifySqliteOptions } from "./fastifySqlite.js";
 import { Server } from "socket.io";
 import userRoutes from "./routes/users.js";
+import fastifyMultipart from '@fastify/multipart';
 import { allSchemas } from "./schemas/index.js";
 import { registerSwagger } from "./swagger/config.js";
 import { setupPongGame } from "./pongGame.js";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import gameRoutes from './routes/games.js';
 import { setupPongGameLocal } from './pongGameLocal.js';
 import { setupTetrisGame } from './tetrisGame.js';
@@ -64,7 +64,8 @@ for (const schema of allSchemas) {
 // Register Swagger documentation
 registerSwagger(fastify);
 
-// Register user routes
+// Register user routes (some "/users/*" routes depend on "@fastify/multipart").
+fastify.register(fastifyMultipart);
 fastify.register(userRoutes, { prefix: "/api" });
 
 // Register game routes
@@ -81,7 +82,7 @@ const start = async () => {
 			parseOptions: {
 				sameSite: 'lax',
 			}
-		})
+		});
 		await fastify.register(cors, {
 			origin: ["https://localhost/"], // the frontend origin allowed
 			credentials: true, // allow sending cookies or Authorization headers

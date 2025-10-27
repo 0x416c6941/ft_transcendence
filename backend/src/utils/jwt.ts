@@ -8,7 +8,7 @@ if (!jwtSecretPath) {
 	throw new Error("process.env.BACKEND_JWT_KEY_PATH isn't a valid path to JWT Secret Key.");
 }
 const JWT_SECRET = fs.readFileSync(jwtSecretPath);
-const JWT_EXPIRES_IN = '24h'; // Token expires in 24 hours
+const JWT_EXPIRES_IN = '15m'; // Token expires in 15 minutes
 const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Refresh token expires in 7 days
 
 export interface JwtPayload {

@@ -172,20 +172,20 @@ export const loginUserSchema = {
 };
 
 export const refreshTokenSchema = {
-	description: 'Rotate tokens using refresh cookie; sets new cookies.',
+	description: 'Rotate auth cookies using refresh cookie; sets new access and refresh cookies.',
 	tags: ['auth'],
 	security: [{ cookieAuth: [] }],
 	response: {
 		200: {
-			description: 'New access and refresh token generated',
+			description: 'New access and refresh cookies set',
 			$ref: 'MessageResponse#'
 		},
 		400: {
-			description: 'Missing refresh token',
+			description: 'Missing refresh cookie',
 			$ref: 'Error#'
 		},
 		401: {
-			description: 'Invalid or expired refresh token',
+			description: 'Invalid or expired refresh cookie',
 			$ref: 'Error#'
 		}
 	}
@@ -299,7 +299,7 @@ export const deleteUserSchema = {
 			}
 		},
 		401: {
-			description: 'Unauthorized - missing or invalid token',
+			description: 'Unauthorized - missing or invalid cookie',
 			$ref: 'Error#'
 		},
 		404: {
@@ -316,7 +316,7 @@ export const deleteUserSchema = {
 export const makeAdminSchema = {
 	description: 'Grant admin privileges to a user by username',
 	tags: ['users'],
-	security: [{ bearerAuth: [] }],
+	security: [{ cookieAuth: [] }],
 	body: {
 		$ref: 'MakeOrUnmakeAdminRequest#'
 	},
@@ -350,7 +350,7 @@ export const makeAdminSchema = {
 export const unmakeAdminSchema = {
 	description: 'Revoke admin privileges of a user by username',
 	tags: ['users'],
-	security: [{ bearerAuth: [] }],
+	security: [{ cookieAuth: [] }],
 	body: {
 		$ref: 'MakeOrUnmakeAdminRequest#'
 	},
@@ -389,7 +389,7 @@ export const oauth42Schema = {
 			description: 'Redirection to 42 for login'
 		},
 		403: {
-			description: "Forbidden - JWT token is valid, however user doesn't exist anymore",
+			description: "Forbidden - User session is valid, however user doesn't exist anymore",
 			$ref: 'Error#'
 		},
 		409: {
@@ -418,7 +418,7 @@ export const oauth42CallbackSchema = {
 			}
 		},
 		403: {
-			description: "Forbidden - JWT token is valid, however user who wants to link 42 account doesn't exist anymore",
+			description: "Forbidden - User session is valid, however user who wants to link 42 account doesn't exist anymore",
 			$ref: 'Error#'
 		},
 		404: {
@@ -459,7 +459,7 @@ export const oauth42UnlinkSchema = {
 			$ref: 'Error#'
 		},
 		409: {
-			description: 'Conflict - JWT token was provided, yet user was removed from the system',
+			description: 'Conflict - User session exists, yet user was removed from the system',
 			$ref: 'Error#'
 		},
 		500: {
@@ -477,27 +477,43 @@ export const getUserAvatarSchema = {
 	},
 	response: {
 		200: {
-			description: 'Avatar of a given user',
-			headers: {
-				'Content-Type': {
-					type: 'string',
-					description: 'MIME type of avatar'
-				}
-			},
-			content: {
-				'image/webp': {
-					schema: {
-						$ref: 'ImageResponse#'
-					}
-				},
-				/* Just in case, however our server should never return an avatar
-				* of MIME type different than "image/webp". */
-				'image/*': {
-					schema: {
-						$ref: 'ImageResponse#'
-					}
-				}
+			description: 'Avatar of a given user (binary image data)',
+			type: 'string',
+			format: 'binary'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
+
+export const updateUserAvatarSchema = {
+	description: 'Update avatar of a user',
+	tags: ['users'],
+	security: [{ cookieAuth: [] }],
+	params: {
+		$ref: 'GenericParamIdUserRequest#'
+	},
+	response: {
+		200: {
+			description: 'Successfully updated avatar',
+			type: 'object',
+			properties: {
+				message: { type: 'string' }
 			}
+		},
+		400: {
+			description: 'Bad request - avatar is either not present, or borked image file',
+			$ref: 'Error#'
+		},
+		403: {
+			description: 'Forbidden - user tried to update avatar of another user without sufficient privileges',
+			$ref: 'Error#'
+		},
+		404: {
+			description: 'Not found - User session is valid, but user was already deleted from the database',
+			$ref: 'Error#'
 		},
 		500: {
 			description: 'Internal server error',
@@ -509,7 +525,7 @@ export const getUserAvatarSchema = {
 export const resetUserAvatarSchema = {
 	description: "Reset user's avatar to a default one",
 	tags: ['users'],
-	security: [{ bearerAuth: [] }],
+	security: [{ cookieAuth: [] }],
 	params: {
 		$ref: 'GenericParamIdUserRequest#'
 	},
@@ -522,7 +538,7 @@ export const resetUserAvatarSchema = {
 			}
 		},
 		404: {
-			description: 'Not found - JWT token is valid, yet user was already removed from the system',
+			description: 'Not found - User session is valid, yet user was already removed from the system',
 			$ref: 'Error#'
 		},
 		409: {
