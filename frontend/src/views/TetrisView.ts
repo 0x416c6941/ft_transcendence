@@ -199,7 +199,10 @@ export default class TetrisView extends AbstractView {
     }
 
     private setupSocket(): void {
-        this.socket = io.of('/tetris');
+        this.socket = (window as any).io(window.location.origin + '/tetris', {
+            path: '/api/socket.io/',
+            withCredentials: true
+        });
 
         this.socket.on('role', (data: { side: 'player1' | 'player2' | null }) => {
             this.mySide = data.side;

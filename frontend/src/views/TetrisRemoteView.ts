@@ -21,13 +21,7 @@ export default class TetrisRemoteView extends AbstractView {
 
     constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
         super(router, pathParams, queryParams);
-        
-        // Verify user is logged in (has accessToken)
-        const hasToken = document.cookie.split(';').some(cookie => cookie.trim().startsWith('accessToken='));
-        if (!hasToken) {
-            // Redirect to home if accessed without proper authentication
-            setTimeout(() => router.navigate('/'), 0);
-        }
+        // Authentication is handled by socket middleware on connection
     }
 
     async getHtml(): Promise<string> {
@@ -118,9 +112,17 @@ export default class TetrisRemoteView extends AbstractView {
     }
 
     private setupSocket(): void {
-        this.socket = io.of('/tetris-remote');
+        this.socket = (window as any).io(window.location.origin + '/tetris-remote', {
+            path: '/api/socket.io/',
+            withCredentials: true
+        });
+
+        this.socket.on('connect', () => {
+            console.log('Connected to /tetris-remote namespace');
+        });
 
         this.socket.on('role_assigned', (data: { side: 'player1' | 'player2' | null }) => {
+            console.log('Role assigned:', data.side);
             this.mySide = data.side;
             if (!this.mySide) {
                 alert('Game is full. Only 2 players can play at once.');
@@ -129,6 +131,7 @@ export default class TetrisRemoteView extends AbstractView {
         });
 
         this.socket.on('connection_error', (data: { message: string }) => {
+            console.error('Connection error:', data);
             alert(data.message || 'Connection error occurred');
             this.router.navigate('/');
         });
@@ -159,12 +162,13 @@ export default class TetrisRemoteView extends AbstractView {
         });
 
         this.socket.on('connect_error', (err: Error) => {
+            console.error('Connect error:', err);
             alert('Failed to connect to game server: ' + err.message);
             this.router.navigate('/');
         });
 
         this.socket.on('disconnect', (reason: string) => {
-            // Connection closed
+            console.log('Disconnected:', reason);
         });
     }
 

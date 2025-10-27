@@ -171,7 +171,10 @@ export default class TetrisAIView extends AbstractView {
     }
 
     private setupSocket(): void {
-        this.socket = io.of('/tetris-ai');
+        this.socket = (window as any).io(window.location.origin + '/tetris-ai', {
+            path: '/api/socket.io/',
+            withCredentials: true
+        });
 
         this.socket.on('role', () => {
             // Single player, always playing
