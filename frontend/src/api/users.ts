@@ -299,3 +299,41 @@ export async function getUserAvatarURL(id: number): Promise<string> {
         const blob = await getUserAvatar(id);
         return URL.createObjectURL(blob);
 }
+
+/**
+ * @brief       Replace the current user's avatar.
+ * @route       PUT /api/users/:id/avatar
+ * @param id    Numeric user ID
+ * @param file  Image file/blob to upload (any type the server accepts)
+ * @returns     { message }
+ */
+export async function uploadUserAvatar(
+        id: number,
+        file: File | Blob
+): Promise<{ message: string }> {
+        // Optional quick client-side check; keeps server logic authoritative
+        if (!('type' in file) || !file.type.startsWith('image/')) {
+                throw new ApiError("Please choose an image file.", 400);
+        }
+
+        const fd = new FormData();
+        // Use a stable field name (e.g., "file"); it matches request.file() on the server
+        fd.append("file", file, (file as File).name ?? "avatar");
+
+        return request<{ message: string }>(`/api/users/${id}/avatar`, {
+                method: "PUT",
+                body: fd,
+        });
+}
+
+/**
+ * @brief Reset  the user's custom avatar back to default.
+ * @route POST /api/users/:id/avatar/reset
+ * @param id Numeric user ID
+ * @returns { message }
+ */
+export async function resetUserAvatar(id: number): Promise<{ message: string }> {
+        return request<{ message: string }>(`/api/users/${id}/avatar/reset`, {
+                method: "POST",
+        });
+}
