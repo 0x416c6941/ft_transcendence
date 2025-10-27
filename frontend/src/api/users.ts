@@ -222,3 +222,80 @@ export async function getUserById(id: number): Promise<User> {
         const data = await request<{ user: User }>(`/api/users/${id}`, { method: "GET" });
         return data.user;
 }
+
+/**
+ * @brief               Centralized fetch for binary responses with cookies and single 401 refresh retry.
+ * @param input         Request URL or Request
+ * @param init          Request init; set retryOn401=false to disable auto-refresh
+ * @returns             Blob
+ * @throws              ApiError on HTTP errors or network failures
+ */
+async function requestBlob(
+        input: RequestInfo | URL,
+        init: RequestInit & { retryOn401?: boolean } = {}
+): Promise<Blob> {
+        const { retryOn401 = true, ...fetchInit } = init;
+
+        let res: Response;
+        try {
+                res = await fetch(input, {
+                ...fetchInit,
+                headers: { Accept: "image/*", ...(fetchInit.headers || {}) },
+                credentials: "include",
+        });
+        } catch {
+                throw new ApiError("Network error", 0);
+        }
+
+        if (res.ok) return res.blob();
+
+        if (res.status === 401 && retryOn401) {
+                try {
+                        const refreshed = await fetch("/api/users/refresh", {
+                        method: "POST",
+                        credentials: "include",
+                        headers: { Accept: "application/json" },
+                });
+
+                if (refreshed.ok) {
+                        const retryRes = await fetch(input, {
+                        ...fetchInit,
+                        headers: { Accept: "image/*", ...(fetchInit.headers || {}) },
+                        credentials: "include",
+                        });
+
+                        if (retryRes.ok) return retryRes.blob();
+                        await safeApiError(retryRes);
+                }
+
+                await safeApiError(refreshed);
+                } catch {
+                        throw new ApiError("Network error during refresh", 0);
+                }
+        }
+
+        await safeApiError(res);
+        throw new Error("Unreachable");
+}
+
+
+/**
+ * @brief       Fetches a user's avatar (binary image).
+ * @route       GET /api/users/:id/avatar
+ * @param id    Numeric user ID
+ * @returns     Blob (e.g., image/webp)
+ */
+export async function getUserAvatar(id: number): Promise<Blob> {
+        return requestBlob(`/api/users/${id}/avatar`, { method: "GET" });
+}
+
+/**
+ * @brief       Fetches a user's avatar and returns an object URL for <img src>.
+ * @route       GET /api/users/:id/avatar
+ * @param id    Numeric user ID
+ * @returns     string object URL (remember to URL.revokeObjectURL when done)
+ */
+export async function getUserAvatarURL(id: number): Promise<string> {
+        const blob = await getUserAvatar(id);
+        return URL.createObjectURL(blob);
+}
