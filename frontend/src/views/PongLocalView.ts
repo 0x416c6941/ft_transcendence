@@ -21,14 +21,14 @@ export default class PongLocalView extends AbstractView {
 
     async getHtml(): Promise<string> {
         return `
-      <main class="h-screen flex flex-col items-center justify-center bg-neutral-900 overflow-hidden">
+      <main class="flex-1 min-h-0 flex flex-col justify-center items-center bg-neutral-900 overflow-hidden">
         <div class="w-full max-w-[860px] mx-auto flex flex-col items-center justify-center">
           <h1 class="text-2xl font-bold text-white mb-3">Local Pong - ${APP_NAME}</h1>
-          
+
           <div class="bg-[#0f1220] rounded-lg border-2 border-neutral-700 shadow-lg p-3 mb-3">
             <canvas id="pong" width="640" height="360" class="rounded"></canvas>
           </div>
-          
+
           <div class="flex flex-row items-center justify-center gap-4 mb-3">
             <button id="start-button" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-lg transition-colors font-medium">
               Start Game
@@ -37,12 +37,12 @@ export default class PongLocalView extends AbstractView {
               Back to Home
             </button>
           </div>
-          
+
           <div class="text-white text-sm">
             <p>Left Player: Arrow Up/Down</p>
             <p>Right Player: W/S</p>
           </div>
-        </div> 
+        </div>
       </main>
     `;
     }

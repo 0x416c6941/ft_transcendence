@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+<html
+  class="h-full"
+  lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -9,7 +11,7 @@
     <title>ft_transcendence</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body class="min-h-screen flex flex-col m-0">
+  <body class="h-full flex flex-col overflow-x-hidden m-0">
     <header class="sticky top-0 z-50 bg-[var(--primaryColor)]">
       <nav class="flex w-full justify-between items-center p-4">
         <!-- Left: Home -->
@@ -37,7 +39,7 @@
       </nav>
 
     </header>
-    <div id="app" class="flex-1 flex flex-col">
+    <div id="app" class="flex-1 min-h-0 flex flex-col bg-gray-800">
       <!-- Fastify will serve this thing on port ${BACKEND_FASTIFY_PORT}. -->
       <script src="/api/socket.io/socket.io.js"></script>
       <script type="module" src="/dist/main.js"></script>

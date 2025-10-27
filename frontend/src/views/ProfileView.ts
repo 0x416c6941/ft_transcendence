@@ -34,7 +34,7 @@ export default class ProfileView extends AbstractView {
 
   async getHtml(): Promise<string> {
     return `
-      <main class="min-h-screen flex items-center justify-center bg-neutral-100 dark:bg-neutral-900">
+      <main class="flex flex-1 items-center justify-center bg-neutral-100 dark:bg-neutral-900">
         <section class="w-full max-w-96 bg-white dark:bg-neutral-800 rounded shadow p-4">
           <h1 class="txt-light-dark-sans text-2xl mb-4">Your profile</h1>
 

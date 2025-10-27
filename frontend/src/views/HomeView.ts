@@ -25,7 +25,7 @@ async getHtml(): Promise<string> {
     : `<a href="/login" data-link class="${buttonClass} text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">Login</a>`;
 
   return `
-    <main class="h-screen flex justify-center items-center flex-col bg-gray-800">
+    <main class="flex-1 min-h-0 flex flex-col justify-center items-center bg-gray-800">
       <h1 class="text-5xl font-bold text-white mb-8 tracking-wide">Welcome to ${APP_NAME}</h1>
       <div class="flex flex-col gap-4 w-64">
         ${authControl}

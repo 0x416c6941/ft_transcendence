@@ -15,7 +15,7 @@ export default class LoginView extends AbstractView {
 
   async getHtml(): Promise<string> {
     return `
-      <main class="h-screen flex flex-col justify-center items-center bg-neutral-100 dark:bg-neutral-900">
+      <main class="flex-1 min-h-0 flex flex-col justify-center items-center bg-neutral-100 dark:bg-neutral-900">
         <h1 class="txt-light-dark-sans text-3xl mb-6">Login to ${APP_NAME}</h1>
         <form id="login-form" class="flex flex-col gap-4 w-64" novalidate>
           <input id="username" type="text" placeholder="Username" class="txt-light-dark-sans p-2 rounded border" />

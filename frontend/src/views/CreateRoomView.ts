@@ -12,7 +12,7 @@ export default class CreateRoomView extends AbstractView {
 
     async getHtml(): Promise<string> {
         return `
-            <main class="h-screen flex justify-center items-center flex-col bg-neutral-200 dark:bg-neutral-900">
+            <main class="flex-1 min-h-0 flex flex-col justify-center items-center bg-neutral-200 dark:bg-neutral-900">
                 <h1 class="txt-light-dark-sans text-3xl mb-4">Create Room - ${APP_NAME}</h1>
                 <div class="bg-white dark:bg-neutral-800 p-6 rounded shadow-lg w-full max-w-md">
                     <form id="create-room-form">
