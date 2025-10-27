@@ -46,7 +46,7 @@ export const gameIdParamSchema = {
 export const getAllGamesSchema = {
 	description: 'Get all game records (requires authentication)',
 	tags: ['games'],
-	security: [{ bearerAuth: [] }],
+	security: [{ cookieAuth: [] }],
 	response: {
 		200: {
 			description: 'List of all games',
@@ -68,7 +68,7 @@ export const getAllGamesSchema = {
 export const getGameByIdSchema = {
 	description: 'Get a single game record by ID (requires authentication)',
 	tags: ['games'],
-	security: [{ bearerAuth: [] }],
+	security: [{ cookieAuth: [] }],
 	params: {
 		$ref: 'GameIdParam#'
 	},
@@ -97,7 +97,7 @@ export const getGameByIdSchema = {
 export const updateGameSchema = {
 	description: 'Update a game record (only admins can update)',
 	tags: ['games'],
-	security: [{ bearerAuth: [] }],
+	security: [{ cookieAuth: [] }],
 	params: {
 		$ref: 'GameIdParam#'
 	},
@@ -146,7 +146,7 @@ export const updateGameSchema = {
 export const deleteGameSchema = {
 	description: 'Delete a game record (only admins can delete)',
 	tags: ['games'],
-	security: [{ bearerAuth: [] }],
+	security: [{ cookieAuth: [] }],
 	params: {
 		$ref: 'GameIdParam#'
 	},

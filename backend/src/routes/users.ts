@@ -6,8 +6,9 @@ import { authenticateToken } from '../middleware/auth.js';
 import {
 	registerUserSchema,
 	loginUserSchema,
-	// refreshTokenSchema, // no longer needed; refresh uses cookie now
-	// getAllUsersSchema,
+	refreshTokenSchema,
+	logoutSchema,
+	getCurrentUserSchema,
 	getUserByIdSchema,
 	updateUserSchema,
 	deleteUserSchema,
@@ -165,6 +166,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	// Refresh token endpoint
 	fastify.post(
 		'/users/refresh',
+		{ schema: refreshTokenSchema },
 		async (request: FastifyRequest, reply: FastifyReply) => {
 			reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
     			const refreshToken = request.cookies?.refreshToken;
@@ -197,6 +199,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
 	// Logout: clear cookies
   	fastify.post('/users/logout',
+		{ schema: logoutSchema },
 		async (request: FastifyRequest, reply: FastifyReply) => {
 			// prevent caching of auth state
       			reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
@@ -244,7 +247,10 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	// Get own user info
 	fastify.get(
 		'/users/me',
-		{preHandler: authenticateToken},
+		{
+			preHandler: authenticateToken,
+			schema: getCurrentUserSchema
+		},
 		async (request: FastifyRequest, reply: FastifyReply) => {
 			// Prevent caching personalized responses
 			reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
@@ -532,7 +538,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
 	/* Unified route to link 42 account to logged in user,
 	 * or log in with 42 account linked to the user
-	 * (in the latter case, JWT must be present in "Authorization: Bearer" header). */
+	 * (in the latter case, user session cookie must be present). */
 	fastify.post('/users/oauth/42',
 		{
 			schema: oauth42Schema
@@ -587,8 +593,8 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
 				// Authorized user wants to link 42 account.
 				if (request.query.state) {
-					/* `authenticateToken()` awaits "Authorization: Bearer *TOKEN*"
-					 * in `request.headers.authorization`. */
+					/* `authenticateToken()` reads the session from the cookie.
+					 * The state parameter is passed through request.headers.authorization. */
 					request.headers.authorization = request.query.state;
 					await authenticateToken(request, reply);
 					// Authentication failed and `authenticateToken()` replied with 401.

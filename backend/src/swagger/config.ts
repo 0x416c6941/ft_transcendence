@@ -33,14 +33,8 @@ export const swaggerConfig = {
 					name: 'accessToken',
 					description:
 						'Authentication via HttpOnly cookie "accessToken". Obtain it by POST /api/users/login. ' +
-            					'Tokens are rotated via POST /api/users/refresh and cleared via POST /api/users/logout.'
+							'Tokens are rotated via POST /api/users/refresh and cleared via POST /api/users/logout.'
 				}
-				// bearerAuth: {
-				// 	type: 'http' as const,
-				// 	scheme: 'bearer',
-				// 	bearerFormat: 'JWT',
-				// 	description: 'Enter your JWT token in the format: Bearer <token>'
-				// }
 			}
 		}
 	}
@@ -53,7 +47,12 @@ export const swaggerUIConfig = {
 		deepLinking: false
 	},
 	staticCSP: true,
-	transformStaticCSP: (header: string) => header
+	transformStaticCSP: (header: string) => {
+		// Modify CSP to allow inline styles and scripts for Swagger UI
+		return header
+			.replace("style-src 'self' https:", "style-src 'self' https: 'unsafe-inline'")
+			.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'");
+	}
 };
 
 /**
