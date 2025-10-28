@@ -84,8 +84,10 @@ const start = async () => {
 			}
 		});
 		await fastify.register(cors, {
-			origin: ["https://localhost/"], // the frontend origin allowed
-			credentials: true, // allow sending cookies or Authorization headers
+			// Frontend or 42 OAuth origin.
+			origin: ["https://localhost/", "https://api.intra.42.fr"],
+			// Allow sending cookies or Authorization headers.
+			credentials: true
   		});
 		// Loading 42's OAuth credentials.
 		if (!process.env.BACKEND_OAUTH_42_UID_PATH || !process.env.BACKEND_OAUTH_42_SECRET_PATH) {

@@ -1,5 +1,4 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import '@fastify/cookie';
 import bcrypt from 'bcrypt';
 import { clearAuthCookies, generateAccessToken, generateRefreshToken, setAuthCookies, verifyToken } from '../utils/jwt.js';
 import { authenticateToken } from '../middleware/auth.js';
@@ -536,9 +535,11 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
-	/* Unified route to link 42 account to logged in user,
-	 * or log in with 42 account linked to the user
-	 * (in the latter case, user session cookie must be present). */
+	/* Unified route to log in with 42 account,
+	 * link 42 account to logged in user
+	 * (user session cookie must be present in this case),
+	 * or create a new user with 42 account, if that 42 account isn't linked to any user.
+	 **/
 	fastify.post('/users/oauth/42',
 		{
 			schema: oauth42Schema
@@ -552,7 +553,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			response_type: 'code'
 		});
 
-		if (request.headers.authorization) {
+		if (request.cookies?.accessToken) {
 			await authenticateToken(request, reply);
 			// Authentication failed and `authenticateToken()` replied with 401.
 			if (!request.user) {
@@ -563,7 +564,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				const user = await dbGetUserById(fastify, request.user!.userId);
 
 				if (!user) {
-					return reply.code(403).send({ error: 'Unauthorized: User not found' });
+					return reply.code(403).send({ error: "JWT token is valid, yet user doesn't exist" });
 				}
 				else if (user.account_id_42) {
 					return reply.code(409).send({ error: 'This user has already linked some 42 account' });
@@ -573,7 +574,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				fastify.log.error(err);
 				return reply.code(500).send({ error: 'SQLite request failed' });
 			}
-			params.append('state', request.headers.authorization);
 		}
 
 		return reply.redirect(`${baseUrl}?${params.toString()}`);

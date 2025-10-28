@@ -388,6 +388,10 @@ export const oauth42Schema = {
 		302: {
 			description: 'Redirection to 42 for login'
 		},
+		401: {
+			description: "Unauthorized - JWT token is invalid",
+			$ref: 'Error#'
+		},
 		403: {
 			description: "Forbidden - User session is valid, however user doesn't exist anymore",
 			$ref: 'Error#'
