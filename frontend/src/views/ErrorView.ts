@@ -46,28 +46,17 @@ export default class ErrorView extends AbstractView {
     		const message = this.queryParams.get('error_message') || 'An error occurred.';
 
   		return `
-  		  <main class="flex-1 min-h-0 flex flex-col justify-center items-center bg-neutral-200 dark:bg-neutral-900">
-  		    <div class="flex flex-1 w-full justify-center items-center flex-col"></div>
-
-  		    <h1 class="txt-light-dark-sans text-5xl font-bold mb-4 tracking-wide select-none">
-  		      Error ${code} - ${message}
-  		    </h1>
-  		    <p class="txt-light-dark-sans text-base mb-4 opacity-80 select-none">
-  		      You will be redirected to the Home page shortly…
-  		    </p>
-
-  		    <div class="flex flex-1 w-full justify-center items-center flex-col">
-  		      <a id="${ErrorView._DIV_REDIRECT_HOME_ID}"
-  		         href="/"
-  		         data-link
-  		         class="select-none flex h-1/5 w-1/5 min-w-[220px] justify-center items-center rounded-4xl bg-sky-500 shadow-xl shadow-neutral-500/50 hover:brightness-110 active:brightness-95 transition-colors">
-  		        <span class="text-neutral-200 font-sans text-1xl">Go Home now</span>
-  		      </a>
-  		    </div>
-  		  </main>
-  		`;
+			<main class="flex-1 min-h-0 flex flex-col justify-center items-center bg-neutral-200 dark:bg-neutral-900">
+				<div class="flex flex-1 w-full justify-center items-center flex-col"></div>
+				<p class="txt-light-dark-sans text-4xl select-none">${code} - ${message}</p>
+				<div class="flex flex-1 w-full justify-center items-center flex-col">
+					<div id="${ErrorView._DIV_REDIRECT_HOME_ID}" class="select-none flex h-1/5 w-1/5 justify-center items-center rounded-4xl bg-sky-500 shadow-xl shadow-neutral-500/50">
+						<p class="text-neutral-200 font-sans text-1xl">Return to Home Page</p>
+					</div>
+				</div>
+			</main>
+		`;
 	}
-
 
   	setup(): void {
   	  	// click handler (for users who don't want to wait)
