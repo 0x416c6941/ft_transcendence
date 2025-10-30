@@ -620,7 +620,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	);
 
 	/* A continuation of "GET" route on "/users/oauth/42".
-
+	 *
 	 * XXX for evaluator: we could've also implemented linking and unlinking of 42 OAuth for existing accounts.
 	 * The reason we don't handle these is because this would require
 	 * adding additional logic and also more work on the frontend side.
