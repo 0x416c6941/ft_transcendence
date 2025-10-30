@@ -558,51 +558,68 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		}
 	);
 
-	/* Unified route to log in with 42 account,
-	 * link 42 account to logged in user
-	 * (user session cookie must be present in this case),
-	 * or create a new user with 42 account, if that 42 account isn't linked to any user.
-	 **/
+	// Log in with 42 OAuth
+	// (tries to create an account for a user if it doesn't exist yet).
 	fastify.get('/users/oauth/42',
 		{
 			schema: oauth42Schema
 		},
 		async (request: FastifyRequest, reply: FastifyReply) => {
-		const baseUrl = 'https://api.intra.42.fr/oauth/authorize';
-		let params = new URLSearchParams({
-			client_id: `${fastify.config.oauth42.uid}`,
-			redirect_uri: 'https://localhost/api/users/oauth/42/callback',
-			scope: 'public',
-			response_type: 'code'
-		});
+			const requestBaseUrl = 'https://api.intra.42.fr/oauth/authorize';
+			let requestParams = new URLSearchParams({
+				client_id: `${fastify.config.oauth42.uid}`,
+				redirect_uri: 'https://localhost/api/users/oauth/42/callback',
+				scope: 'public',
+				response_type: 'code'
+			});
 
-		if (request.cookies?.accessToken) {
-			await authenticateToken(request, reply);
-			// Authentication failed and `authenticateToken()` replied with 401.
-			if (!request.user) {
-				return;
-			}
+			// In case we catch any error, we need to redirect user back.
+			const errorBaseUrl = 'https://localhost/error/';
+			let errorParams: URLSearchParams | null = null;
 
-			try {
-				const user = await dbGetUserById(fastify, request.user!.userId);
+			if (request.cookies?.accessToken) {
+				let hasResetCookie = false;
 
-				if (!user) {
-					return reply.code(403).send({ error: "JWT token is valid, yet user doesn't exist" });
+				// Prevent caches from storing personalized responses.
+				reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
+				try {
+					request.user = verifyToken(request.cookies.accessToken);
 				}
-				else if (user.account_id_42) {
-					return reply.code(409).send({ error: 'This user has already linked some 42 account' });
+				catch (err: any) {
+					// User stores invalid cookie and tries to log in with 42 OAuth.
+					// Makes sense to clear it for them in this case, however log this situation.
+					clearAuthCookies(reply);
+					fastify.log.info(`Clearing cookie with invalid JWT during 42 OAuth: ${request.cookies.accessToken}`);
+					hasResetCookie = true;
+				}
+				if (!hasResetCookie) {
+					try {
+						const user = await dbGetUserById(fastify, request.user!.userId);
+
+						if (user) {
+							errorParams = new URLSearchParams({
+								error_code: '403',
+								error_message: 'You are already logged in'
+							});
+							return reply.redirect(`${errorBaseUrl}?${errorParams.toString()}`);
+						}
+					}
+					catch (err: any) {
+						fastify.log.error(err);
+						errorParams = new URLSearchParams({
+							error_code: '500',
+							error_message: 'SQLite request failed'
+						});
+						return reply.redirect(`${errorBaseUrl}?${errorParams.toString()}`);
+					}
 				}
 			}
-			catch (err: any) {
-				fastify.log.error(err);
-				return reply.code(500).send({ error: 'SQLite request failed' });
-			}
+
+			return reply.redirect(`${requestBaseUrl}?${requestParams.toString()}`);
 		}
+	);
 
-		return reply.redirect(`${baseUrl}?${params.toString()}`);
-	});
-
-	// A continuation of "POST" route on "/users/oauth/42".
+	// A continuation of "GET" route on "/users/oauth/42".
 	fastify.get<{ Querystring: Oauth42CallbackQuerystring }>(
 		'/users/oauth/42/callback',
 		{

@@ -386,23 +386,7 @@ export const oauth42Schema = {
 	tags: ['users'],
 	response: {
 		302: {
-			description: 'Redirection to 42 for login'
-		},
-		401: {
-			description: "Unauthorized - JWT token is invalid",
-			$ref: 'Error#'
-		},
-		403: {
-			description: "Forbidden - User session is valid, however user doesn't exist anymore",
-			$ref: 'Error#'
-		},
-		409: {
-			description: 'Conflict - user tries to link a 42 account, yet some 42 account is already linked to them',
-			$ref: 'Error#'
-		},
-		500: {
-			description: 'Internal server error',
-			$ref: 'Error#'
+			description: 'Redirection either to 42 for login or back to the frontend in case of an error'
 		}
 	}
 };
