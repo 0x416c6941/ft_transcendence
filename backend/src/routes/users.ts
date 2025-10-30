@@ -30,7 +30,11 @@ import {
 	exchange42CodeFor42Token,
 	get42PublicData
 } from '../utils/users.js';
-import { AVATAR_IMAGE_SIZE_LIMIT } from '../app.config.js'
+import {
+	RESERVED_42_USERNAME_PREFIX,
+	RESERVED_42_DISPLAY_NAME_PREFIX,
+	AVATAR_IMAGE_SIZE_LIMIT
+} from '../app.config.js'
 import { URLSearchParams } from 'url';
 import path from 'node:path';
 import fsPromises from 'node:fs/promises';
@@ -76,6 +80,15 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		async (request: FastifyRequest<{ Body: CreateUserBody }>, reply: FastifyReply) => {
 			const { username, password, email, display_name } = request.body;
 
+			/* Reserve some prefix for username and display name
+			 * for 42 accounts in order to prevent possible collisions with normal accounts
+			 * and try to ensure successful registration. */
+			if (username.startsWith(RESERVED_42_USERNAME_PREFIX) ||
+				display_name.startsWith(RESERVED_42_DISPLAY_NAME_PREFIX)) {
+				return reply
+					.code(403)
+					.send({ error: 'Username and display prefix "42_" is reserved for 42 OAuth accounts.' })
+			}
 			try {
 				// Hash the password
 				const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
@@ -294,6 +307,16 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		) => {
 			const userId = request.user!.userId;
 			const { username, password, email, display_name } = request.body;
+
+			/* Reserve some prefix for username and display name
+			 * for 42 accounts in order to prevent possible collisions with normal accounts
+			 * and try to ensure successful registration. */
+			if (username?.startsWith(RESERVED_42_USERNAME_PREFIX) ||
+				display_name?.startsWith(RESERVED_42_DISPLAY_NAME_PREFIX)) {
+				return reply
+					.code(403)
+					.send({ error: 'Username and display prefix "42_" is reserved for 42 OAuth accounts.' })
+			}
 
 			// Build dynamic update query
 			const updates: string[] = [];
