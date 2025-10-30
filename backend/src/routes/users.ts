@@ -763,15 +763,21 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	}, async (request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
 		const { id } = request.params;
 
-		if (request.user!.userId !== parseInt(id)) {
-			return reply.code(403).send({ message: "Requested user isn't you." });
-		}
-		// Checking if user still exists.
+		/* Checking if user still exists
+		 * and if they have sufficient privileges to update avatar
+		 * of a requested user. */
 		try {
-			const user = await dbGetUserById(fastify, parseInt(id));
+			const user = await dbGetUserById(fastify, request.user!.userId);
 
 			if (!user) {
 				return reply.code(404).send({ error: "Your JWT token is valid, yet user doesn't exist" });
+			}
+
+			const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
+
+			if (request.user!.userId !== parseInt(id) &&
+				!adminCheck) {
+				return reply.code(403).send({ error: "Insufficient privileges." });
 			}
 		}
 		catch (error: unknown) {
@@ -818,12 +824,22 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		async(request: FastifyRequest<{ Params: UserParams }>, reply: FastifyReply) => {
 			const { id } = request.params;
 
+			/* Checking if user still exists
+			 * and if they have sufficient privileges to reset avatar
+			 * of a requested user. */
 			// Checking if user still exists at all.
 			try {
 				const user = await dbGetUserById(fastify, parseInt(id));
 
 				if (!user) {
 					return reply.code(404).send({ error: "Your JWT token is valid, yet user doesn't exist" });
+				}
+
+				const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
+
+				if (request.user!.userId !== parseInt(id) &&
+					!adminCheck) {
+					return reply.code(403).send({ error: "Insufficient privileges." });
 				}
 			}
 			catch (error: unknown) {

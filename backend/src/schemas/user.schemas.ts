@@ -541,6 +541,10 @@ export const resetUserAvatarSchema = {
 				message: { type: 'string' }
 			}
 		},
+		403: {
+			description: 'Forbidden - user tried to reset avatar of another user without sufficient privileges',
+			$ref: 'Error#'
+		},
 		404: {
 			description: 'Not found - User session is valid, yet user was already removed from the system',
 			$ref: 'Error#'
