@@ -133,7 +133,7 @@ export const registerUserSchema = {
 			$ref: 'Error#'
 		},
 		409: {
-			description: 'Conflict - username or email already exists',
+			description: 'Conflict - username, display name or email already exists',
 			$ref: 'Error#'
 		},
 		500: {
@@ -275,7 +275,7 @@ export const updateUserSchema = {
 			$ref: 'Error#'
 		},
 		409: {
-			description: 'Conflict - username or email already exists',
+			description: 'Conflict - username, display name or email already exists',
 			$ref: 'Error#'
 		},
 		500: {

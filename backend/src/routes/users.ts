@@ -115,7 +115,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			} catch (err: any) {
 				if (err.message.includes('UNIQUE constraint failed')) {
 					return reply.code(409).send({
-						error: 'Username or email already exists'
+						error: 'Username, display name or email already exists'
 					});
 				}
 				fastify.log.error(err);
@@ -370,7 +370,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			} catch (err: any) {
 				if (err.message.includes('UNIQUE constraint failed')) {
 					return reply.code(409).send({
-						error: 'Username or email already exists'
+						error: 'Username, display name or email already exists'
 					});
 				}
 				fastify.log.error(err);
