@@ -27,6 +27,20 @@ export default class LoginView extends AbstractView {
         </form>
         <p id="error-msg" role="alert" aria-live="polite" class="text-red-500 mt-2" hidden></p>
         <p id="success-msg" role="alert" aria-live="polite" class="text-green-500 mt-2" hidden></p>
+
+        <div class="flex items-center gap-3 w-64 my-4">
+          <div class="h-px bg-neutral-300 dark:bg-neutral-700 flex-1"></div>
+          <span class="txt-light-dark-sans text-sm">or</span>
+          <div class="h-px bg-neutral-300 dark:bg-neutral-700 flex-1"></div>
+        </div>
+
+        <a id="oauth-42-btn" href="https://localhost/api/users/oauth/42"
+          class="w-64 text-center bg-black/90 hover:bg-black text-white py-2 rounded shadow transition-colors"
+          rel="nofollow"
+        >
+          Sign in with 42
+        </a>
+
         <div class="mt-6">
           <a href="/" data-link class="txt-light-dark-sans underline">Back to Home</a>
         </div>
