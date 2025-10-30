@@ -16,6 +16,7 @@ import cors from "@fastify/cors";
 import path from 'node:path';
 import gameRoutes from './routes/games.js';
 import { setupPongGameLocal } from './pongGameLocal.js';
+import { setupPongAI } from './pongAI.js';
 import { setupTetrisGame } from './tetrisGame.js';
 import { setupTetrisAI } from './tetrisAI.js';
 import { setupTetrisRemote } from './tetrisRemote.js';
@@ -271,6 +272,9 @@ const start = async () => {
 
 		// Set up Pong Local game server
 		setupPongGameLocal(fastify, io);
+
+		// Set up Pong AI game server
+		setupPongAI(fastify, io);
 
 		/* IPv4 only here.
 		 * We don't need to take care of IPv6, since we'll either way

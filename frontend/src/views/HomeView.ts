@@ -38,8 +38,12 @@ async getHtml(): Promise<string> {
           Join Room
         </a>
         <a href="/pong-local" data-link
-           class="bg-indigo-600 text-white px-4 py-2 rounded shadow text-center">
-          Play Pong (Local)
+           class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
+          Pong: Alias vs. Alias
+        </a>
+        <a href="/pong-ai" data-link
+           class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
+          Pong: Alias vs AI
         </a>
         <a href="/tetris" data-link
            class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
