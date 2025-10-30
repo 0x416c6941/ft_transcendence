@@ -55,6 +55,12 @@ nav a {
   font-size: 1rem;
 }
 
+nav button{
+  color: var(--secondaryColor);
+  text-decoration: none;
+  font-size: 1rem;
+}
+
 nav a:hover {
   color: var(--highlightColor);
 }
@@ -62,18 +68,4 @@ nav a:hover {
 header div {
   display: flex;
   gap: 1rem;
-}
-
-/* scope to header to avoid global clashes */
-.site-header nav a,
-.site-header nav button {
-  color: var(--secondaryColor);
-  text-decoration: none;
-  font-size: 1.5rem;   /* matches Tailwind text-base */
-  line-height: 1;    /* matches leading-none */
-}
-
-.site-header nav a:hover,
-.site-header nav button:hover {
-  color: var(--highlightColor);
 }
