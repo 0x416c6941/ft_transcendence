@@ -197,7 +197,7 @@ export default class RegisterView extends AbstractView {
           err instanceof Error ? err.message : "Registration failed. Please try again.";
         const msg =
           /409|exists|UNIQUE/i.test(raw)
-            ? "That username or email is already taken."
+            ? "That username, display name or email is already taken."
             : raw;
         this.setFormError(msg);
       } finally {
