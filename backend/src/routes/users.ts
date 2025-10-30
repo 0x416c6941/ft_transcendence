@@ -540,7 +540,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	 * (user session cookie must be present in this case),
 	 * or create a new user with 42 account, if that 42 account isn't linked to any user.
 	 **/
-	fastify.post('/users/oauth/42',
+	fastify.get('/users/oauth/42',
 		{
 			schema: oauth42Schema
 		},
