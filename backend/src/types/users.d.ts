@@ -58,10 +58,25 @@ interface Oauth42CallbackQuerystring {
 	 * Code to exchange for 42 access token.
 	 */
 	code: string;
+}
+
+/**
+ * @interface Account42Data
+ * Required data about 42 account we receive during 42 OAuth.
+ */
+interface Account42Data {
+	id: number;
+	email: string;
+	login: string;
 
 	/**
-	 * @property {string | undefined} state
-	 * If present, contains JWT for account linking.
+	 * @property {object | undefined} image
+	 * 42 account's image.
 	 */
-	state?: string;
+	image?: {
+		/**
+		 * URL to image of 42 account.
+		 */
+		link: string;
+	}
 }

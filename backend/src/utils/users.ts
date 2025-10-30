@@ -1,4 +1,9 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
+import validator from 'validator';
+import { randomBytes } from 'node:crypto';
+import { RANDOM_PASSWORD_LENGTH_FOR_42_ACCOUNT } from '../app.config.js';
+import path from 'node:path';
+import sharp from 'sharp';
 
 /**
  * @class ApiError
@@ -154,6 +159,7 @@ export async function dbGetAdminByUserId(fastify: FastifyInstance, userId: numbe
  * @param {number | null}	accountId42	Either an ID of 42 account to link
  * 						or `null` to unlink 42 account.
  */
+/*
 export async function dbUpdateUserAccountId42(fastify: FastifyInstance,
 	userId: number, accountId42: number | null) {
 	try {
@@ -175,6 +181,7 @@ export async function dbUpdateUserAccountId42(fastify: FastifyInstance,
 		throw new ApiError('SQLite request failed', 500, err);
 	}
 }
+ */
 
 /**
  * Exchange 42 OAuth code for 42 OAuth token.
@@ -195,9 +202,6 @@ export async function exchange42CodeFor42Token(fastify: FastifyInstance,
 		code: `${request.query.code}`,
 		redirect_uri: 'https://localhost/api/users/oauth/42/callback'
 	};
-	if (request.query.state) {
-		tokenRequestBody = Object.assign(tokenRequestBody, { state: `${request.query.state}` });
-	}
 
 	try {
 		const tokenResponse = await fetch(tokenUrl, {
@@ -244,12 +248,84 @@ export async function get42PublicData(token: { access_token: string }) {
 			throw new ApiError('Received an error from the 42 API', 502, errorData);
 		}
 
-		return dataResponse.json();
+		const data: Account42Data = await dataResponse.json();
+		// Making sure data we received from 42 is valid.
+		if (!data.id || !data.email || !data.login ||
+			!validator.isEmail(data.email)) {
+			throw new ApiError('Got bad account data from the 42 API', 502);
+		}
+
+		return data;
 	}
 	catch (error) {
 		if (error instanceof ApiError) {
 			throw error;
 		}
 		throw new ApiError('Could not connect to the 42 API', 500, error);
+	}
+}
+
+export async function dbRegisterUserWithAccount42(fastify: FastifyInstance,
+	account42: Account42Data) {
+	let dbInsertedUser: any = null;
+
+	try {
+		// We'll later convert these random bytes to HEX.
+		// One byte contains two HEX numbers (xxxx xxxx), therefore
+		// dividing `RANDOM_PASSWORD_LENGTH_FOR_42_ACCOUNT` by 2.
+		const randomPasswordBuffer = randomBytes(RANDOM_PASSWORD_LENGTH_FOR_42_ACCOUNT / 2);
+		const randomPassword = randomPasswordBuffer.toString('hex');
+
+		dbInsertedUser = await new Promise<any>((resolve, reject) => {
+			fastify.sqlite.run(
+				'INSERT INTO users (username, password, email, display_name, account_id_42) VALUES (?, ?, ?, ?, ?)',
+				[`42_${account42.login}`, randomPassword, account42.email, `42_${account42.login}`, account42.id],
+				function (err: Error | null) {
+					if (err) {
+						reject(err);
+					}
+					resolve (this);
+				}
+			);
+		})
+
+		if (account42.image) {
+			const imageResponse = await fetch(account42.image.link);
+
+			if (!imageResponse.ok) {
+				const errorData = await imageResponse.json();
+				throw new ApiError('Received an error from the 42 API upon requesting user image', 502, errorData);
+			}
+
+			const imageArrayBuffer = await imageResponse.arrayBuffer();
+			const imageBuffer = Buffer.from(imageArrayBuffer);
+
+			const imageOutputPath = path.join(fastify.config.avatarsPath.avatarsPath, `${dbInsertedUser.lastID}.webp`);
+			await sharp(imageBuffer)
+				.resize(256, 256)
+				.webp()
+				.toFile(imageOutputPath);
+		}
+	}
+	catch (error) {
+		if (dbInsertedUser) {
+			// Delete newly added user (clean up after some failure).
+			await new Promise<void>((resolve, reject) => {
+				fastify.sqlite.run('DELETE FROM users u WHERE u.id = ?',
+					[dbInsertedUser.lastID],
+					function (err: Error | null) {
+						if (err) {
+							reject(err);
+						}
+						resolve();
+					}
+				)
+			})
+		}
+
+		if (error instanceof ApiError) {
+			throw error;
+		}
+		throw new ApiError('Failed to create new user with 42 OAuth account data', 500, error);
 	}
 }

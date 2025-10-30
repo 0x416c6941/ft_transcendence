@@ -21,6 +21,13 @@ export const RESERVED_42_USERNAME_PREFIX: string = '42_';
 export const RESERVED_42_DISPLAY_NAME_PREFIX: string = '42_';
 
 /**
+ * @var {readonly number} RANDOM_PASSWORD_LENGTH_FOR_42_ACCOUNT
+ * Amount of characters to generate for a random placeholder password
+ * for a newly created user based on 42 OAuth data.
+ */
+export const RANDOM_PASSWORD_LENGTH_FOR_42_ACCOUNT: number = 60;
+
+/**
  * @var {readonly number} AVATAR_IMAGE_SIZE_LIMIT
  * Maximum allowed size of custom user avatars in bytes.
  */

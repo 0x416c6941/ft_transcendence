@@ -78,8 +78,7 @@ export const userSchemas = [
 		type: 'object',
 		required: ['code'],
 		properties: {
-			code: { type: 'string', description: 'Code from 42 API to exchange for token' },
-			state: { type: 'string', description: 'Our JWT token sent back to us, signaling user wants to link 42 account' }
+			code: { type: 'string', description: 'Code from 42 API to exchange for token' }
 		}
 	},
 	{
@@ -392,7 +391,7 @@ export const oauth42Schema = {
 };
 
 export const oauth42CallbackSchema = {
-	description: 'Exchange 42 code received from 42 API to 42 access token for the user authorization or account linkage',
+	description: 'Exchange 42 code received from 42 API to 42 access token for the user authorization or account creation',
 	tags: ['users'],
 	querystring: {
 		$ref: 'Oauth42CallbackRequest#'
