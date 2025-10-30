@@ -397,28 +397,8 @@ export const oauth42CallbackSchema = {
 		$ref: 'Oauth42CallbackRequest#'
 	},
 	response: {
-		200: {
-			description: 'Successfully exchanged 42 code to 42 access token and processed user request',
-			type: 'object',
-			properties: {
-				message: { type: 'string' }
-			}
-		},
-		403: {
-			description: "Forbidden - User session is valid, however user who wants to link 42 account doesn't exist anymore",
-			$ref: 'Error#'
-		},
-		404: {
-			description: "Not found - 42 account was used for login, yet isn't linked to any user",
-			$ref: 'Error#'
-		},
-		409: {
-			description: 'Conflict - either user has already linked some 42 account, or this 42 account is linked to someone else',
-			$ref: 'Error#'
-		},
-		500: {
-			description: 'Internal server error',
-			$ref: 'Error#'
+		302: {
+			description: 'Redirection either to home view of frontend in case of success or to error view of frontend in case of a failure'
 		}
 	}
 };
