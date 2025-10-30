@@ -1,7 +1,5 @@
 <!DOCTYPE html>
-<html
-  class="h-full"
-  lang="en">
+<html class="h-full" lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -15,14 +13,14 @@
     <header class="sticky top-0 z-50 bg-[var(--primaryColor)]">
       <nav class="flex w-full justify-between items-center p-4">
         <!-- Left: Home -->
-        <ul class="flex list-none gap-6 items-center">
+        <ul class="flex">
           <li>
             <a id="btn-home" href="/" data-link>Home</a>
           </li>
         </ul>
 
         <!-- Right: two fixed slots -->
-        <ul class="flex list-none gap-6 items-center">
+        <ul class="flex space-x-6">
           <!-- slot 1 -->
           <li>
             <a id="btn-login" href="/login" data-link>Login / Sign in</a>
@@ -31,13 +29,10 @@
           <!-- slot 2 -->
           <li>
             <a id="btn-register" href="/register" data-link>Register</a>
-            <button id="btn-logout" hidden>
-              Logout
-            </button>
+            <button id="btn-logout" hidden>Logout</button>
           </li>
         </ul>
       </nav>
-
     </header>
     <div id="app" class="flex-1 min-h-0 flex flex-col bg-gray-800">
       <!-- Fastify will serve this thing on port ${BACKEND_FASTIFY_PORT}. -->
