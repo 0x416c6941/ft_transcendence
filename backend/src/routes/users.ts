@@ -39,6 +39,7 @@ import { URLSearchParams } from 'url';
 import path from 'node:path';
 import fsPromises from 'node:fs/promises';
 import mime from 'mime';
+import fastifyMultipart from '@fastify/multipart';
 import sharp from 'sharp';
 
 /* Higher number => more Bcrypt hashing rounds
@@ -73,6 +74,9 @@ interface LoginBody {
 }
 
 export default async function userRoutes(fastify: FastifyInstance) {
+	// We need to be able to receive at least avatars, potentially other files as well.
+	fastify.register(fastifyMultipart);
+
 	// Create a new user (Register)
 	fastify.post<{ Body: CreateUserBody }>(
 		'/users',

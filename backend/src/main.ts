@@ -7,7 +7,6 @@ import fs from "node:fs";
 import fastifySqlite, { FastifySqliteOptions } from "./fastifySqlite.js";
 import { Server } from "socket.io";
 import userRoutes from "./routes/users.js";
-import fastifyMultipart from '@fastify/multipart';
 import { allSchemas } from "./schemas/index.js";
 import { registerSwagger } from "./swagger/config.js";
 import { setupPongGame } from "./pongGame.js";
@@ -65,8 +64,7 @@ for (const schema of allSchemas) {
 // Register Swagger documentation
 registerSwagger(fastify);
 
-// Register user routes (some "/users/*" routes depend on "@fastify/multipart").
-fastify.register(fastifyMultipart);
+// Register user routes.
 fastify.register(userRoutes, { prefix: "/api" });
 
 // Register game routes
