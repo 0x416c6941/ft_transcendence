@@ -225,6 +225,17 @@ export async function getUserById(id: number): Promise<User> {
 }
 
 /**
+ * @brief Fetches a user by ID.
+ * @route GET /api/users/:id
+ * @param id Numeric user ID
+ * @returns User object
+ */
+export async function getUserByUsername(username: string): Promise<User> {
+        const data = await request<{ user: User }>(`/api/users/by-username/${username}`, { method: "GET" });
+        return data.user;
+}
+
+/**
  * @brief               Centralized fetch for binary responses with cookies and single 401 refresh retry.
  * @param input         Request URL or Request
  * @param init          Request init; set retryOn401=false to disable auto-refresh
@@ -337,4 +348,37 @@ export async function resetUserAvatar(id: number): Promise<{ message: string }> 
         return request<{ message: string }>(`/api/users/${id}/avatar/reset`, {
                 method: "POST",
         });
+}
+
+export type FriendsGetResponse = {
+        ids: number[];
+}
+
+/**
+ * @brief Fetches the current user's friends list.
+ * @route GET /api/friends
+ * @returns { ids: number[] }
+ */
+export async function getFriendsList(): Promise<FriendsGetResponse> {
+        return request<FriendsGetResponse>("/api/friends", { method: "GET" });
+}
+
+/**
+ * @brief Adds a user to the current user's friends list.
+ * @route POST /api/friends/:username
+ * @param username Target user's username
+ * @returns { message }
+ */
+export async function addFriend(username: string): Promise<{ message: string }> {
+        return request<{ message: string }>(`/api/friends/${encodeURIComponent(username)}`, { method: "POST" });
+}
+
+/**
+ * @brief Removes a user from the current user's friends list.
+ * @route DELETE /api/friends/:username
+ * @param username Target user's username
+ * @returns { message }
+ */
+export async function removeFriend(username: string): Promise<{ message: string }> {
+        return request<{ message: string }>(`/api/friends/${encodeURIComponent(username)}`, { method: "DELETE" });
 }
