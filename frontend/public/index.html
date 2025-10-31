@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body class="h-full flex flex-col overflow-x-hidden m-0">
-    <header class="sticky top-0 z-50 bg-[var(--primaryColor)]">
+    <header class="sticky top-0 z-50 bg-(--primaryColor)">
       <nav class="flex w-full justify-between items-center p-4">
         <!-- Left: Home -->
         <ul class="flex">
@@ -21,6 +21,12 @@
 
         <!-- Right: two fixed slots -->
         <ul class="flex space-x-6">
+          <li>
+            <a id="btn-stats" href="/stats" data-link>Stats</a>
+          </li>
+          <li>
+            <a id="btn-friends" href="/friends" data-link>Friends</a>
+          </li>
           <!-- slot 1 -->
           <li>
             <a id="btn-login" href="/login" data-link>Login / Sign in</a>
