@@ -36,14 +36,20 @@ export default class RegisterView extends AbstractView {
 
   async getHtml(): Promise<string> {
     return `
-      <main class="flex-1 min-h-0 flex flex-col justify-center items-center bg-neutral-200 dark:bg-neutral-900">
-        <section class="w-full max-w-96 bg-neutral-100 rounded shadow p-2">
-          <h1 class="txt-light-dark-sans text-3xl mb-4 text-center">Create your account</h1>
+      <main
+        class="flex-1 min-h-0 flex flex-col justify-center items-center bg-neutral-200 dark:bg-neutral-900"
+      >
+        <section
+          class="w-full max-w-96 bg-neutral-100 dark:bg-neutral-800 rounded shadow p-2"
+        >
+          <h1 class="header1 w-full mb-4 text-center">Create your account</h1>
 
           <form id="register-form" novalidate>
             <!-- Display name -->
             <div class="mb-4">
-              <label class="txt-light-dark-sans" for="nickname">Display name</label>
+              <label class="txt-light-dark-sans" for="nickname"
+                >Display name</label
+              >
               <input
                 class="w-full border rounded p-2"
                 type="text"
@@ -60,7 +66,12 @@ export default class RegisterView extends AbstractView {
               <p id="nickname-help" class="text-neutral-500 text-sm mt-2">
                 1–20 chars, letters, numbers, underscores only.
               </p>
-              <p id="nickname-error" class="text-red-500 text-sm mt-2" role="alert" aria-live="polite"></p>
+              <p
+                id="nickname-error"
+                class="text-red-500 text-sm mt-2"
+                role="alert"
+                aria-live="polite"
+              ></p>
             </div>
 
             <!-- Username -->
@@ -82,7 +93,12 @@ export default class RegisterView extends AbstractView {
               <p id="username-help" class="text-neutral-500 text-sm mt-2">
                 3–20 chars, letters, numbers, underscores only.
               </p>
-              <p id="username-error" class="text-red-500 text-sm mt-2" role="alert" aria-live="polite"></p>
+              <p
+                id="username-error"
+                class="text-red-500 text-sm mt-2"
+                role="alert"
+                aria-live="polite"
+              ></p>
             </div>
 
             <!-- Email -->
@@ -98,7 +114,12 @@ export default class RegisterView extends AbstractView {
                 required
                 aria-describedby="email-error"
               />
-              <p id="email-error" class="text-red-500 text-sm mt-2" role="alert" aria-live="polite"></p>
+              <p
+                id="email-error"
+                class="text-red-500 text-sm mt-2"
+                role="alert"
+                aria-live="polite"
+              ></p>
             </div>
 
             <!-- Password -->
@@ -117,19 +138,34 @@ export default class RegisterView extends AbstractView {
               <p id="password-help" class="text-neutral-500 text-sm mt-2">
                 At least 8 characters, incl. upper, lower, and a number.
               </p>
-              <p id="password-error" class="text-red-500 text-sm mt-2" role="alert" aria-live="polite"></p>
+              <p
+                id="password-error"
+                class="text-red-500 text-sm mt-2"
+                role="alert"
+                aria-live="polite"
+              ></p>
             </div>
 
             <button
               id="register-submit"
               type="submit"
-              class="w-full bg-sky-500 text-white py-2 px-4 rounded shadow"
+              class="w-full button button-login py-2 px-4 rounded shadow"
             >
               Create account
             </button>
 
-            <p id="form-error" class="text-red-500 text-sm mt-2" role="alert" aria-live="polite"></p>
-            <p id="form-success" class="text-green-600 text-sm mt-2" role="status" aria-live="polite"></p>
+            <p
+              id="form-error"
+              class="text-red-500 text-sm mt-2"
+              role="alert"
+              aria-live="polite"
+            ></p>
+            <p
+              id="form-success"
+              class="text-green-600 text-sm mt-2"
+              role="status"
+              aria-live="polite"
+            ></p>
           </form>
         </section>
       </main>
