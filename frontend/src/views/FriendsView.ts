@@ -1,13 +1,13 @@
 import AbstractView from "./AbstractView.js";
 import Router from "../router.js";
 import { APP_NAME } from "../app.config.js";
+import { io } from '../socket.js';
 
 import {
 	getFriendsList,
 	addFriend,
 	removeFriend,
 	getUserById,
-	getUserByUsername,
 	getUserAvatarURL,
 } from "../api/users.js";
 import { getEl } from "../utils/utils.js";
@@ -34,6 +34,12 @@ export default class FriendsView extends AbstractView {
 	private aborter?: AbortController;
   	private avatarObjectUrls: Set<string> = new Set();
 
+	// Socket + online state
+	private socket: any = io;
+	private onlineUserIds: Set<number> = new Set();
+	private rowByUsername: Map<string, HTMLLIElement> = new Map();
+	private currentUserId: number | null = null;
+
 	//DOM refs
 	private refs!: {
 		form: HTMLFormElement;
@@ -43,10 +49,11 @@ export default class FriendsView extends AbstractView {
 		empty: HTMLParagraphElement;
 		tpl: HTMLTemplateElement;
 	}
+
 	// Bound handlers (for cleanup)
   	private onFormSubmit!: (e: Event) => void;
 
-	constructor(
+	  constructor(
 		router: Router,
 		pathParams: Map<string, string>,
 		queryParams: URLSearchParams
@@ -80,7 +87,6 @@ export default class FriendsView extends AbstractView {
         class="flex-1 border rounded px-3 py-2 txt-light-dark-sans"
         aria-label="Username"
         required
-        pattern="^[A-Za-z0-9_.-]+$"
       />
       <button type="submit" class="button button-login px-3 py-2 rounded">
         Add
@@ -145,7 +151,68 @@ export default class FriendsView extends AbstractView {
 </div>
     `;
   }
+// --------- Socket.IO handlers
+  	private handleConnect = () => {
+		try { this.socket.emit("request_online_users"); } catch {}
+	};
 
+	private handleUserInfo = (data: { userId: number }) => {
+		this.currentUserId = data.userId;
+	};
+
+	private handleOnlineUsersUpdated = (users: { userId: number }[]) => {
+		// rebuild online set
+		this.onlineUserIds.clear();
+		for (const u of users) this.onlineUserIds.add(u.userId);
+
+		// update dots in-place
+		for (const [, li] of this.rowByUsername) {
+			const dot = li.querySelector<HTMLElement>(".status-dot");
+			if (!dot) continue;
+			const idAttr = li.getAttribute("data-user-id");
+			if (!idAttr) continue;
+			const isOnline = this.onlineUserIds.has(Number(idAttr));
+			dot.classList.remove("bg-green-500", "bg-gray-400");
+			dot.classList.add(this.onlineStatus(isOnline));
+			dot.title = isOnline ? "Online" : "Offline";
+			dot.setAttribute("aria-label", dot.title);
+		}
+	};
+
+	private attachSocketListeners(): void {
+		if (!this.socket) return;
+		this.socket.on("connect", this.handleConnect);
+		this.socket.on("user_info", this.handleUserInfo);
+		this.socket.on("online_users_updated", this.handleOnlineUsersUpdated);
+
+		// If already connected when view mounts, request snapshot now
+		if (this.socket.connected) {
+			this.handleConnect();
+		}
+	}
+
+	private detachSocketListeners(): void {
+		if (!this.socket) return;
+		this.socket.off("connect", this.handleConnect);
+		this.socket.off("user_info", this.handleUserInfo);
+		this.socket.off("online_users_updated", this.handleOnlineUsersUpdated);
+	}
+
+	private refreshOnlineDots(): void {
+		for (const [, li] of this.rowByUsername) {
+			const dot = li.querySelector<HTMLElement>(".status-dot");
+			if (!dot) continue;
+			const idAttr = li.getAttribute("data-user-id");
+			if (!idAttr) continue;
+			const isOnline = this.onlineUserIds.has(Number(idAttr));
+			dot.classList.remove("bg-green-500", "bg-gray-400");
+			dot.classList.add(this.onlineStatus(isOnline));
+			dot.title = isOnline ? "Online" : "Offline";
+			dot.setAttribute("aria-label", dot.title);
+		}
+	}
+
+	// ---------- UI helpers
 	private initRefs(): void {
 		this.refs = {
 			form: getEl<HTMLFormElement>("friends-add-form"),
@@ -172,7 +239,7 @@ export default class FriendsView extends AbstractView {
 	}
 
 	private onlineStatus(online?: boolean): string {
-    	return online ? "bg-green-500" : "bg-gray-400";
+    		return online ? "bg-green-500" : "bg-gray-400";
   	}
 
 	// ---------- API calls
@@ -200,13 +267,13 @@ export default class FriendsView extends AbstractView {
 				} catch {
 					// ignore avatar errors
 				}
-				const displayName = user.display_name || user.username;
+				const isOnline = this.onlineUserIds.has(user.id);
 				return {
 					id: user.id,
 					username: user.username,
-					displayName,
+					displayName: user.display_name,
 					avatarUrl,
-					isOnline: false, // no online status endpoint available here
+					isOnline,
 				} as Friend;
 			})
 		);
@@ -222,6 +289,9 @@ export default class FriendsView extends AbstractView {
 		const uname = node.querySelector<HTMLSpanElement>(".friend-username")!;
 		const dot = node.querySelector<HTMLElement>(".status-dot")!;
 		const removeBtn = node.querySelector<HTMLButtonElement>(".remove-btn")!;
+
+		node.setAttribute("data-user-id", String(friend.id));
+		node.setAttribute("data-username", friend.username);
 
 		// avatar
 		if (friend.avatarUrl) {
@@ -254,6 +324,7 @@ export default class FriendsView extends AbstractView {
 					this.avatarObjectUrls.delete(friend.avatarUrl);
 				}
 				node.remove();
+				this.rowByUsername.delete(friend.username);
 				if (!this.refs.list.children.length) {
 					this.refs.empty.classList.remove("hidden");
 				}
@@ -265,13 +336,15 @@ export default class FriendsView extends AbstractView {
 				);
 			}
 		});
-
+		// register for live updates
+		this.rowByUsername.set(friend.username, node);
 		return node;
 	}
 
 
 	private renderList(friends: Friend[]) {
 		this.refs.list.innerHTML = "";
+		this.rowByUsername.clear();
 
 		if (!friends.length) {
 			this.refs.empty.classList.remove("hidden");
@@ -292,6 +365,7 @@ export default class FriendsView extends AbstractView {
 
 			const friends = await this.apiList();       // fetch from backend
 			this.renderList(friends);                   // update DOM
+			this.refreshOnlineDots();		    // update online status
 
 			if (friends.length === 0) {
 				this.showMsg(
@@ -322,6 +396,7 @@ export default class FriendsView extends AbstractView {
 		// collect refs
 		try {
 			this.initRefs();
+			this.attachSocketListeners();
 		} catch {
 			return;
 		}
@@ -347,7 +422,6 @@ export default class FriendsView extends AbstractView {
 
 				// simplest + reliable: re-fetch from server
 				await this.loadFriends();
-
 				this.showMsg(`Added @${username}`, "ok");
 			} catch (err) {
 				this.showMsg(
@@ -369,7 +443,7 @@ export default class FriendsView extends AbstractView {
 
 	cleanup(): void {
 		try {
-			// 1️⃣ Remove event listeners (only if refs were initialized)
+			// Remove event listeners (only if refs were initialized)
 			if (this.refs?.form && this.onFormSubmit) {
 				this.refs.form.removeEventListener("submit", this.onFormSubmit);
 			}
@@ -377,7 +451,12 @@ export default class FriendsView extends AbstractView {
 			console.warn("[FriendsView] cleanup: failed to remove form listener", err);
 		}
 
-		// 2️⃣ Abort any pending requests
+		// Detach socket listeners and clear maps/sets
+		this.detachSocketListeners();
+		this.rowByUsername.clear();
+		this.onlineUserIds.clear();
+
+		// Abort any pending requests
 		if (this.aborter) {
 			try {
 				this.aborter.abort();
@@ -387,7 +466,7 @@ export default class FriendsView extends AbstractView {
 			this.aborter = undefined;
 		}
 
-		// 3️⃣ Revoke any created avatar object URLs to prevent memory leaks
+		// Revoke any created avatar object URLs to prevent memory leaks
 		if (this.avatarObjectUrls?.size) {
 			for (const url of this.avatarObjectUrls) {
 				try {
@@ -399,11 +478,8 @@ export default class FriendsView extends AbstractView {
 			this.avatarObjectUrls.clear();
 		}
 
-		// 4️⃣ Optional: clear DOM refs to release memory faster (helps in SPAs)
+		// Optional: clear DOM refs
 		this.refs = undefined as any;
-
-
 		console.debug("[FriendsView] cleanup completed");
 	}
-
 }
