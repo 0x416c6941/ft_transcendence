@@ -20,6 +20,7 @@ import {
 	resetUserAvatar
 } from "../api/users.js";
 import { auth } from "../auth.js";
+import {getEl} from "../utils/utils.js";
 
 /**
  * ProfileView (cookie-based auth)
@@ -214,30 +215,25 @@ export default class ProfileView extends AbstractView {
       </main>
 		`;
 	}
-  // ----------  utils ----------
-  private getEl<T extends HTMLElement>(id: string): T {
-    const el = document.getElementById(id);
-    if (!el) throw new Error(`Missing element: #${id}`);
-    return el as T;
-  }
 
+  // ----------  utils ----------
   private initRefs() {
     this.refs = {
-      form: this.getEl<HTMLFormElement>("profile-form"),
-      msg: this.getEl<HTMLParagraphElement>("profile-msg"),
-      logoutBtn: this.getEl<HTMLButtonElement>("logout-btn"),
-      deleteBtn: this.getEl<HTMLButtonElement>("delete-btn"),
-      updateBtn: this.getEl<HTMLButtonElement>("update-btn"),
-      editBtn: this.getEl<HTMLButtonElement>("edit-btn"),
-      avatarImg: this.getEl<HTMLImageElement>("avatar"),
-      avatarFile: this.getEl<HTMLInputElement>("avatar-file"),
-      avatarUploadBtn: this.getEl<HTMLButtonElement>("avatar-upload-btn"),
-      avatarResetBtn: this.getEl<HTMLButtonElement>("avatar-reset-btn"),
-      avatarMsg: this.getEl<HTMLParagraphElement>("avatar-msg"),
-      usernameEl: this.getEl<HTMLInputElement>("username"),
-      displayNameEl: this.getEl<HTMLInputElement>("display_name"),
-      emailEl: this.getEl<HTMLInputElement>("email"),
-      passwordEl: this.getEl<HTMLInputElement>("password"),
+      form: getEl<HTMLFormElement>("profile-form"),
+      msg: getEl<HTMLParagraphElement>("profile-msg"),
+      logoutBtn: getEl<HTMLButtonElement>("logout-btn"),
+      deleteBtn: getEl<HTMLButtonElement>("delete-btn"),
+      updateBtn: getEl<HTMLButtonElement>("update-btn"),
+      editBtn: getEl<HTMLButtonElement>("edit-btn"),
+      avatarImg: getEl<HTMLImageElement>("avatar"),
+      avatarFile: getEl<HTMLInputElement>("avatar-file"),
+      avatarUploadBtn: getEl<HTMLButtonElement>("avatar-upload-btn"),
+      avatarResetBtn: getEl<HTMLButtonElement>("avatar-reset-btn"),
+      avatarMsg: getEl<HTMLParagraphElement>("avatar-msg"),
+      usernameEl: getEl<HTMLInputElement>("username"),
+      displayNameEl: getEl<HTMLInputElement>("display_name"),
+      emailEl: getEl<HTMLInputElement>("email"),
+      passwordEl: getEl<HTMLInputElement>("password"),
     };
   }
 
