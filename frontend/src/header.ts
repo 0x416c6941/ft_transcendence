@@ -6,9 +6,11 @@ export function mountHeader(router: Router) {
   const $login = document.getElementById("btn-login");
   const $register = document.getElementById("btn-register");
   const $profile = document.getElementById("btn-profile");
+  const $friends = document.getElementById("btn-friends");
+  const $stats = document.getElementById("btn-stats");
   const $logout = document.getElementById("btn-logout") as HTMLButtonElement | null;
 
-  if (!$login || !$register || !$profile || !$logout) return () => {};
+  if (!$login || !$register || !$profile || !$logout || !$friends || !$stats) return () => {};
 
   void auth.bootstrap();
 
@@ -18,6 +20,8 @@ export function mountHeader(router: Router) {
     $register.hidden = loggedIn;
     $profile.hidden = !loggedIn;
     $logout.hidden = !loggedIn;
+    $friends.hidden = !loggedIn;
+    $stats.hidden = !loggedIn;
   };
 
   // initial paint
@@ -26,7 +30,7 @@ export function mountHeader(router: Router) {
   // keep UI in sync
   const unsubscribe = auth.subscribe(render);
 
-  // nav handlers (tiny QoL)
+  // nav handlers
   $login.addEventListener("click", (e) => {
     e.preventDefault();
     router.navigate("/login");
@@ -38,6 +42,14 @@ export function mountHeader(router: Router) {
   $profile.addEventListener("click", (e) => {
     e.preventDefault();
     router.navigate("/profile");
+  });
+  $friends.addEventListener("click", (e) => {
+    e.preventDefault();
+    router.navigate("/friends");
+  });
+  $stats.addEventListener("click", (e) => {
+    e.preventDefault();
+    router.navigate("/stats");
   });
 
   // logout flow
