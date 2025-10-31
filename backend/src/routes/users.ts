@@ -263,23 +263,35 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	// Get a specific user by Username
 	fastify.get<{ Params: UsernameParams }>(
 		'/users/by-username/:username',
-		{ schema: getUserByUsernameSchema },
+		{
+			preHandler: authenticateToken,
+			schema: getUserByUsernameSchema
+		},
 		async (request: FastifyRequest<{ Params: UsernameParams }>, reply: FastifyReply) => {
 			const { username } = request.params;
 
 			try {
-				const user = await dbGetUserByUsername(fastify, username);
-				if (!user) {
+				const dbUser = await dbGetUserByUsername(fastify, username);
+				if (!dbUser) {
 					return reply.code(404).send({ error: 'User not found' });
 				}
-				const { id, username: uname, display_name, created_at } = user;
 
-				return reply.code(200).send({
-					user: { id, username: uname, display_name, created_at }
-				});
+				return reply
+					.code(200)
+					.send({
+						user: {
+							id: dbUser.id,
+							username: dbUser.username,
+							email: dbUser.email,
+							display_name: dbUser.display_name,
+							created_at: dbUser.created_at
+						}
+					});
 			} catch (err: any) {
 				fastify.log.error(err);
-				return reply.code(500).send({ error: 'Failed to retrieve user' });
+				return reply
+					.code(500)
+					.send({ error: 'Failed to retrieve user' });
 			}
 		}
 	);

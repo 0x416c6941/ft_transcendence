@@ -224,6 +224,9 @@ export const getUserByUsernameSchema = {
 	description: 'Retrieve a specific user by username (password excluded)',
 	tags: ['users'],
 	security: [{ cookieAuth: [] }],
+	params: {
+		$ref: 'GenericParamUsername#'
+	},
 	response: {
 		200: {
 			description: 'User details',
