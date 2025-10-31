@@ -2,6 +2,8 @@
  * @fileoverview Custom types used in "/users" routes.
  */
 
+/* XXX: This shouldn't be here, as it's a generic type.
+ * Still, I think no one cares, so that's probably not an issue. */
 /**
  * @interface SqliteRunResult
  * Type for `run()` result of SQLite,

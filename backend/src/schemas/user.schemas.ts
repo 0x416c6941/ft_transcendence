@@ -86,7 +86,7 @@ export const userSchemas = [
 		type: 'object',
 		required: ['id'],
 		properties: {
-			id: { type: 'number', description: 'ID of a user' }
+			id: { type: 'integer', description: 'ID of a user' }
 		}
 	},
 	{

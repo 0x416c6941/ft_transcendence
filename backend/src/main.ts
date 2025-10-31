@@ -21,6 +21,7 @@ import { setupTetrisAI } from './tetrisAI.js';
 import { setupTetrisRemote } from './tetrisRemote.js';
 import { seedDatabase } from './seedDatabase.js';
 import { verifyToken } from './utils/jwt.js';
+import friendsRoutes from './routes/friends.js';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -69,6 +70,9 @@ fastify.register(userRoutes, { prefix: "/api" });
 
 // Register game routes
 fastify.register(gameRoutes, { prefix: '/api' });
+
+// Register friends router.
+fastify.register(friendsRoutes, { prefix: '/api' });
 
 const start = async () => {
   const port = Number(process.env.BACKEND_FASTIFY_PORT);
