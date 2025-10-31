@@ -220,6 +220,29 @@ export const getAllUsersSchema = {
 	}
 };
 
+export const getUserByUsernameSchema = {
+	description: 'Retrieve a specific user by username (password excluded)',
+	tags: ['users'],
+	security: [{ cookieAuth: [] }],
+	response: {
+		200: {
+			description: 'User details',
+			type: 'object',
+			properties: {
+				user: { $ref: 'User#' }
+			}
+		},
+		404: {
+			description: 'User not found',
+			$ref: 'Error#'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
+
 export const getUserByIdSchema = {
 	description: 'Retrieve a specific user by ID (password excluded)',
 	tags: ['users'],
