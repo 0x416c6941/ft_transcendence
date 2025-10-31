@@ -39,6 +39,7 @@ interface Room {
     playerInput: InputState;
     aiInput: InputState;
     aiTargetY: number | null;
+    aiDecisionMade: boolean;
     gameActive: boolean;
     gameRecord: Partial<GameRecord> | null;
 }
@@ -96,7 +97,7 @@ function predictBallYAtAI(room: Room): number {
             y = clamp(y, 0, HEIGHT - BALL_SIZE);
         }
         // If ball crosses targetX (AI side), return predicted center Y
-        if (x >= targetX) return y + BALL_SIZE / 2;
+        if (x >= targetX) return y + BALL_SIZE / 2 + (Math.random() - 0.5) * 120;
     }
     // Fallback: center of screen
     return HEIGHT / 2;
@@ -106,18 +107,21 @@ function makeAIDecision(room: Room): void {
     const { vx } = room.gameState.ball;
     // If the ball is moving away from the AI, stop moving and clear target
     if (vx <= 0) {
+        room.aiDecisionMade = false;
         room.aiTargetY = null;
         room.aiInput = { up: false, down: false };
         return;
     }
 
+    // If already made a decision for this ball approach, don't recalculate
+    if (room.aiDecisionMade) return;
+
     // Ball is moving toward the AI, predict intercept
     let predictedY = predictBallYAtAI(room);
-    // Add small random error when ball is coming toward the AI
-    // predictedY += (Math.random() - 0.5) * 20;
 
     predictedY = clamp(predictedY, PADDLE_HEIGHT / 2, HEIGHT - PADDLE_HEIGHT / 2);
     room.aiTargetY = predictedY;
+    room.aiDecisionMade = true;
 
     const paddleCenter = room.gameState.paddles.aiY + PADDLE_HEIGHT / 2;
     const diff = predictedY - paddleCenter;
@@ -141,6 +145,7 @@ function createAIRoom(playerId: string): Room {
         playerInput: { up: false, down: false },
         aiInput: { up: false, down: false },
         aiTargetY: null,
+        aiDecisionMade: false,
         gameActive: false,
         gameRecord: null,
     };
