@@ -139,6 +139,7 @@ export default class FriendsView extends AbstractView {
             class="status-dot inline-block w-3 h-3 rounded-full"
             title=""
           ></span>
+	  <span class="status-label text-xs italic opacity-70"></span>
           <button
             class="remove-btn button button-logout py-2 px-3 rounded text-sm txt-light-dark-sans"
           >
@@ -172,10 +173,7 @@ export default class FriendsView extends AbstractView {
 			const idAttr = li.getAttribute("data-user-id");
 			if (!idAttr) continue;
 			const isOnline = this.onlineUserIds.has(Number(idAttr));
-			dot.classList.remove("bg-green-500", "bg-gray-400");
-			dot.classList.add(this.onlineStatus(isOnline));
-			dot.title = isOnline ? "Online" : "Offline";
-			dot.setAttribute("aria-label", dot.title);
+			this.applyStatusUI(li, isOnline);
 		}
 	};
 
@@ -205,14 +203,28 @@ export default class FriendsView extends AbstractView {
 			const idAttr = li.getAttribute("data-user-id");
 			if (!idAttr) continue;
 			const isOnline = this.onlineUserIds.has(Number(idAttr));
-			dot.classList.remove("bg-green-500", "bg-gray-400");
-			dot.classList.add(this.onlineStatus(isOnline));
-			dot.title = isOnline ? "Online" : "Offline";
-			dot.setAttribute("aria-label", dot.title);
+			this.applyStatusUI(li, isOnline);
 		}
 	}
 
 	// ---------- UI helpers
+	private applyStatusUI(li: HTMLElement, isOnline: boolean): void {
+		const dot = li.querySelector<HTMLElement>(".status-dot");
+		const label = li.querySelector<HTMLElement>(".status-label");
+		if (!dot || !label) return;
+
+		// dot
+		dot.classList.remove("bg-green-500", "bg-gray-400");
+		dot.classList.add(this.onlineStatus(isOnline));
+		dot.title = isOnline ? "Online" : "Offline";
+		dot.setAttribute("aria-label", dot.title);
+
+		// label text + color
+		label.textContent = isOnline ? "Online" : "Offline";
+		label.classList.remove("text-green-600", "text-gray-500");
+		label.classList.add(isOnline ? "text-green-600" : "text-gray-500");
+	}
+
 	private initRefs(): void {
 		this.refs = {
 			form: getEl<HTMLFormElement>("friends-add-form"),
@@ -303,10 +315,7 @@ export default class FriendsView extends AbstractView {
 		display.textContent = friend.displayName;
 		uname.textContent = `@${friend.username}`;
 
-		// status dot
-		dot.classList.add(this.onlineStatus(friend.isOnline));
-		dot.title = friend.isOnline ? "Online" : "Offline";
-		dot.setAttribute("aria-label", dot.title);
+		this.applyStatusUI(node, friend.isOnline);
 
 		// row click → navigate
 		node.addEventListener("click", () => {
@@ -318,7 +327,7 @@ export default class FriendsView extends AbstractView {
 			e.stopPropagation();
 			try {
 				await removeFriend(friend.username);
-				// optional: free just this avatar URL immediately
+				// free just this avatar URL immediately
 				if (friend.avatarUrl) {
 					try { URL.revokeObjectURL(friend.avatarUrl); } catch {}
 					this.avatarObjectUrls.delete(friend.avatarUrl);
