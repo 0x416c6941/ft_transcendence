@@ -8,6 +8,7 @@ import { PathToRegister } from './router.js';
 import HomeView from './views/HomeView.js';
 import LoginView from './views/LoginView.js';
 import ErrorView from './views/ErrorView.js';
+import FriendsView from './views/FriendsView.js';
 // Pong-related views.
 import PongView from './views/PongView.js';
 import CreateRoomView from './views/CreateRoomView.js';
@@ -43,6 +44,7 @@ export const PATHS_TO_ROUTE: PathToRegister[] = [
 	{ path: '/tetris-ai', constructor: TetrisAIView },
 	{ path: '/tetris-remote', constructor: TetrisRemoteView, guard: 'auth' },
 	{ path: '/error/', constructor: ErrorView },
+	{ path: '/friends', constructor: FriendsView, guard: 'auth' },
 ] as const;
 
 /**

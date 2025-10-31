@@ -16,6 +16,7 @@
 		"src/api/users.ts",
 		"src/utils/validators.ts",
 		"src/utils/sanitize.ts",
+		"src/utils/utils.ts",
 		"src/views/AbstractView.ts",
 		"src/views/NotFoundView.ts",
 		"src/views/HomeView.ts",

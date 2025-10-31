@@ -37,35 +37,77 @@ header {
   background-color: var(--primaryColor);
 }
 
-header p {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: var(--highlightColor);
-}
-
 nav ul {
   display: flex;
   list-style: none;
-  gap: 1.5rem;
+  gap: 2rem;
 }
 
-nav a {
+/* Style links and buttons in nav (no invalid nesting) */
+nav a,
+nav button {
   color: var(--secondaryColor);
   text-decoration: none;
-  font-size: 1rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  background: none;
+  border: 0;
 }
 
-nav button{
-  color: var(--secondaryColor);
-  text-decoration: none;
-  font-size: 1rem;
-}
-
-nav a:hover {
+nav a:hover,
+nav button:hover {
   color: var(--highlightColor);
 }
 
-header div {
-  display: flex;
-  gap: 1rem;
+/* Base button style */
+.button {
+  font-weight: 600;
+  padding: 0.4em 0.4em;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.25s ease-in-out;
+  display: inline-block;
+}
+
+/* Light mode by default */
+.button {
+  background-color: #f5f5f5;
+  color: #1a1a1a;
+  border-color: #d1d1d1;
+}
+
+.button:hover {
+  background-color: #e6e6e6;
+  border-color: #bfbfbf;
+  color: var(--highlightColor);
+}
+
+/* Variants */
+.button-login {
+  background-color: #4caf50;
+  color: #ffffff;
+  border-color: #4caf50;
+}
+
+.button-login:hover {
+  background-color: #43a047;
+  border-color: #388e3c;
+}
+
+.button-logout {
+  background-color: #f44336;
+  border-color: #f44336;
+  color: #ffffff;
+}
+
+.button-logout:hover {
+  background-color: #e53935;
+  border-color: #c62828;
+  color: var(--secondaryColor);
+}
+
+.button-reset {
+  background-color: #404345;
+  color: #ffffff;
 }
