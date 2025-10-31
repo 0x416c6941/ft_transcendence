@@ -169,7 +169,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					});
 			} catch (err: any) {
 				if (err instanceof ApiError) {
-        				request.log.error({ err: err.details }, err.message);
+					fastify.log.error({ err: err.details }, err.message);
 					return reply.code(err.replyHttpCode).send({ error: err.message });
 				}
 
@@ -290,7 +290,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				return reply.code(200).send({ user });
 			} catch (err: any) {
 				if (err instanceof ApiError) {
-					request.log.error({ err: err.details }, err.message);
+					fastify.log.error({ err: err.details }, err.message);
 					return reply.code(err.replyHttpCode).send({ error: err.message });
 				}
 				fastify.log.error({ err }, "Failed to retrieve user");
@@ -429,7 +429,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					.send({ message: 'User deleted successfully' });
 			} catch (err: any) {
 				if (err instanceof ApiError) {
-					request.log.error({ err: err.details }, err.message);
+					fastify.log.error({ err: err.details }, err.message);
 					return reply.code(err.replyHttpCode).send({ error: err.message });
 				}
 				fastify.log.error({ err }, "Failed to delete user");

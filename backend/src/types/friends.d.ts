@@ -28,3 +28,7 @@ interface FriendsDbRecord {
 	 */
 	created_at: string;
 }
+
+interface UsernameParams {
+	username: string;
+}

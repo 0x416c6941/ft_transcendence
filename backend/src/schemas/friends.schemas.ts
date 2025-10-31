@@ -15,6 +15,16 @@ export const GenericParamUsernameSchema = {
 	required: ['username']
 };
 
+export const MessageResponseSchema = {
+	$id: 'MessageResponse',
+	type: 'object',
+	properties: {
+		message: {
+			type: 'string'
+		}
+	}
+};
+
 export const ErrorResponseSchema = {
 	$id: 'ErrorResponse',
 	type: 'object',
@@ -52,6 +62,33 @@ export const GetFriendsSchema = {
 		500: {
 			description: 'Well, some internal server error. What else could be here?',
 			$ref: 'ErrorResponse#'
+		}
+	}
+};
+
+export const AddFriendSchema = {
+	description: 'Add user as a new friend',
+	tags: ['users', 'friends'],
+	security: [{ cookieAuth: [] }],
+	params: {
+		$ref: 'GenericParamUsername#'
+	},
+	response: {
+		200: {
+			description: 'Successfully added user as a friend',
+			$ref: 'MessageResponse#'
+		},
+		401: {
+			description: "JWT token is valid, however user's been already removed from the system",
+			$ref: 'ErrorResponse#'
+		},
+		404: {
+			description: "Username to be added as friend doesn't exist",
+			$ref: 'ErrorResponse#'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
 		}
 	}
 };

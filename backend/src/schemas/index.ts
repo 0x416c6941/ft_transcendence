@@ -14,8 +14,8 @@ import {
 	gameIdParamSchema
 } from './game.schemas.js';
 import {
-	ErrorResponseSchema,
-	GenericParamUsernameSchema
+	GenericParamUsernameSchema,
+	ErrorResponseSchema
 } from './friends.schemas.js';
 
 export const gameSchemas = [
