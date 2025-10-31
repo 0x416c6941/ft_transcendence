@@ -37,7 +37,7 @@ export default class RegisterView extends AbstractView {
   async getHtml(): Promise<string> {
     return `
       <main class="flex-1 min-h-0 flex flex-col justify-center items-center bg-neutral-200 dark:bg-neutral-900">
-        <section class="w-full max-w-64 bg-neutral-100 rounded shadow p-2">
+        <section class="w-full max-w-96 bg-neutral-100 rounded shadow p-2">
           <h1 class="txt-light-dark-sans text-3xl mb-4 text-center">Create your account</h1>
 
           <form id="register-form" novalidate>
