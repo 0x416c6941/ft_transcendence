@@ -81,6 +81,11 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 						.code(404)
 						.send({ error: "User with such username doesn't exist" });
 				}
+				else if (user.username === toAdd.username) {
+					return reply
+						.code(400)
+						.send({ error: "You can't add yourself as a friend" });
+				}
 
 				await dbAddFriendsRecord(fastify, user.id, toAdd.id);
 
@@ -125,6 +130,11 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 					return reply
 						.code(404)
 						.send({ error: "User with such username doesn't exist" });
+				}
+				else if (user.username === toRemove.username) {
+					return reply
+						.code(400)
+						.send({ error: "You can't remove yourself from your friend list" });
 				}
 
 				await dbRemoveFriendsRecord(fastify, user.id, toRemove.id);
