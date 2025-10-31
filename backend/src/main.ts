@@ -7,7 +7,6 @@ import fs from "node:fs";
 import fastifySqlite, { FastifySqliteOptions } from "./fastifySqlite.js";
 import { Server } from "socket.io";
 import userRoutes from "./routes/users.js";
-import fastifyMultipart from '@fastify/multipart';
 import { allSchemas } from "./schemas/index.js";
 import { registerSwagger } from "./swagger/config.js";
 import { setupPongGame } from "./pongGame.js";
@@ -22,6 +21,7 @@ import { setupTetrisAI } from './tetrisAI.js';
 import { setupTetrisRemote } from './tetrisRemote.js';
 import { seedDatabase } from './seedDatabase.js';
 import { verifyToken } from './utils/jwt.js';
+import friendsRoutes from './routes/friends.js';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -65,12 +65,14 @@ for (const schema of allSchemas) {
 // Register Swagger documentation
 registerSwagger(fastify);
 
-// Register user routes (some "/users/*" routes depend on "@fastify/multipart").
-fastify.register(fastifyMultipart);
+// Register user routes.
 fastify.register(userRoutes, { prefix: "/api" });
 
 // Register game routes
 fastify.register(gameRoutes, { prefix: '/api' });
+
+// Register friends router.
+fastify.register(friendsRoutes, { prefix: '/api' });
 
 const start = async () => {
   const port = Number(process.env.BACKEND_FASTIFY_PORT);

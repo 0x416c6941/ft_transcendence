@@ -39,6 +39,7 @@ import { URLSearchParams } from 'url';
 import path from 'node:path';
 import fsPromises from 'node:fs/promises';
 import mime from 'mime';
+import fastifyMultipart from '@fastify/multipart';
 import sharp from 'sharp';
 
 /* Higher number => more Bcrypt hashing rounds
@@ -73,6 +74,9 @@ interface LoginBody {
 }
 
 export default async function userRoutes(fastify: FastifyInstance) {
+	// We need to be able to receive at least avatars, potentially other files as well.
+	fastify.register(fastifyMultipart);
+
 	// Create a new user (Register)
 	fastify.post<{ Body: CreateUserBody }>(
 		'/users',
@@ -165,7 +169,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					});
 			} catch (err: any) {
 				if (err instanceof ApiError) {
-        				request.log.error({ err: err.details }, err.message);
+					fastify.log.error({ err: err.details }, err.message);
 					return reply.code(err.replyHttpCode).send({ error: err.message });
 				}
 
@@ -286,7 +290,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				return reply.code(200).send({ user });
 			} catch (err: any) {
 				if (err instanceof ApiError) {
-					request.log.error({ err: err.details }, err.message);
+					fastify.log.error({ err: err.details }, err.message);
 					return reply.code(err.replyHttpCode).send({ error: err.message });
 				}
 				fastify.log.error({ err }, "Failed to retrieve user");
@@ -425,7 +429,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					.send({ message: 'User deleted successfully' });
 			} catch (err: any) {
 				if (err instanceof ApiError) {
-					request.log.error({ err: err.details }, err.message);
+					fastify.log.error({ err: err.details }, err.message);
 					return reply.code(err.replyHttpCode).send({ error: err.message });
 				}
 				fastify.log.error({ err }, "Failed to delete user");
@@ -620,7 +624,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 	);
 
 	/* A continuation of "GET" route on "/users/oauth/42".
-
+	 *
 	 * XXX for evaluator: we could've also implemented linking and unlinking of 42 OAuth for existing accounts.
 	 * The reason we don't handle these is because this would require
 	 * adding additional logic and also more work on the frontend side.

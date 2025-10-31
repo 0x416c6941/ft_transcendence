@@ -61,6 +61,33 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 			}
 		});
 	});
+	// Create `friends` table if it doesn't exist yet.
+	await new Promise<void>((resolve, reject) => {
+		// If attribute is a part of the primary key,
+		// "NOT NULL" is implied automatically (according to SQL standards).
+		// Still, let's also write it explicitly, because, well, why not?
+		db.run(`
+			CREATE TABLE IF NOT EXISTS friends (
+				adder_id INTEGER NOT NULL,
+				added_id INTEGER NOT NULL,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+				-- It wouldn't make sense for a user to be friends with themselves, right?
+				CHECK (adder_id != added_id),
+
+				PRIMARY KEY (adder_id, added_id),
+
+				FOREIGN KEY (added_id) REFERENCES users(id) ON DELETE CASCADE,
+				FOREIGN KEY (adder_id) REFERENCES users(id) ON DELETE CASCADE
+			)
+		`,
+		function (err: Error | null) {
+			if (err) {
+				reject(err);
+			}
+			resolve();
+		});
+	});
 
 	// Create games table
 	await new Promise<void>((resolve, reject) => {

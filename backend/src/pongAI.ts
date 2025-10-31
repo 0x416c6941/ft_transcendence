@@ -1,6 +1,5 @@
 import { FastifyInstance } from 'fastify';
 import { Server, Socket, Namespace } from 'socket.io';
-import { saveGameRecord, isSocketAuthenticated, GameRecord } from './utils/gameStats.js';
 
 //CONSTANTS
 const WIDTH = 640;
@@ -27,6 +26,7 @@ type Snapshot = {
     paddles: { playerY: number; aiY: number };
     ball: { x: number; y: number };
     score: { player: number; ai: number };
+    playerAlias: string;
 };
 
 // Room types
@@ -39,8 +39,9 @@ interface Room {
     playerInput: InputState;
     aiInput: InputState;
     aiTargetY: number | null;
+    aiDecisionMade: boolean;
     gameActive: boolean;
-    gameRecord: Partial<GameRecord> | null;
+    playerAlias: string;
 }
 
 //HELPERS
@@ -76,6 +77,7 @@ function makeSnapshot(room: Room): Snapshot {
         paddles: room.gameState.paddles,
         ball: { x: room.gameState.ball.x, y: room.gameState.ball.y },
         score: room.gameState.score,
+        playerAlias: room.playerAlias,
     };
 }
 
@@ -96,7 +98,7 @@ function predictBallYAtAI(room: Room): number {
             y = clamp(y, 0, HEIGHT - BALL_SIZE);
         }
         // If ball crosses targetX (AI side), return predicted center Y
-        if (x >= targetX) return y + BALL_SIZE / 2;
+        if (x >= targetX) return y + BALL_SIZE / 2 + (Math.random() - 0.5) * 120;
     }
     // Fallback: center of screen
     return HEIGHT / 2;
@@ -106,18 +108,21 @@ function makeAIDecision(room: Room): void {
     const { vx } = room.gameState.ball;
     // If the ball is moving away from the AI, stop moving and clear target
     if (vx <= 0) {
+        room.aiDecisionMade = false;
         room.aiTargetY = null;
         room.aiInput = { up: false, down: false };
         return;
     }
 
+    // If already made a decision for this ball approach, don't recalculate
+    if (room.aiDecisionMade) return;
+
     // Ball is moving toward the AI, predict intercept
     let predictedY = predictBallYAtAI(room);
-    // Add small random error when ball is coming toward the AI
-    // predictedY += (Math.random() - 0.5) * 20;
 
     predictedY = clamp(predictedY, PADDLE_HEIGHT / 2, HEIGHT - PADDLE_HEIGHT / 2);
     room.aiTargetY = predictedY;
+    room.aiDecisionMade = true;
 
     const paddleCenter = room.gameState.paddles.aiY + PADDLE_HEIGHT / 2;
     const diff = predictedY - paddleCenter;
@@ -141,19 +146,18 @@ function createAIRoom(playerId: string): Room {
         playerInput: { up: false, down: false },
         aiInput: { up: false, down: false },
         aiTargetY: null,
+        aiDecisionMade: false,
         gameActive: false,
-        gameRecord: null,
+        playerAlias: '',
     };
     rooms.set(id, room);
     return room;
 }
 
-function leaveAIRoom(roomId: string, playerId: string, socket: Socket): void {
+function leaveAIRoom(roomId: string, playerId: string): void {
     const room = rooms.get(roomId);
     if (!room || room.player !== playerId) return;
     rooms.delete(roomId);
-    socket.leave(roomId);
-    socket.data.roomId = undefined;
 }
 
 //GAME LOOP
@@ -227,7 +231,6 @@ function step(room: Room, ns: Namespace): void {
     }
 }
 
-// Stop the game and notify client
 function stopGame(room: Room, ns: Namespace): void {
     room.gameActive = false;
     room.status = 'finished';
@@ -241,8 +244,11 @@ export function setupPongAI(fastify: FastifyInstance, io: Server): void {
     ns.on('connection', (socket: Socket) => {
         socket.on('create_ai_room', () => {
             // Leave previous room if any
-            if (socket.data.roomId)
-                leaveAIRoom(socket.data.roomId, socket.id, socket);
+            if (socket.data.roomId) {
+                leaveAIRoom(socket.data.roomId, socket.id);
+                socket.leave(socket.data.roomId);
+                socket.data.roomId = undefined;
+            }
             const room = createAIRoom(socket.id);
             socket.join(room.id);
             socket.data.roomId = room.id;
@@ -252,30 +258,22 @@ export function setupPongAI(fastify: FastifyInstance, io: Server): void {
         socket.on('leave_ai_room', () => {
             const roomId = socket.data.roomId;
             if (!roomId) return;
-            leaveAIRoom(roomId, socket.id, socket);
+            leaveAIRoom(roomId, socket.id);
+            socket.leave(roomId);
+            socket.data.roomId = undefined;
             socket.emit('ai_room_left');
         });
 
-        socket.on('start_ai_game', () => {
+        socket.on('start_ai_game', (data: { playerAlias: string }) => {
             const roomId = socket.data.roomId;
             if (!roomId) return;
             const room = rooms.get(roomId);
             if (!room || room.player !== socket.id || room.gameActive) return;
 
+            room.playerAlias = data.playerAlias;
             room.gameActive = true;
             room.status = 'in_progress';
             resetGameState(room);
-
-            // Initialize game record
-            const playerIsUser = isSocketAuthenticated(socket);
-            room.gameRecord = {
-                game_name: 'Pong AI',
-                started_at: new Date().toISOString(),
-                player1_name: 'Player',
-                player1_is_user: playerIsUser,
-                player2_name: 'AI',
-                player2_is_user: false
-            };
 
             ns.to(room.id).emit('game_state', makeSnapshot(room));
         });
@@ -293,19 +291,10 @@ export function setupPongAI(fastify: FastifyInstance, io: Server): void {
         socket.on('disconnect', async () => {
             for (const room of rooms.values()) {
                 if (room.player === socket.id) {
+                    socket.leave(room.id);
                     stopGame(room, ns);
-                    leaveAIRoom(room.id, socket.id, socket);
-
-                    // Save game record on disconnect
-                    if (room.gameRecord) {
-                        room.gameRecord.finished_at = new Date().toISOString();
-                        room.gameRecord.winner = undefined;
-                        room.gameRecord.data = JSON.stringify({
-                            reason: 'player_disconnected'
-                        });
-                        await saveGameRecord(fastify, room.gameRecord as GameRecord);
-                        room.gameRecord = null;
-                    }
+                    leaveAIRoom(room.id, socket.id);
+                    socket.data.roomId = undefined;
                     break;
                 }
             }
@@ -330,20 +319,6 @@ export function setupPongAI(fastify: FastifyInstance, io: Server): void {
         for (const room of rooms.values()) {
             if (!room.gameActive) continue;
             step(room, ns);
-
-            // Check for game end and save record
-            if (!room.gameActive && room.status === 'finished' && room.gameRecord) {
-                const winner = room.gameState.score.player >= WINNING_SCORE ? 'Player' : 'AI';
-                room.gameRecord.finished_at = new Date().toISOString();
-                room.gameRecord.winner = winner;
-                room.gameRecord.data = JSON.stringify({
-                    reason: 'game_over',
-                    winner: winner,
-                    score: room.gameState.score
-                });
-                await saveGameRecord(fastify, room.gameRecord as GameRecord);
-                room.gameRecord = null;
-            }
         }
     }, 1000 / TICK_HZ);
 

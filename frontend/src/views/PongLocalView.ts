@@ -1,7 +1,6 @@
 import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
-import { io } from '../socket.js';
 
 export default class PongLocalView extends AbstractView {
     private canvas: HTMLCanvasElement | null = null;
@@ -23,10 +22,66 @@ export default class PongLocalView extends AbstractView {
         return `
       <main class="flex-1 min-h-0 flex flex-col justify-center items-center bg-neutral-900 overflow-hidden">
         <div class="w-full max-w-[860px] mx-auto flex flex-col items-center justify-center">
-          <h1 class="text-2xl font-bold text-white mb-3">Local Pong - ${APP_NAME}</h1>
+          <h1 class="text-2xl font-bold text-white mb-3">Pong Battle</h1>
 
           <div class="bg-[#0f1220] rounded-lg border-2 border-neutral-700 shadow-lg p-3 mb-3">
             <canvas id="pong" width="640" height="360" class="rounded"></canvas>
+          </div>
+
+          <!-- Alias Input Overlay -->
+          <div id="alias-overlay" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center">
+            <div class="bg-neutral-700 p-8 rounded-xl shadow-2xl max-w-md w-full mx-4 border-2 border-neutral-600">
+              <h2 class="text-2xl font-bold text-white mb-6 text-center">Enter Player Names</h2>
+              
+              <div class="space-y-4">
+                <div>
+                  <label for="left-alias" class="block text-sm font-semibold text-gray-300 mb-2">
+                    Left Player (Arrow Keys)
+                  </label>
+                  <input 
+                    id="left-alias" 
+                    type="text" 
+                    placeholder="Enter name..." 
+                    maxlength="15"
+                    class="w-full px-4 py-3 rounded-lg bg-neutral-800 text-white border-2 border-neutral-600 
+                           focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-400"
+                  />
+                </div>
+                
+                <div>
+                  <label for="right-alias" class="block text-sm font-semibold text-gray-300 mb-2">
+                    Right Player (W/S)
+                  </label>
+                  <input 
+                    id="right-alias" 
+                    type="text" 
+                    placeholder="Enter name..." 
+                    maxlength="15"
+                    class="w-full px-4 py-3 rounded-lg bg-neutral-800 text-white border-2 border-neutral-600 
+                           focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-400"
+                  />
+                </div>
+                
+                <p id="alias-error" class="text-red-400 text-sm font-semibold hidden">
+                  Both names must contain at least one non-whitespace character
+                </p>
+                
+                <div class="flex gap-3 mt-6">
+                  <button 
+                    id="save-alias-btn" 
+                    class="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 
+                           text-white font-bold rounded-lg shadow-lg transition-colors">
+                    SAVE
+                  </button>
+                  <button 
+                    id="cancel-alias-btn" 
+                    class="flex-1 px-6 py-3 bg-neutral-600 hover:bg-neutral-700 
+                           text-white font-bold rounded-lg shadow-lg transition-colors">
+                    CANCEL
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="flex flex-row items-center justify-center gap-4 mb-3">
@@ -58,7 +113,9 @@ export default class PongLocalView extends AbstractView {
 
     private handleStartClick = (): void => {
         if (!this.roomId) return;
-        this.socket?.emit('start_local_game', { roomId: this.roomId });
+        const overlay = document.getElementById('alias-overlay');
+        overlay?.classList.remove('hidden');
+        (document.getElementById('left-alias') as HTMLInputElement)?.focus();
     };
 
     private handleKeyDown = (e: KeyboardEvent): void => {
@@ -79,10 +136,33 @@ export default class PongLocalView extends AbstractView {
         if (changed) this.sendInput();
     };
 
+    private setupOverlayButtons(): void {
+        const overlay = document.getElementById('alias-overlay');
+        
+        document.getElementById('save-alias-btn')?.addEventListener('click', () => {
+            const leftAlias = (document.getElementById('left-alias') as HTMLInputElement)?.value.trim() || '';
+            const rightAlias = (document.getElementById('right-alias') as HTMLInputElement)?.value.trim() || '';
+            const errorMsg = document.getElementById('alias-error');
+
+            if (!leftAlias || !rightAlias) {
+                errorMsg?.classList.remove('hidden');
+                return;
+            }
+
+            errorMsg?.classList.add('hidden');
+            overlay?.classList.add('hidden');
+            this.socket?.emit('start_local_game', { roomId: this.roomId, leftAlias, rightAlias });
+        });
+
+        document.getElementById('cancel-alias-btn')?.addEventListener('click', () => {
+            overlay?.classList.add('hidden');
+        });
+    }
+
     setup(): void {
-        console.log('PongLocalView setup called');
-        this.socket = io;
-        console.log('Emitting create_local_room');
+        this.socket = (window as any).io(window.location.origin + '/pong-local', {
+            path: '/api/socket.io/'
+        });
         this.socket.emit('create_local_room');
 
         this.canvas = document.getElementById('pong') as HTMLCanvasElement;
@@ -92,14 +172,9 @@ export default class PongLocalView extends AbstractView {
         document.getElementById('start-button')?.addEventListener('click', this.handleStartClick);
 
         this.socket.on('local_room_created', (data: { roomId: string }) => {
-            console.log('local_room_created received:', data.roomId);
             this.roomId = data.roomId;
-            console.log('Room joined, roomId:', this.roomId);
             this.updateStartButton();
         });
-
-        // Remove join listener
-        // this.socket.on('local_room_joined', ...);
 
         this.socket.on('game_stopped', () => {
             this.snap = null;
@@ -126,6 +201,8 @@ export default class PongLocalView extends AbstractView {
             this.updateStartButton();
         });
 
+        this.setupOverlayButtons();
+
         // keyboard
         window.addEventListener('keydown', this.handleKeyDown);
         window.addEventListener('keyup', this.handleKeyUp);
@@ -146,11 +223,11 @@ export default class PongLocalView extends AbstractView {
         // sockets
         if (this.socket) {
             this.socket.off('local_room_created');
-            // this.socket.off('local_room_joined');
             this.socket.off('game_state');
             this.socket.off('game_stopped');
             this.socket.off('game_end');
-            if (this.roomId) this.socket.emit('leave_local_room', { roomId: this.roomId });
+            this.socket.emit('leave_local_room', { roomId: this.roomId });
+            this.socket.disconnect();
             this.socket = null;
         }
 
@@ -181,7 +258,6 @@ export default class PongLocalView extends AbstractView {
         }
 
         startButton.style.display = 'block';
-        startButton.textContent = 'Start Game';
     }
 
     private draw(): void {
@@ -204,6 +280,13 @@ export default class PongLocalView extends AbstractView {
             this.ctx.fillText('Press Start Game to begin', WIDTH / 2, HEIGHT / 2);
             return;
         }
+
+        // Draw player aliases
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 18px Arial';
+        this.ctx.textAlign = 'center';
+        if (this.snap.leftAlias) this.ctx.fillText(this.snap.leftAlias, 80, 25);
+        if (this.snap.rightAlias) this.ctx.fillText(this.snap.rightAlias, WIDTH - 80, 25);
 
         // Center dashed line
         this.ctx.strokeStyle = '#334155';
@@ -251,12 +334,13 @@ export default class PongLocalView extends AbstractView {
         this.ctx.fillText(this.snap.score.right.toString(), WIDTH / 2 + 40, 40);
 
         // show winner if game ended
-        if (this.gameEnded && this.winner) {
+        if (this.gameEnded && this.winner && this.snap) {
             this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
             this.ctx.fillRect(0, 0, WIDTH, HEIGHT);
             this.ctx.fillStyle = '#000000';
             this.ctx.font = 'bold 48px Arial';
-            this.ctx.fillText(`${this.winner.toUpperCase()} WINS!`, WIDTH / 2, HEIGHT / 2);
+            const winnerAlias = this.winner === 'left' ? this.snap.leftAlias : this.snap.rightAlias;
+            this.ctx.fillText(`${winnerAlias} WINS!`, WIDTH / 2, HEIGHT / 2);
             this.ctx.font = '24px Arial';
             this.ctx.fillText('Press Start Game for a rematch', WIDTH / 2, HEIGHT / 2 + 60);
         }
@@ -269,4 +353,6 @@ type Snapshot = {
     paddles: { leftY: number; rightY: number };
     ball: { x: number; y: number };
     score: { left: number; right: number };
+    leftAlias: string;
+    rightAlias: string;
 };

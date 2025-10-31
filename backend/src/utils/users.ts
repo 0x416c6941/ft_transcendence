@@ -5,6 +5,8 @@ import { RANDOM_PASSWORD_LENGTH_FOR_42_ACCOUNT } from '../app.config.js';
 import path from 'node:path';
 import sharp from 'sharp';
 
+/* XXX: This shouldn't be here, since it's more of a generic class,
+ * not just "/users" routes' related. */
 /**
  * @class ApiError
  * Custom class to better handle errors.
