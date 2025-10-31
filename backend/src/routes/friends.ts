@@ -36,7 +36,7 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 						.send({ error: 'JWT is valid, yet your user was removed from the system' });
 				}
 
-				const friends = await dbGetAllFriendsByAdderId(fastify, user.adder_id);
+				const friends = await dbGetAllFriendsByAdderId(fastify, request.user!.userId);
 				const friendsIds = friends.map((friend: FriendsDbRecord) => friend.added_id);
 
 				return reply
