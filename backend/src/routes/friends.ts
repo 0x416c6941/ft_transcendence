@@ -6,7 +6,8 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { authenticateToken } from '../middleware/auth.js';
 import {
 	AddFriendSchema,
-	GetFriendsSchema
+	GetFriendsSchema,
+	RemoveFriendSchema
 } from '../schemas/friends.schemas.js';
 import {
 	ApiError,
@@ -14,8 +15,9 @@ import {
 	dbGetUserByUsername
 } from '../utils/users.js';
 import {
+	dbGetAllFriendsByAdderId,
 	dbAddFriendsRecord,
-	dbGetAllFriendsByAdderId
+	dbRemoveFriendsRecord
 } from '../utils/friends.js';
 
 export default async function friendsRoutes(fastify: FastifyInstance) {
@@ -31,7 +33,7 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 				if (!user) {
 					return reply
 						.code(401)
-						.send({ error: 'JWT is valid, yet user was removed from the system' });
+						.send({ error: 'JWT is valid, yet your user was removed from the system' });
 				}
 
 				const friends = await dbGetAllFriendsByAdderId(fastify, user.adder_id);
@@ -70,7 +72,7 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 				if (!user) {
 					return reply
 						.code(401)
-						.send({ error: 'JWT is valid, yet user was removed from the system' });
+						.send({ error: 'JWT is valid, yet your user was removed from the system' });
 				}
 
 				const toAdd = await dbGetUserByUsername(fastify, username);
@@ -85,6 +87,51 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 				return reply
 					.code(200)
 					.send({ message: 'Successfully added a user as friend' });
+			}
+			catch (err: any) {
+				if (err instanceof ApiError) {
+					fastify.log.error({ err }, err.message);
+					return reply
+						.code(err.replyHttpCode)
+						.send({ error: err.message });
+				}
+				fastify.log.error(err);
+				return reply
+					.code(500)
+					.send({ error: 'Internal server error' });
+			}
+		}
+	);
+
+	fastify.delete<{ Params: UsernameParams }>(
+		'/friends/:username',
+		{
+			preHandler: authenticateToken,
+			schema: RemoveFriendSchema
+		},
+		async (request: FastifyRequest<{ Params: UsernameParams }>, reply: FastifyReply) => {
+			const { username } = request.params;
+
+			try {
+				const user = await dbGetUserById(fastify, request.user!.userId);
+				if (!user) {
+					return reply
+						.code(401)
+						.send({ error: 'JWT is valid, yet your user was removed from the system' });
+				}
+
+				const toRemove = await dbGetUserByUsername(fastify, username);
+				if (!toRemove) {
+					return reply
+						.code(404)
+						.send({ error: "User with such username doesn't exist" });
+				}
+
+				await dbRemoveFriendsRecord(fastify, user.id, toRemove.id);
+
+				return reply
+					.code(200)
+					.send({ message: 'Successfully removed a user from friends list' });
 			}
 			catch (err: any) {
 				if (err instanceof ApiError) {

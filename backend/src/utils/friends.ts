@@ -6,7 +6,9 @@ export async function dbGetAllFriendsByAdderId(fastify: FastifyInstance,
 	try {
 		const friends = await new Promise<any>((resolve, reject) => {
 			fastify.sqlite.all(`
-				SELECT f.* FROM friends f WHERE f.adder_id = ?`,
+					SELECT f.* FROM friends f
+					WHERE f.adder_id = ?
+				`,
 				[adderId],
 				function (err: Error | any, rows: Array<FriendsDbRecord>) {
 					if (err) {
@@ -79,6 +81,36 @@ export async function dbAddFriendsRecord(fastify: FastifyInstance,
 				}
 			);
 		});
+	}
+	catch (err: any) {
+		if (err instanceof ApiError) {
+			throw err;
+		}
+		throw new ApiError('SQLite request failed', 500, err);
+	}
+}
+
+export async function dbRemoveFriendsRecord(fastify: FastifyInstance,
+		adderId: number, addedId: number) {
+	try {
+		const result = await new Promise<any>((resolve, reject) => {
+			fastify.sqlite.run(`
+					DELETE FROM friends
+					WHERE adder_id = ? AND added_id = ?
+				`,
+				[adderId, addedId],
+				function (err: Error | any) {
+					if (err) {
+						reject(err);
+					}
+					resolve(this);
+				}
+			);
+		});
+
+		if (result.changes === 0) {
+			throw new ApiError("Provided user isn't in your friends list", 409);
+		}
 	}
 	catch (err: any) {
 		if (err instanceof ApiError) {

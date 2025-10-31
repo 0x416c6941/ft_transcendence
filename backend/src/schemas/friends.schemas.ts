@@ -86,6 +86,41 @@ export const AddFriendSchema = {
 			description: "Username to be added as friend doesn't exist",
 			$ref: 'ErrorResponse#'
 		},
+		409: {
+			description: 'Username was already added as a friend',
+			$ref: 'ErrorResponse#'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
+
+export const RemoveFriendSchema = {
+	description: 'Remove user from friends list',
+	tags: ['users', 'friends'],
+	security: [{ cookieAuth: [] }],
+	params: {
+		$ref: 'GenericParamUsername#'
+	},
+	response: {
+		200: {
+			description: 'Successfully remove user from friends list',
+			$ref: 'MessageResponse#'
+		},
+		401: {
+			description: "JWT token is valid, however user's been already removed from the system",
+			$ref: 'ErrorResponse#'
+		},
+		404: {
+			description: "Username to remove from friends list doesn't exist",
+			$ref: 'ErrorResponse#'
+		},
+		409: {
+			description: "Username isn't even a friend to begin with",
+			$ref: 'ErrorResponse#'
+		},
 		500: {
 			description: 'Internal server error',
 			$ref: 'Error#'
