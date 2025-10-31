@@ -115,7 +115,7 @@ export default class FriendsView extends AbstractView {
       </div>
     </div>
 
-    <!-- Optional: template for one friend row -->
+    <!-- template for one friend row -->
     <template id="friend-item-tpl">
       <li class="p-3 flex items-center justify-between">
         <div class="flex items-center gap-3">
@@ -230,7 +230,7 @@ export default class FriendsView extends AbstractView {
 		img.alt = `${friend.username} avatar`;
 
 		// text
-		display.textContent = friend.displayName || friend.username;
+		display.textContent = friend.displayName;
 		uname.textContent = `@${friend.username}`;
 
 		// status dot
@@ -240,7 +240,7 @@ export default class FriendsView extends AbstractView {
 
 		// row click → navigate
 		node.addEventListener("click", () => {
-			this.router.navigate(`/profile/${friend.username}`);
+			this.router.navigate(`/stats/${friend.username}`);
 		});
 
 		// remove (stop navigation)
