@@ -89,6 +89,22 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 
 				await dbAddFriendsRecord(fastify, user.id, toAdd.id);
 
+				// Notify both users about the friend update via socket
+				const io = (fastify as any).io;
+				const onlineUsers = (fastify as any).onlineUsers as Map<number, { socketId: string; username: string; displayName: string }>;
+				
+				// Notify the user who added the friend
+				const userSocket = onlineUsers.get(user.id);
+				if (userSocket) {
+					io.to(userSocket.socketId).emit('friends_updated');
+				}
+				
+				// Notify the user who was added
+				const addedUserSocket = onlineUsers.get(toAdd.id);
+				if (addedUserSocket) {
+					io.to(addedUserSocket.socketId).emit('friends_updated');
+				}
+
 				return reply
 					.code(200)
 					.send({ message: 'Successfully added a user as friend' });
@@ -138,6 +154,22 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 				}
 
 				await dbRemoveFriendsRecord(fastify, user.id, toRemove.id);
+
+				// Notify both users about the friend update via socket
+				const io = (fastify as any).io;
+				const onlineUsers = (fastify as any).onlineUsers as Map<number, { socketId: string; username: string; displayName: string }>;
+				
+				// Notify the user who removed the friend
+				const userSocket = onlineUsers.get(user.id);
+				if (userSocket) {
+					io.to(userSocket.socketId).emit('friends_updated');
+				}
+				
+				// Notify the user who was removed
+				const removedUserSocket = onlineUsers.get(toRemove.id);
+				if (removedUserSocket) {
+					io.to(removedUserSocket.socketId).emit('friends_updated');
+				}
 
 				return reply
 					.code(200)

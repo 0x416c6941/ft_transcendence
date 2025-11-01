@@ -1,6 +1,9 @@
 // src/ui/header.ts
 import { auth } from "./auth.js";
 import Router from "./router.js";
+import ChatPanel from "./components/ChatPanel.js";
+
+let chatPanel: ChatPanel | null = null;
 
 export function mountHeader(router: Router) {
   const $login = document.getElementById("btn-login");
@@ -8,9 +11,10 @@ export function mountHeader(router: Router) {
   const $profile = document.getElementById("btn-profile");
   const $friends = document.getElementById("btn-friends");
   const $stats = document.getElementById("btn-stats");
+  const $chat = document.getElementById("btn-chat") as HTMLButtonElement | null;
   const $logout = document.getElementById("btn-logout") as HTMLButtonElement | null;
 
-  if (!$login || !$register || !$profile || !$logout || !$friends || !$stats) return () => {};
+  if (!$login || !$register || !$profile || !$logout || !$friends || !$stats || !$chat) return () => {};
 
   void auth.bootstrap();
 
@@ -22,6 +26,32 @@ export function mountHeader(router: Router) {
     $logout.hidden = !loggedIn;
     $friends.hidden = !loggedIn;
     $stats.hidden = !loggedIn;
+    
+    // Chat button always visible but styled differently
+    const chatDisabledLine = document.getElementById('chat-disabled-line');
+    if (loggedIn) {
+      $chat.classList.remove('opacity-50', 'cursor-not-allowed', 'text-gray-400');
+      $chat.classList.add('text-white', 'hover:text-green-400');
+      $chat.disabled = false;
+      if (chatDisabledLine) chatDisabledLine.style.display = 'none';
+    } else {
+      $chat.classList.add('opacity-50', 'cursor-not-allowed', 'text-gray-400');
+      $chat.classList.remove('text-white', 'hover:text-green-400');
+      $chat.disabled = true;
+      if (chatDisabledLine) chatDisabledLine.style.display = 'block';
+    }
+
+    // Initialize chat panel for authenticated users
+    if (loggedIn && !chatPanel) {
+      const bodyElement = document.body;
+      if (bodyElement) {
+        chatPanel = new ChatPanel(router);
+        chatPanel.mount(bodyElement);
+      }
+    } else if (!loggedIn && chatPanel) {
+      chatPanel.unmount();
+      chatPanel = null;
+    }
   };
 
   // initial paint
@@ -50,6 +80,15 @@ export function mountHeader(router: Router) {
   $stats.addEventListener("click", (e) => {
     e.preventDefault();
     router.navigate("/stats");
+  });
+  
+  // chat toggle
+  $chat.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (!chatPanel) {
+      return;
+    }
+    chatPanel.toggle();
   });
 
   // logout flow

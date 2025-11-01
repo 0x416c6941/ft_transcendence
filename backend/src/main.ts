@@ -22,6 +22,7 @@ import { setupTetrisRemote } from './tetrisRemote.js';
 import { seedDatabase } from './seedDatabase.js';
 import { verifyToken } from './utils/jwt.js';
 import friendsRoutes from './routes/friends.js';
+import { setupChatSocket } from './chatSocket.js';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -187,12 +188,22 @@ const start = async () => {
 		});
 
 		fastify.decorate('io', io);
+		
+		// Expose onlineUsers for chat functionality
+		(fastify as any).onlineUsers = onlineUsers;
+		
 		io.on('connection', (socket) => {
 			const userId = (socket as any).userId;
 			const username = (socket as any).username;
 
 			fastify.log.info(`User ${username} (${userId}) connected: ${socket.id}`);
-			socket.emit('user_info', { userId, username });
+
+			// Check if user is admin and send user info
+			fastify.sqlite.get('SELECT 1 FROM admins WHERE user_id = ?', [userId], (adminErr: Error | null, adminRow: any) => {
+				const isAdmin = !!adminRow;
+				socket.emit('user_info', { userId, username, isAdmin });
+				(socket as any).isAdmin = isAdmin; // Store on socket for later use
+			});
 
 			// Get user's display name and add to online users
 			fastify.sqlite.get('SELECT display_name FROM users WHERE id = ?', [userId], (err: Error | null, row: any) => {
@@ -263,6 +274,9 @@ const start = async () => {
 
 		// Seed database with default users (if empty)
 		await seedDatabase(fastify);
+
+		// Set up chat socket handlers
+		setupChatSocket(fastify, io);
 
 		// Set up Tetris game servers
 		setupTetrisGame(fastify, io);
