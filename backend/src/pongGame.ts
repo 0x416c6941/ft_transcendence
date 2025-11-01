@@ -2,6 +2,7 @@
 import { FastifyInstance } from 'fastify';
 import { Server, Socket } from 'socket.io';
 import * as bcrypt from 'bcrypt';
+import { saveGameRecord, isSocketAuthenticated, GameRecord } from './utils/gameStats.js';
 
 const WIDTH = 640;
 const HEIGHT = 360;
@@ -40,6 +41,7 @@ interface Room {
     readyState: ReadyState;
     gameActive: boolean;
     playersMap: Map<string, { side: Side; input: InputState }>; // per room
+    currentGameRecord?: GameRecord;
 }
 
 // Initial game state
@@ -175,7 +177,7 @@ function leaveRoom(roomId: string, playerId: string): void {
 }
 
 // Update game state - one step of physics
-function step(room: Room, io: Server): void {
+async function step(room: Room, io: Server, fastify: FastifyInstance): Promise<void> {
     // Update paddles based on input
     for (const [, { side, input }] of room.playersMap) {
         if (side === 'left') {
@@ -241,7 +243,20 @@ function step(room: Room, io: Server): void {
         io.to(room.id).emit('game_state', finalSnapshot);
         room.gameActive = false;
         room.status = 'finished';
-        io.to(room.id).emit('game_end', { winner: room.gameState.score.left >= WINNING_SCORE ? 'left' : 'right' });
+        const winner = room.gameState.score.left >= WINNING_SCORE ? 'left' : 'right';
+        io.to(room.id).emit('game_end', { winner });
+        
+        // Save game record
+        if (room.currentGameRecord) {
+            room.currentGameRecord.finished_at = new Date().toISOString();
+            room.currentGameRecord.winner = winner === 'left' ? room.currentGameRecord.player1_name : room.currentGameRecord.player2_name;
+            room.currentGameRecord.data = JSON.stringify({
+                finalScore: room.gameState.score,
+                winner,
+            });
+            await saveGameRecord(fastify, room.currentGameRecord);
+        }
+        
         room.readyState.left = false;
         room.readyState.right = false;
         io.to(room.id).emit('ready_state', room.readyState);
@@ -359,6 +374,46 @@ export function setupPongGame(fastify: FastifyInstance, io: Server): void {
                 room.gameActive = true;
                 room.status = 'in_progress';
                 resetGameState(room);
+                
+                // Initialize game record
+                const leftSocketId = room.players[0];
+                const rightSocketId = room.players[1];
+                const onlineUsers = (fastify as any).onlineUsers;
+                
+                let leftPlayerName = 'Guest';
+                let leftIsUser = false;
+                let rightPlayerName = 'Guest';
+                let rightIsUser = false;
+                
+                if (leftSocketId && onlineUsers) {
+                    for (const [userId, userData] of onlineUsers.entries()) {
+                        if (userData.socketId === leftSocketId) {
+                            leftPlayerName = userData.username || 'Guest';
+                            leftIsUser = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (rightSocketId && onlineUsers) {
+                    for (const [userId, userData] of onlineUsers.entries()) {
+                        if (userData.socketId === rightSocketId) {
+                            rightPlayerName = userData.username || 'Guest';
+                            rightIsUser = true;
+                            break;
+                        }
+                    }
+                }
+                
+                room.currentGameRecord = {
+                    game_name: 'pong',
+                    started_at: new Date().toISOString(),
+                    player1_name: leftPlayerName,
+                    player1_is_user: leftIsUser,
+                    player2_name: rightPlayerName,
+                    player2_is_user: rightIsUser,
+                };
+                
                 const snapshot = {
                     width: WIDTH,
                     height: HEIGHT,
@@ -384,7 +439,7 @@ export function setupPongGame(fastify: FastifyInstance, io: Server): void {
             player.input.down = !!data.down;
         });
 
-        socket.on('disconnect', () => {
+        socket.on('disconnect', async () => {
             // Find room where player is
             for (const room of rooms.values()) {
                 if (room.players.indexOf(socket.id) !== -1 || room.spectators.indexOf(socket.id) !== -1) {
@@ -392,6 +447,18 @@ export function setupPongGame(fastify: FastifyInstance, io: Server): void {
                     const player = room.playersMap.get(socket.id);
                     if (player && (player.side === 'left' || player.side === 'right')) {
                         room.readyState[player.side] = false;
+                        
+                        // Save game record if game was active
+                        if (room.gameActive && room.currentGameRecord) {
+                            room.currentGameRecord.finished_at = new Date().toISOString();
+                            room.currentGameRecord.winner = 'N/A';
+                            room.currentGameRecord.data = JSON.stringify({
+                                finalScore: room.gameState.score,
+                                reason: 'Player disconnected',
+                            });
+                            await saveGameRecord(fastify, room.currentGameRecord);
+                        }
+                        
                         resetGameState(room);
                         stopGame(room, io);
                         setTimeout(() => reassignRoles(room, io), 100);
@@ -408,7 +475,7 @@ export function setupPongGame(fastify: FastifyInstance, io: Server): void {
     setInterval(() => {
         for (const room of rooms.values()) {
             if (room.gameActive) {
-                step(room, io);
+                step(room, io, fastify);
             }
         }
     }, 1000 / TICK_HZ);
