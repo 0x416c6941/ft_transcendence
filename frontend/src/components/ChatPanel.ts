@@ -35,20 +35,37 @@ interface Friend {
 	is_online: boolean;
 }
 
+interface GameInvite {
+	id: number;
+	gameType: 'tetris' | 'pong';
+	fromUserId: number;
+	fromUsername: string;
+	fromDisplayName: string;
+	toUserId: number;
+	toUsername: string;
+	toDisplayName: string;
+	status: 'pending' | 'accepted' | 'declined' | 'expired';
+	createdAt: string;
+}
+
 export default class ChatPanel {
 	private router: Router;
 	private socket: any;
 	private container: HTMLElement | null = null;
-	private currentTab: 'global' | 'dm' = 'global';
+	private currentTab: 'global' | 'dm' | 'games' = 'global';
 	private globalMessages: ChatMessage[] = [];
 	private conversations: Conversation[] = [];
 	private activeConversationId: number | null = null;
 	private dmMessages: Map<number, ChatMessage[]> = new Map();
+	private gameInvites: GameInvite[] = [];
 	private isInGame: boolean = false;
 	private isOpen: boolean = false;
 	private friends: Friend[] = [];
+	private onlineUsers: Array<{ userId: number; username: string; displayName: string }> = [];
 	private isAdmin: boolean = false;
 	private cachedOnlineUserIds: Set<number> = new Set(); // Cache online user IDs
+	private dmUnreadCount: number = 0;
+	private gameInviteCount: number = 0;
 
 	constructor(router: Router) {
 		this.router = router;
@@ -87,6 +104,9 @@ export default class ChatPanel {
 
 		this.socket.on('online_users_updated', (users: Array<{ userId: number; username: string; displayName: string }>) => {
 			const onlineUserIds = new Set(users.map(u => u.userId));
+			
+			// Store online users list
+			this.onlineUsers = users;
 			
 			// Cache the online user IDs for when friends are fetched
 			this.cachedOnlineUserIds = onlineUserIds;
@@ -244,6 +264,47 @@ export default class ChatPanel {
 		this.socket.on('chat:error', (data: { code: string; message: string }) => {
 			this.showNotification(data.message, 'error');
 		});
+
+		// Game invite listeners
+		this.socket.on('game:invite_received', (data: GameInvite) => {
+			this.gameInvites.unshift(data);
+			this.gameInviteCount++;
+			this.updateUnreadBadge();
+			this.showNotification(`${data.fromDisplayName} invited you to play ${data.gameType}!`, 'info');
+			if (this.container && this.currentTab === 'games') this.renderMessages();
+		});
+
+		this.socket.on('game:invite_sent', () => this.socket.emit('game:get_invites'));
+
+		this.socket.on('game:invite_accepted', (data: { inviteId: number; byDisplayName: string; gameType: string }) => {
+			const invite = this.gameInvites.find(inv => inv.id === data.inviteId);
+			if (invite) invite.status = 'accepted';
+			
+			this.updateBadgeAndRefresh();
+			this.showNotification(`${data.byDisplayName} accepted your invite!`, 'success');
+			
+			setTimeout(() => {
+				this.router.navigate(data.gameType === 'tetris' ? '/tetris-remote' : '/pong');
+			}, 1000);
+		});
+
+		this.socket.on('game:invite_declined', (data: { inviteId: number; byDisplayName: string }) => {
+			const invite = this.gameInvites.find(inv => inv.id === data.inviteId);
+			if (invite) invite.status = 'declined';
+			
+			this.updateBadgeAndRefresh();
+			this.showNotification(`${data.byDisplayName} declined your invite`, 'info');
+		});
+
+		this.socket.on('game:invites_list', (data: GameInvite[]) => {
+			this.gameInvites = data;
+			this.gameInviteCount = data.filter(inv => inv.status === 'pending' && inv.toUserId === (this.socket as any).userId).length;
+			this.updateUnreadBadge();
+			
+			if (this.container && this.currentTab === 'games') {
+				this.renderMessages();
+			}
+		});
 	}
 
 	public mount(parentElement: HTMLElement): void {
@@ -336,10 +397,17 @@ export default class ChatPanel {
 				}">
 					Global Chat
 				</button>
-				<button id="tab-dm" class="flex-1 py-3 text-sm font-semibold transition-colors ${
+				<button id="tab-dm" class="relative flex-1 py-3 text-sm font-semibold transition-colors ${
 					this.currentTab === 'dm' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'
 				}">
 					Direct Messages
+					<span id="tab-dm-badge" class="hidden absolute top-1 right-2 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"></span>
+				</button>
+				<button id="tab-games" class="relative flex-1 py-3 text-sm font-semibold transition-colors ${
+					this.currentTab === 'games' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'
+				}">
+					Games
+					<span id="tab-games-badge" class="hidden absolute top-1 right-2 bg-green-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"></span>
 				</button>
 			</div>
 
@@ -493,8 +561,146 @@ export default class ChatPanel {
 		`;
 	}
 
+	private renderGameInvitesHTML(): string {
+		const userId = (this.socket as any).userId;
+		// Filter out current user from online users list
+		const availableUsers = this.onlineUsers.filter(u => u.userId !== userId);
+		
+		// Count completed invites (accepted/declined)
+		const completedInvites = this.gameInvites.filter(inv => 
+			inv.status === 'accepted' || inv.status === 'declined'
+		);
+		
+		// Send Invite Section
+		const sendInviteSection = `
+			<div class="px-4 py-3 border-b border-gray-700">
+				<div class="flex items-center justify-between mb-3">
+					<h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
+						<span>📨</span> Send Game Invite
+					</h3>
+					${completedInvites.length > 0 ? `
+						<button 
+							id="cleanup-invites"
+							class="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors flex items-center gap-1"
+							title="Remove accepted/declined invites">
+							<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+							</svg>
+							Clean Up (${completedInvites.length})
+						</button>
+					` : ''}
+				</div>
+				${availableUsers.length === 0 ? `
+					<p class="text-xs text-gray-500">No other users online</p>
+				` : `
+					<div class="space-y-2">
+						${availableUsers.map(user => `
+							<div class="flex items-center justify-between bg-gray-700 rounded-lg p-3">
+								<div class="flex items-center gap-3">
+									<div class="w-2 h-2 bg-green-500 rounded-full"></div>
+									<span class="text-sm text-white">${this.escapeHtml(user.displayName)}</span>
+								</div>
+								<div class="flex gap-2">
+									<button 
+										class="send-game-invite px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+										data-friend-id="${user.userId}"
+										data-game-type="tetris"
+										title="Invite to Tetris">
+										🎮 Tetris
+									</button>
+									<button 
+										class="send-game-invite px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+										data-friend-id="${user.userId}"
+										data-game-type="pong"
+										title="Invite to Pong">
+										🏓 Pong
+									</button>
+								</div>
+							</div>
+						`).join('')}
+					</div>
+				`}
+			</div>
+		`;
+		
+		// Invites List Section
+		const invitesSection = this.gameInvites.length === 0 ? `
+			<div class="text-center text-gray-400 px-4 py-8">
+				<svg class="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+				</svg>
+				<p class="text-xs text-gray-500">No pending invites</p>
+			</div>
+		` : `
+			<div class="px-4 py-4 space-y-3">
+				${this.gameInvites.map(invite => {
+					const isReceived = invite.toUserId === userId;
+					const isPending = invite.status === 'pending';
+					const gameIcon = invite.gameType === 'tetris' ? '🎮' : '🏓';
+					
+					let statusBadge = '';
+					let actionButtons = '';
+					
+					if (invite.status === 'accepted') {
+						statusBadge = '<span class="text-xs text-green-400">✓ Accepted</span>';
+					} else if (invite.status === 'declined') {
+						statusBadge = '<span class="text-xs text-red-400">✗ Declined</span>';
+					} else if (invite.status === 'expired') {
+						statusBadge = '<span class="text-xs text-gray-500">⌛ Expired</span>';
+					} else if (isPending && isReceived) {
+						actionButtons = `
+							<div class="flex gap-2 mt-2">
+								<button 
+									class="accept-invite flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
+									data-invite-id="${invite.id}"
+									data-game-type="${invite.gameType}">
+									Accept
+								</button>
+								<button 
+									class="decline-invite flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors"
+									data-invite-id="${invite.id}">
+									Decline
+								</button>
+							</div>
+						`;
+					} else if (isPending && !isReceived) {
+						statusBadge = '<span class="text-xs text-yellow-400">⏳ Waiting...</span>';
+					}
+					
+					return `
+						<div class="bg-gray-700 rounded-lg p-4">
+							<div class="flex items-start gap-3">
+								<div class="text-3xl">${gameIcon}</div>
+								<div class="flex-1">
+									<div class="flex items-center justify-between mb-1">
+										<span class="font-semibold text-white capitalize">${invite.gameType}</span>
+										${statusBadge}
+									</div>
+									<p class="text-sm text-gray-300">
+										${isReceived 
+											? `<span class="text-blue-400">${this.escapeHtml(invite.fromDisplayName)}</span> invited you to play` 
+											: `You invited <span class="text-blue-400">${this.escapeHtml(invite.toDisplayName)}</span>`
+										}
+									</p>
+									<p class="text-xs text-gray-500 mt-1">${this.formatTimestamp(invite.createdAt)}</p>
+									${actionButtons}
+								</div>
+							</div>
+						</div>
+					`;
+				}).join('')}</div>
+		`;
+		
+		return sendInviteSection + invitesSection;
+	}
+
 	private renderInputArea(): string {
 		if (this.currentTab === 'dm' && !this.activeConversationId && !(this as any).tempRecipientId) {
+			return '';
+		}
+		
+		// No input area for games tab
+		if (this.currentTab === 'games') {
 			return '';
 		}
 
@@ -537,6 +743,9 @@ export default class ChatPanel {
 		if (this.currentTab === 'dm' && !this.activeConversationId && !(this as any).tempRecipientId) {
 			messagesContainer.innerHTML = this.renderConversationListHTML();
 			this.attachConversationListeners();
+		} else if (this.currentTab === 'games') {
+			messagesContainer.innerHTML = this.renderGameInvitesHTML();
+			this.attachGameInviteListeners();
 		} else {
 			messagesContainer.innerHTML = this.renderMessagesHTML();
 			this.attachDeleteListeners();
@@ -550,6 +759,7 @@ export default class ChatPanel {
 		// Tab switcher
 		document.getElementById('tab-global')?.addEventListener('click', () => this.switchTab('global'));
 		document.getElementById('tab-dm')?.addEventListener('click', () => this.switchTab('dm'));
+		document.getElementById('tab-games')?.addEventListener('click', () => this.switchTab('games'));
 
 		if (!this.isInGame) {
 			// Send button
@@ -609,18 +819,86 @@ export default class ChatPanel {
 		});
 	}
 
-	private switchTab(tab: 'global' | 'dm'): void {
+	private attachGameInviteListeners(): void {
+		document.querySelectorAll('.send-game-invite').forEach(btn => {
+			btn.addEventListener('click', () => {
+				const targetUserId = parseInt(btn.getAttribute('data-friend-id')!);
+				const gameType = btn.getAttribute('data-game-type')! as 'tetris' | 'pong';
+				const targetUser = this.onlineUsers.find(u => u.userId === targetUserId);
+				
+				if (targetUser) {
+					this.socket.emit('game:send_invite', { toUserId: targetUserId, gameType });
+					this.showNotification(`Game invite sent to ${targetUser.displayName}!`, 'success');
+				}
+			});
+		});
+		
+		document.querySelectorAll('.accept-invite').forEach(btn => {
+			btn.addEventListener('click', () => {
+				const inviteId = parseInt(btn.getAttribute('data-invite-id')!);
+				const gameType = btn.getAttribute('data-game-type')! as 'tetris' | 'pong';
+				const invite = this.gameInvites.find(inv => inv.id === inviteId);
+				
+				if (invite) invite.status = 'accepted';
+				this.socket.emit('game:accept_invite', { inviteId, gameType });
+				this.showNotification('Invite accepted! Starting game...', 'success');
+				
+				if (this.currentTab === 'games') this.renderMessages();
+				setTimeout(() => this.router.navigate(gameType === 'tetris' ? '/tetris-remote' : '/pong'), 1000);
+			});
+		});
+
+		document.querySelectorAll('.decline-invite').forEach(btn => {
+			btn.addEventListener('click', () => {
+				const inviteId = parseInt(btn.getAttribute('data-invite-id')!);
+				const invite = this.gameInvites.find(inv => inv.id === inviteId);
+				
+				if (invite) invite.status = 'declined';
+				this.socket.emit('game:decline_invite', { inviteId });
+				this.showNotification('Invite declined', 'info');
+				
+				if (this.currentTab === 'games') this.renderMessages();
+			});
+		});
+
+		const cleanupBtn = document.getElementById('cleanup-invites');
+		if (cleanupBtn) {
+			cleanupBtn.addEventListener('click', () => {
+				const completedIds = this.gameInvites
+					.filter(inv => inv.status === 'accepted' || inv.status === 'declined')
+					.map(inv => inv.id);
+				
+				if (completedIds.length > 0) {
+					this.gameInvites = this.gameInvites.filter(inv => 
+						inv.status !== 'accepted' && inv.status !== 'declined'
+					);
+					this.socket.emit('game:cleanup_invites', { inviteIds: completedIds });
+					this.showNotification(`Cleaned up ${completedIds.length} invite(s)`, 'success');
+					if (this.currentTab === 'games') this.renderMessages();
+				}
+			});
+		}
+	}
+
+	private switchTab(tab: 'global' | 'dm' | 'games'): void {
 		this.currentTab = tab;
 		this.activeConversationId = null;
 
 		if (tab === 'global') {
 			this.socket.emit('chat:get_history', { type: 'global', limit: 50 });
 			// chat:history handler will render when data arrives (or immediately if cached)
-		} else {
+		} else if (tab === 'dm') {
 			// Switching to DM tab - request conversations and fresh online status
 			this.socket.emit('chat:get_conversations');
 			this.socket.emit('request_online_users');
 			// chat:conversations handler will render when data arrives
+		} else if (tab === 'games') {
+			// Switching to Games tab - request game invites list and online users
+			this.socket.emit('game:get_invites');
+			this.socket.emit('request_online_users');
+			// Clear game invite count when viewing
+			this.gameInviteCount = 0;
+			this.updateUnreadBadge();
 		}
 		
 		// Always render to update tabs immediately - messages area will be updated by handlers
@@ -682,13 +960,46 @@ export default class ChatPanel {
 		if (!badge) return;
 
 		// Calculate total unread messages across all conversations
-		const totalUnread = this.conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
+		this.dmUnreadCount = this.conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
+		const totalUnread = this.dmUnreadCount + this.gameInviteCount;
 
 		if (totalUnread > 0) {
 			badge.textContent = totalUnread > 99 ? '99+' : totalUnread.toString();
 			badge.classList.remove('hidden');
 		} else {
 			badge.classList.add('hidden');
+		}
+		
+		// Update individual tab badges
+		const dmBadge = document.getElementById('tab-dm-badge');
+		const gamesBadge = document.getElementById('tab-games-badge');
+		
+		if (dmBadge) {
+			if (this.dmUnreadCount > 0) {
+				dmBadge.textContent = this.dmUnreadCount > 99 ? '99+' : this.dmUnreadCount.toString();
+				dmBadge.classList.remove('hidden');
+			} else {
+				dmBadge.classList.add('hidden');
+			}
+		}
+		
+		if (gamesBadge) {
+			if (this.gameInviteCount > 0) {
+				gamesBadge.textContent = this.gameInviteCount > 99 ? '99+' : this.gameInviteCount.toString();
+				gamesBadge.classList.remove('hidden');
+			} else {
+				gamesBadge.classList.add('hidden');
+			}
+		}
+	}
+
+	private updateBadgeAndRefresh(): void {
+		this.gameInviteCount = this.gameInvites.filter(inv => 
+			inv.status === 'pending' && inv.toUserId === (this.socket as any).userId
+		).length;
+		this.updateUnreadBadge();
+		if (this.container && this.currentTab === 'games') {
+			requestAnimationFrame(() => this.renderMessages());
 		}
 	}
 
@@ -709,5 +1020,26 @@ export default class ChatPanel {
 		const div = document.createElement('div');
 		div.textContent = text;
 		return div.innerHTML;
+	}
+
+	private formatTimestamp(timestamp: string): string {
+		const date = new Date(timestamp);
+		const now = new Date();
+		const diffMs = now.getTime() - date.getTime();
+		const diffMins = Math.floor(diffMs / 60000);
+		const diffHours = Math.floor(diffMs / 3600000);
+		const diffDays = Math.floor(diffMs / 86400000);
+
+		if (diffMins < 1) {
+			return 'Just now';
+		} else if (diffMins < 60) {
+			return `${diffMins}m ago`;
+		} else if (diffHours < 24) {
+			return `${diffHours}h ago`;
+		} else if (diffDays < 7) {
+			return `${diffDays}d ago`;
+		} else {
+			return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+		}
 	}
 }

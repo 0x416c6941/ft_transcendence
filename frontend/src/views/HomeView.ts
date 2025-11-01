@@ -1,13 +1,10 @@
 import AbstractView from "./AbstractView.js";
 import Router from "../router.js";
 import { APP_NAME } from "../app.config.js";
-import OnlineUsers from '../components/OnlineUsers.js';
 import { auth } from "../auth.js";
-import { io } from '../socket.js';
 
 export default class HomeView extends AbstractView {
   private isLoggedIn: boolean = false;
-  private onlineUsersComponent: OnlineUsers | null = null;
   private unsubscribeAuth?: () => void;
 
   constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
@@ -53,12 +50,6 @@ async getHtml(): Promise<string> {
            class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
           Tetris: Alias vs AI
         </a>
-        ${this.isLoggedIn ? `
-        <button id="remote-game-btn"
-           class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
-          Tetris: Remote Game
-        </button>
-        ` : ''}
       </div>
     </main>
     `;
@@ -81,24 +72,6 @@ async getHtml(): Promise<string> {
       });
     }
 
-    // Mount OnlineUsers component if user is logged in
-    if (this.isLoggedIn && io.connected) {
-      this.onlineUsersComponent = new OnlineUsers(this.router);
-      const mainElement = document.querySelector('main');
-      if (mainElement) {
-        this.onlineUsersComponent.mount(mainElement);
-      }
-
-      // Setup Remote Game button click handler
-      const remoteGameBtn = document.getElementById('remote-game-btn');
-      if (remoteGameBtn) {
-        remoteGameBtn.addEventListener('click', () => {
-          if (this.onlineUsersComponent) {
-            this.onlineUsersComponent.show();
-          }
-        });
-      }
-    }
     this.unsubscribeAuth = auth.subscribe((s) => {
       const next = s.status === "authenticated";
       if (next !== this.isLoggedIn) {
@@ -112,11 +85,6 @@ async getHtml(): Promise<string> {
     if (this.unsubscribeAuth) {
       this.unsubscribeAuth();
       this.unsubscribeAuth = undefined;
-    }
-    // Unmount OnlineUsers component
-    if (this.onlineUsersComponent) {
-      this.onlineUsersComponent.unmount();
-      this.onlineUsersComponent = null;
     }
   }
 }

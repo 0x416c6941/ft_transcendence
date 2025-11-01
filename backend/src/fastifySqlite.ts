@@ -219,6 +219,31 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 		});
 	});
 
+	// Create game_invites table
+	await new Promise<void>((resolve, reject) => {
+		db.run(`
+			CREATE TABLE IF NOT EXISTS game_invites (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				game_type TEXT NOT NULL CHECK(game_type IN ('tetris', 'pong')),
+				from_user_id INTEGER NOT NULL,
+				to_user_id INTEGER NOT NULL,
+				status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'accepted', 'declined', 'expired')),
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				responded_at DATETIME,
+				FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+				FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
+			)
+		`, (err: Error | null) => {
+			if (err) {
+				fastify.log.error(`Failed to create game_invites table: ${err.message}`);
+				reject(err);
+			} else {
+				fastify.log.info('Game invites table ready');
+				resolve();
+			}
+		});
+	});
+
 	fastify.decorate('sqlite', db);
 	fastify.addHook('onClose', (fastify: FastifyInstance, done: () => void) => {
 		db.close((err: Error | null) => {

@@ -225,36 +225,7 @@ const start = async () => {
 				userId: id, username: data.username, displayName: data.displayName
 			}));
 			socket.emit('online_users_updated', usersList);
-		});			// Handle game invites
-			socket.on('game:invite', (data: { targetUserId: number }) => {
-				const targetUser = onlineUsers.get(data.targetUserId);
-				if (!targetUser) return;
-
-				io.to(targetUser.socketId).emit('game:invite_received', {
-					fromUserId: userId, fromUsername: username, fromDisplayName: onlineUsers.get(userId)?.displayName
-				});
-				fastify.log.info(`Game invite from ${username} to ${targetUser.username}`);
-			});
-
-			// Handle game invite acceptance
-			socket.on('game:accept', (data: { fromUserId: number }) => {
-				const inviterUser = onlineUsers.get(data.fromUserId);
-				if (!inviterUser) return;
-
-				io.to(inviterUser.socketId).emit('game:invite_accepted', { byUserId: userId, byUsername: username });
-				fastify.log.info(`${username} accepted game invite from ${inviterUser.username}`);
-			});
-
-			// Handle game invite decline
-			socket.on('game:decline', (data: { fromUserId: number }) => {
-				const inviterUser = onlineUsers.get(data.fromUserId);
-				if (!inviterUser) return;
-
-				io.to(inviterUser.socketId).emit('game:invite_declined', {
-					byUserId: userId, byUsername: username, byDisplayName: onlineUsers.get(userId)?.displayName
-				});
-				fastify.log.info(`${username} declined game invite from ${inviterUser.username}`);
-			});
+		});
 
 		socket.on('disconnect', () => {
 			fastify.log.info(`User ${username} (${userId}) disconnected: ${socket.id}`);

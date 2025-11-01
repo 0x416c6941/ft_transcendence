@@ -7,19 +7,11 @@ interface OnlineUser {
   displayName: string;
 }
 
-interface GameInvite {
-  fromUserId: number;
-  fromUsername: string;
-  fromDisplayName: string;
-}
-
 export default class OnlineUsers {
   private router: Router;
   private container: HTMLElement | null = null;
   private isVisible: boolean = false;
   private onlineUsers: OnlineUser[] = [];
-  private pendingInvite: number | null = null; // User ID we sent an invite to
-  private receivedInvite: GameInvite | null = null;
   private socket: any = null;
   private currentUserId: number | null = null;
 
@@ -44,23 +36,6 @@ export default class OnlineUsers {
       this.onlineUsers = users;
       this.render();
     });
-
-    this.socket.on('game:invite_received', (invite: GameInvite) => {
-      this.receivedInvite = invite;
-      this.showInviteModal();
-    });
-
-    this.socket.on('game:invite_accepted', (data: { byUsername: string }) => {
-      this.pendingInvite = null;
-      this.showNotification(`${data.byUsername} accepted your invite!`, 'success');
-      setTimeout(() => this.router.navigate('/tetris-remote'), 1500);
-    });
-
-    this.socket.on('game:invite_declined', (data: { byDisplayName: string }) => {
-      this.pendingInvite = null;
-      this.showNotification(`${data.byDisplayName} declined your invite.`, 'error');
-      this.render();
-    });
   }
 
   public mount(parentElement: HTMLElement): void {
@@ -83,7 +58,7 @@ export default class OnlineUsers {
     this.container = null;
 
     if (this.socket) {
-      ['user_info', 'online_users_updated', 'game:invite_received', 'game:invite_accepted', 'game:invite_declined']
+      ['user_info', 'online_users_updated']
         .forEach(event => this.socket.off(event));
     }
   }
@@ -139,16 +114,8 @@ export default class OnlineUsers {
               </div>
               ${user.userId === this.currentUserId ? `
                 <span class="text-gray-500 text-sm italic">You</span>
-              ` : this.pendingInvite === user.userId ? `
-                <span class="text-yellow-400 text-sm">Pending...</span>
               ` : `
-                <button 
-                  class="invite-user-btn bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm transition-colors"
-                  data-user-id="${user.userId}"
-                  data-username="${this.escapeHtml(user.username)}"
-                >
-                  Invite
-                </button>
+                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
               `}
             </div>
           `).join('')}
@@ -158,74 +125,6 @@ export default class OnlineUsers {
 
     // Attach event listeners
     this.container.querySelector('#close-panel')?.addEventListener('click', () => this.hide());
-
-    this.container.querySelectorAll('.invite-user-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement;
-        const userId = parseInt(target.getAttribute('data-user-id') || '0');
-        const username = target.getAttribute('data-username') || '';
-        this.sendInvite(userId, username);
-      });
-    });
-  }
-
-  private sendInvite(userId: number, username: string): void {
-    this.pendingInvite = userId;
-    this.socket?.emit('game:invite', { targetUserId: userId });
-    this.showNotification(`Invite sent to ${username}`, 'info');
-    this.render();
-  }
-
-  private showInviteModal(): void {
-    if (!this.receivedInvite) return;
-
-    const modal = document.createElement('div');
-    modal.id = 'invite-modal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[60]';
-    modal.innerHTML = `
-      <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-        <h3 class="text-white text-xl font-semibold mb-4">Game Invite!</h3>
-        <p class="text-gray-300 mb-6">
-          <span class="font-semibold text-sky-400">${this.escapeHtml(this.receivedInvite.fromDisplayName)}</span> 
-          wants to play Tetris with you.
-        </p>
-        <div class="flex gap-3">
-          <button id="accept-invite" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition-colors">
-            Accept
-          </button>
-          <button id="decline-invite" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition-colors">
-            Decline
-          </button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    modal.querySelector('#accept-invite')?.addEventListener('click', () => {
-      this.acceptInvite();
-      modal.remove();
-    });
-
-    modal.querySelector('#decline-invite')?.addEventListener('click', () => {
-      this.declineInvite();
-      modal.remove();
-    });
-  }
-
-  private acceptInvite(): void {
-    if (!this.receivedInvite) return;
-    this.socket?.emit('game:accept', { fromUserId: this.receivedInvite.fromUserId });
-    this.showNotification('Invite accepted! Starting game...', 'success');
-    this.receivedInvite = null;
-    setTimeout(() => this.router.navigate('/tetris-remote'), 1500);
-  }
-
-  private declineInvite(): void {
-    if (!this.receivedInvite) return;
-    this.socket?.emit('game:decline', { fromUserId: this.receivedInvite.fromUserId });
-    this.showNotification('Invite declined', 'info');
-    this.receivedInvite = null;
   }
 
   private showNotification(message: string, type: 'success' | 'error' | 'info'): void {
