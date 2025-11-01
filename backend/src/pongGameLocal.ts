@@ -10,6 +10,8 @@ const PADDLE_SPEED = 6;
 const BALL_SIZE = 10;
 const TICK_HZ = 60;
 const WINNING_SCORE = 10;
+const MAX_BOUNCE_ANGLE = Math.PI / 6;
+const SPEED_MULTIPLIER = 1.1;
 
 //TYPES
 // Game state types
@@ -109,12 +111,12 @@ function leaveLocalRoom(roomId: string, playerId: string): void {
 // Update game state
 function step(room: Room, ns: Namespace): void {
     // Update paddles based on input
-    if (room.input.leftUp) room.gameState.paddles.leftY -= PADDLE_SPEED;
-    if (room.input.leftDown) room.gameState.paddles.leftY += PADDLE_SPEED;
+    if (room.input.rightUp) room.gameState.paddles.leftY -= PADDLE_SPEED;
+    if (room.input.rightDown) room.gameState.paddles.leftY += PADDLE_SPEED;
     room.gameState.paddles.leftY = clamp(room.gameState.paddles.leftY, 0, HEIGHT - PADDLE_HEIGHT);
 
-    if (room.input.rightUp) room.gameState.paddles.rightY -= PADDLE_SPEED;
-    if (room.input.rightDown) room.gameState.paddles.rightY += PADDLE_SPEED;
+    if (room.input.leftUp) room.gameState.paddles.rightY -= PADDLE_SPEED;
+    if (room.input.leftDown) room.gameState.paddles.rightY += PADDLE_SPEED;
     room.gameState.paddles.rightY = clamp(room.gameState.paddles.rightY, 0, HEIGHT - PADDLE_HEIGHT);
 
     // Move ball
@@ -133,7 +135,18 @@ function step(room: Room, ns: Namespace): void {
         room.gameState.ball.y + BALL_SIZE >= room.gameState.paddles.leftY &&
         room.gameState.ball.y <= room.gameState.paddles.leftY + PADDLE_HEIGHT
     ) {
-        room.gameState.ball.vx = Math.abs(room.gameState.ball.vx);
+        const paddleCenter = room.gameState.paddles.leftY + PADDLE_HEIGHT / 2;
+        const ballCenter = room.gameState.ball.y + BALL_SIZE / 2;
+        const deltaY = ballCenter - paddleCenter;
+        const normalizedDelta = deltaY / (PADDLE_HEIGHT / 2);
+        let bounceAngle = normalizedDelta * MAX_BOUNCE_ANGLE;
+        const randomOffset = (Math.random() - 0.5) * 0.2;
+        bounceAngle += randomOffset;
+        bounceAngle = clamp(bounceAngle, -MAX_BOUNCE_ANGLE, MAX_BOUNCE_ANGLE);
+        let speed = Math.sqrt(room.gameState.ball.vx ** 2 + room.gameState.ball.vy ** 2);
+        speed *= SPEED_MULTIPLIER;
+        room.gameState.ball.vx = speed * Math.cos(bounceAngle);
+        room.gameState.ball.vy = speed * Math.sin(bounceAngle);
         room.gameState.ball.x = PADDLE_WIDTH;
     }
 
@@ -143,7 +156,18 @@ function step(room: Room, ns: Namespace): void {
         room.gameState.ball.y + BALL_SIZE >= room.gameState.paddles.rightY &&
         room.gameState.ball.y <= room.gameState.paddles.rightY + PADDLE_HEIGHT
     ) {
-        room.gameState.ball.vx = -Math.abs(room.gameState.ball.vx);
+        const paddleCenter = room.gameState.paddles.rightY + PADDLE_HEIGHT / 2;
+        const ballCenter = room.gameState.ball.y + BALL_SIZE / 2;
+        const deltaY = ballCenter - paddleCenter;
+        const normalizedDelta = deltaY / (PADDLE_HEIGHT / 2);
+        let bounceAngle = normalizedDelta * MAX_BOUNCE_ANGLE;
+        const randomOffset = (Math.random() - 0.5) * 0.2;
+        bounceAngle += randomOffset;
+        bounceAngle = clamp(bounceAngle, -MAX_BOUNCE_ANGLE, MAX_BOUNCE_ANGLE);
+        let speed = Math.sqrt(room.gameState.ball.vx ** 2 + room.gameState.ball.vy ** 2);
+        speed *= SPEED_MULTIPLIER;
+        room.gameState.ball.vx = -speed * Math.cos(bounceAngle);
+        room.gameState.ball.vy = speed * Math.sin(bounceAngle);
         room.gameState.ball.x = WIDTH - PADDLE_WIDTH - BALL_SIZE;
     }
 
