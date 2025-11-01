@@ -235,6 +235,10 @@ export const getUserByUsernameSchema = {
 				user: { $ref: 'User#' }
 			}
 		},
+		401: {
+			description: "JWT token of a request sender is valid, yet their own user doesn't exist",
+			$ref: 'Error#'
+		},
 		404: {
 			description: 'User not found',
 			$ref: 'Error#'

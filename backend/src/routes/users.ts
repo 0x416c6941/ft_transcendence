@@ -271,6 +271,13 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			const { username } = request.params;
 
 			try {
+				const requesterUser = await dbGetUserById(fastify, request.user!.userId);
+				if (!requesterUser) {
+					return reply
+						.code(401)
+						.send({ error: "Your JWT token is valid, yet your user doesn't exist" });
+				}
+
 				const dbUser = await dbGetUserByUsername(fastify, username);
 				if (!dbUser) {
 					return reply.code(404).send({ error: 'User not found' });
