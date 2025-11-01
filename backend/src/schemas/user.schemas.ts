@@ -451,12 +451,12 @@ export const oauth42UnlinkSchema = {
 			description: "Forbidden - user requested to unlink 42 account from soneone else, yet they aren't an admin",
 			$ref: 'Error#'
 		},
-		404: {
-			description: "Not found - provided user doesn't any 42 account linked",
-			$ref: 'Error#'
-		},
 		409: {
 			description: 'Conflict - User session exists, yet user was removed from the system',
+			$ref: 'Error#'
+		},
+		422: {
+			description: "Unprocessable Content - provided user doesn't any 42 account linked",
 			$ref: 'Error#'
 		},
 		500: {
@@ -504,12 +504,12 @@ export const updateUserAvatarSchema = {
 			description: 'Bad request - avatar is either not present, or borked image file',
 			$ref: 'Error#'
 		},
-		403: {
-			description: 'Forbidden - user tried to update avatar of another user without sufficient privileges',
+		401: {
+			description: 'Unauthorized - User session is valid, but user was already deleted from the database',
 			$ref: 'Error#'
 		},
-		404: {
-			description: 'Not found - User session is valid, but user was already deleted from the database',
+		403: {
+			description: 'Forbidden - user tried to update avatar of another user without sufficient privileges',
 			$ref: 'Error#'
 		},
 		500: {
@@ -534,12 +534,12 @@ export const resetUserAvatarSchema = {
 				message: { type: 'string' }
 			}
 		},
-		403: {
-			description: 'Forbidden - user tried to reset avatar of another user without sufficient privileges',
+		401: {
+			description: 'Unauthorized - User session is valid, but user was already deleted from the database',
 			$ref: 'Error#'
 		},
-		404: {
-			description: 'Not found - User session is valid, yet user was already removed from the system',
+		403: {
+			description: 'Forbidden - user tried to reset avatar of another user without sufficient privileges',
 			$ref: 'Error#'
 		},
 		409: {
@@ -554,17 +554,22 @@ export const resetUserAvatarSchema = {
 };
 
 export const getCurrentUserSchema = {
-  description: 'Get the currently authenticated user from the access cookie',
-  tags: ['users'],
-  security: [{ cookieAuth: [] }],
-  response: {
-    200: {
-      description: 'Current user details',
-      type: 'object',
-      properties: {
-        user: { $ref: 'User#' }
-      }
-    },
-    401: { description: 'Unauthorized', $ref: 'Error#' }
-  }
+	description: 'Get the currently authenticated user from the access cookie',
+	tags: ['users'],
+	security: [{ cookieAuth: [] }],
+	response: {
+		200: {
+			description: 'Current user details',
+			type: 'object',
+			properties: {
+				user: {
+					$ref: 'User#'
+				}
+			}
+		},
+		401: {
+			description: "JWT token is valid, yet your user doesn't exist",
+			$ref: 'Error#'
+		}
+	}
 };

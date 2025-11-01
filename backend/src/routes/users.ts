@@ -311,17 +311,15 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			schema: getCurrentUserSchema
 		},
 		async (request: FastifyRequest, reply: FastifyReply) => {
-			// Prevent caching personalized responses
-			reply.header("Cache-Control", "no-store").header("Vary", "Cookie");
-			if (!request.user?.userId) {
-				return reply.code(401).send({ error: 'Unauthorized' });
-			}
 			try {
-				const userData = await dbGetUserById(fastify, request.user.userId);
+				const userData = await dbGetUserById(fastify, request.user!.userId);
 
 				if (!userData) {
-					return reply.code(404).send({ error: 'User not found' });
+					return reply
+						.code(401)
+						.send({ error: "JWT token is valid, yet your user doesn't exist" });
 				}
+
 				const user: PublicUserInfo = {
 					id: userData.id,
 					username: userData.username,
@@ -755,7 +753,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					return reply.code(409).send({ error: "That user doesn't exist anymore" });
 				}
 				else if (!existenceCheck.account_id_42) {
-					return reply.code(404).send({ error: "That user doesn't have any linked 42 account" });
+					return reply.code(422).send({ error: "That user doesn't have any linked 42 account" });
 				}
 
 				await dbUpdateUserAccountId42(fastify, request.user!.userId, null);
@@ -822,7 +820,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			const user = await dbGetUserById(fastify, request.user!.userId);
 
 			if (!user) {
-				return reply.code(404).send({ error: "Your JWT token is valid, yet user doesn't exist" });
+				return reply.code(401).send({ error: "Your JWT token is valid, yet user doesn't exist" });
 			}
 
 			const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
@@ -884,7 +882,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				const user = await dbGetUserById(fastify, parseInt(id));
 
 				if (!user) {
-					return reply.code(404).send({ error: "Your JWT token is valid, yet user doesn't exist" });
+					return reply.code(401).send({ error: "Your JWT token is valid, yet user doesn't exist" });
 				}
 
 				const adminCheck = await dbGetAdminByUserId(fastify, request.user!.userId);
