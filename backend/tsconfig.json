@@ -16,6 +16,7 @@
 	"files": [
 		"src/main.ts",
 		"src/fastifySqlite.ts",
-		"src/routes/users.ts"
+		"src/routes/users.ts",
+		"src/routes/stats.ts"
 	]
 }

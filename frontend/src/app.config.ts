@@ -18,6 +18,7 @@ import PongAIView from './views/PongAIView.js';
 import TetrisView from './views/TetrisView.js';
 import TetrisAIView from './views/TetrisAIView.js';
 import TetrisRemoteView from './views/TetrisRemoteView.js';
+import StatsView from './views/StatsView.js';
 
 /**
  * @var {readonly string} DIV_ID
@@ -44,6 +45,7 @@ export const PATHS_TO_ROUTE: PathToRegister[] = [
 	{ path: '/tetris-remote', constructor: TetrisRemoteView, guard: 'auth' },
 	{ path: '/error/', constructor: ErrorView },
 	{ path: '/friends', constructor: FriendsView, guard: 'auth' },
+	{ path: '/stats', constructor: StatsView },
 ] as const;
 
 /**

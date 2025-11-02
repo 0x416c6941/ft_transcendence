@@ -23,6 +23,7 @@ import { seedDatabase } from './seedDatabase.js';
 import { verifyToken } from './utils/jwt.js';
 import friendsRoutes from './routes/friends.js';
 import { setupChatSocket } from './chatSocket.js';
+import statsRoutes from './routes/stats.js';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -74,6 +75,9 @@ fastify.register(gameRoutes, { prefix: '/api' });
 
 // Register friends router.
 fastify.register(friendsRoutes, { prefix: '/api' });
+
+// Register stats routes
+fastify.register(statsRoutes, { prefix: '/api' });
 
 const start = async () => {
   const port = Number(process.env.BACKEND_FASTIFY_PORT);
