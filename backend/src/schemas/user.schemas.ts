@@ -27,7 +27,8 @@ export const userSchemas = [
 			username: { type: 'string', description: 'Unique username' },
 			password: { type: 'string', format: 'password', description: 'User password (will be hashed)' },
 			email: { type: 'string', format: 'email', description: 'User email address' },
-			display_name: { type: 'string', description: 'Display name' }
+			display_name: { type: 'string', description: 'Display name' },
+			use_2fa: { type: 'boolean', description: 'Enable two-factor authentication' }
 		}
 	},
 	{
@@ -63,6 +64,23 @@ export const userSchemas = [
 		properties: {
 			accessToken: { type: 'string', description: 'New JWT access token' },
 			refreshToken: { type: 'string', description: 'New JWT refresh token' }
+		}
+	},
+	{
+		$id: 'TwoFactorSetupResponse',
+		type: 'object',
+		properties: {
+			qrCode: { type: 'string', description: 'QR code data URL for Google Authenticator' },
+			secret: { type: 'string', description: 'TOTP secret for manual entry' }
+		}
+	},
+	{
+		$id: 'TwoFactorVerifyRequest',
+		type: 'object',
+		required: ['token', 'tempToken'],
+		properties: {
+			token: { type: 'string', description: '6-digit TOTP token from authenticator app' },
+			tempToken: { type: 'string', description: 'Temporary token from login' }
 		}
 	},
 	{
@@ -125,7 +143,8 @@ export const registerUserSchema = {
 			type: 'object',
 			properties: {
 				message: { type: 'string' },
-				username: { type: 'string' }
+				username: { type: 'string' },
+				requires2FA: { type: 'boolean', description: 'Whether 2FA setup is required' }
 			}
 		},
 		400: {
@@ -152,8 +171,13 @@ export const loginUserSchema = {
 	},
 	response: {
 		200: {
-			description: 'Login successful',
-			$ref: 'MessageResponse#'
+			description: 'Login successful (or 2FA required)',
+			type: 'object',
+			properties: {
+				message: { type: 'string', description: 'Status message' },
+				requires2FA: { type: 'boolean', description: 'Whether 2FA verification is required' },
+				tempToken: { type: 'string', description: 'Temporary token for 2FA verification' }
+			}
 		},
 		400: {
 			description: 'Bad request - missing required fields',
@@ -569,6 +593,60 @@ export const getCurrentUserSchema = {
 		},
 		401: {
 			description: "JWT token is valid, yet your user doesn't exist",
+			$ref: 'Error#'
+		}
+	}
+};
+
+export const twoFactorSetupSchema = {
+	description: 'Get QR code for setting up two-factor authentication',
+	tags: ['auth'],
+	security: [],
+	querystring: {
+		type: 'object',
+		required: ['username'],
+		properties: {
+			username: { type: 'string', description: 'Username of newly registered user' }
+		}
+	},
+	response: {
+		200: {
+			description: 'QR code and secret for Google Authenticator',
+			$ref: 'TwoFactorSetupResponse#'
+		},
+		404: {
+			description: 'User not found',
+			$ref: 'Error#'
+		},
+		500: {
+			description: 'Internal server error',
+			$ref: 'Error#'
+		}
+	}
+};
+
+export const twoFactorVerifySchema = {
+	description: 'Verify two-factor authentication token and complete login',
+	tags: ['auth'],
+	security: [],
+	body: {
+		$ref: 'TwoFactorVerifyRequest#'
+	},
+	response: {
+		200: {
+			description: 'Login successful',
+			$ref: 'MessageResponse#'
+		},
+		400: {
+			description: 'Bad request - missing required fields',
+			$ref: 'Error#'
+		},
+		401: {
+			description: 'Unauthorized - invalid token',
+			$ref: 'Error#'
+		},
+		500: {
+			description: 'Internal server error',
 			$ref: 'Error#'
 		}
 	}

@@ -146,6 +146,22 @@ export default class RegisterView extends AbstractView {
               ></p>
             </div>
 
+            <!-- 2FA Checkbox -->
+            <div class="mb-4">
+              <label class="flex items-center txt-light-dark-sans">
+                <input
+                  type="checkbox"
+                  id="use-2fa"
+                  name="use_2fa"
+                  class="mr-2"
+                />
+                Enable Two-Factor Authentication (2FA)
+              </label>
+              <p class="text-neutral-500 text-sm mt-2">
+                Requires Google Authenticator app for login
+              </p>
+            </div>
+
             <button
               id="register-submit"
               type="submit"
@@ -168,6 +184,24 @@ export default class RegisterView extends AbstractView {
             ></p>
           </form>
         </section>
+
+        <!-- 2FA Setup Modal -->
+        <div id="twofa-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div class="bg-white dark:bg-neutral-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 class="text-2xl font-bold mb-4 txt-light-dark-sans">Set Up Two-Factor Authentication</h2>
+            <p class="mb-4 txt-light-dark-sans">Scan this QR code with Google Authenticator:</p>
+            <div class="flex justify-center mb-4">
+              <img id="qr-code-image" src="" alt="QR Code" class="max-w-full" />
+            </div>
+            <p class="mb-2 txt-light-dark-sans text-sm">Or enter this secret manually:</p>
+            <div class="bg-neutral-100 dark:bg-neutral-700 p-2 rounded mb-4">
+              <code id="secret-text" class="txt-light-dark-sans text-sm break-all"></code>
+            </div>
+            <button id="2fa-continue-btn" class="w-full button button-login py-2 px-4 rounded shadow">
+              Continue to Login
+            </button>
+          </div>
+        </div>
       </main>
     `;
   }
@@ -186,7 +220,10 @@ export default class RegisterView extends AbstractView {
     this.onInput = (e: Event) => {
       const target = e.target as HTMLInputElement | null;
       if (!target || !target.name) return;
-      this.validateField(target.name as FieldName);
+      // Only validate fields that have validators (skip use_2fa checkbox)
+      if (target.name in VALIDATORS) {
+        this.validateField(target.name as FieldName);
+      }
     };
     this.formEl.addEventListener("input", this.onInput);
     this.formEl.addEventListener("blur", this.onInput, true);
@@ -213,20 +250,33 @@ export default class RegisterView extends AbstractView {
 
       if (!(nk.status && un.status && em.status && pw.status)) return;
 
+      const use2FACheckbox = document.getElementById("use-2fa") as HTMLInputElement;
+      const use2FA = use2FACheckbox?.checked || false;
+
       const payload = {
         username: nkfc(username),
         password,
         email: emailSan(email),
         display_name: nkfc(nickname),
+        use_2fa: use2FA
       };
 
       this.setFormBusy(true);
       this.clearFormMessages();
 
       try {
-        await createUser(payload);
-        this.setFormSuccess("Account created! Redirecting…");
-        setTimeout(() => this.router.navigate("/login"), 1200);
+        const response = await createUser(payload);
+        
+        // Check if 2FA was enabled
+        if (use2FA && (response as any).requires2FA) {
+          // Fetch QR code
+          await this.show2FASetup(username);
+          // Keep form busy while modal is shown
+          return;
+        } else {
+          this.setFormSuccess("Account created! Redirecting…");
+          setTimeout(() => this.router.navigate("/login"), 1200);
+        }
       } catch (err) {
         // Friendlier message for common conflict case
         const raw =
@@ -300,5 +350,38 @@ export default class RegisterView extends AbstractView {
     if (!this.submitBtn) return;
     this.submitBtn.disabled = busy;
     this.submitBtn.textContent = busy ? "Creating account…" : "Create account";
+  }
+
+  private async show2FASetup(username: string): Promise<void> {
+    try {
+      const response = await fetch(`https://localhost/api/users/2fa/setup?username=${encodeURIComponent(username)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch 2FA setup');
+      }
+
+      const data = await response.json();
+      
+      const modal = document.getElementById("twofa-modal");
+      const qrImage = document.getElementById("qr-code-image") as HTMLImageElement;
+      const secretText = document.getElementById("secret-text");
+      const continueBtn = document.getElementById("2fa-continue-btn");
+
+      if (!modal || !qrImage || !secretText || !continueBtn) {
+        throw new Error('2FA modal elements not found');
+      }
+
+      qrImage.src = data.qrCode;
+      secretText.textContent = data.secret;
+      modal.classList.remove("hidden");
+
+      continueBtn.addEventListener("click", () => {
+        this.router.navigate("/login");
+      });
+    } catch (err) {
+      this.setFormError("Failed to setup 2FA. Please contact support.");
+      this.setFormBusy(false);
+    }
   }
 }

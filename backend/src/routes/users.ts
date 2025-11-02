@@ -1,6 +1,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import bcrypt from 'bcrypt';
-import { clearAuthCookies, generateAccessToken, generateRefreshToken, setAuthCookies, verifyToken } from '../utils/jwt.js';
+import speakeasy from 'speakeasy';
+import QRCode from 'qrcode';
+import { clearAuthCookies, generateAccessToken, generateRefreshToken, generateTemp2FAToken, setAuthCookies, verifyToken, verifyTemp2FAToken } from '../utils/jwt.js';
 import { authenticateToken } from '../middleware/auth.js';
 import {
 	registerUserSchema,
@@ -19,7 +21,9 @@ import {
 	getUserAvatarSchema,
 	updateUserAvatarSchema,
 	resetUserAvatarSchema,
-	getUserByUsernameSchema
+	getUserByUsernameSchema,
+	twoFactorSetupSchema,
+	twoFactorVerifySchema
 } from '../schemas/user.schemas.js';
 import {
 	ApiError,
@@ -60,6 +64,7 @@ interface CreateUserBody {
 	password: string;
 	email: string;
 	display_name: string;
+	use_2fa?: boolean;
 }
 
 interface UpdateUserBody {
@@ -83,7 +88,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		'/users',
 		{ schema: registerUserSchema },
 		async (request: FastifyRequest<{ Body: CreateUserBody }>, reply: FastifyReply) => {
-			const { username, password, email, display_name } = request.body;
+			const { username, password, email, display_name, use_2fa } = request.body;
 
 			/* Reserve some prefix for username and display name
 			 * for 42 accounts in order to prevent possible collisions with normal accounts
@@ -98,11 +103,21 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				// Hash the password
 				const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
+				// Generate TOTP secret if 2FA is enabled
+				let totpSecret: string | null = null;
+				if (use_2fa) {
+					const secret = speakeasy.generateSecret({
+						name: `ft_transcendence (${username})`,
+						length: 32
+					});
+					totpSecret = secret.base32;
+				}
+
 				// Insert user into database
 				await new Promise<void>((resolve, reject) => {
 					fastify.sqlite.run(
-						`INSERT INTO users (username, password, email, display_name) VALUES (?, ?, ?, ?)`,
-						[username, hashedPassword, email, display_name],
+						`INSERT INTO users (username, password, email, display_name, use_2fa, totp_secret) VALUES (?, ?, ?, ?, ?, ?)`,
+						[username, hashedPassword, email, display_name, use_2fa ? 1 : 0, totpSecret],
 						function (err: Error | null) {
 							if (err) {
 								reject(err);
@@ -115,7 +130,8 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
 				return reply.code(201).send({
 					message: 'User created successfully',
-					username: username
+					username: username,
+					requires2FA: use_2fa || false
 				});
 			} catch (err: any) {
 				if (err.message.includes('UNIQUE constraint failed')) {
@@ -125,6 +141,45 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				}
 				fastify.log.error(err);
 				return reply.code(500).send({ error: 'Failed to create user' });
+			}
+		}
+	);
+
+	// Get 2FA setup QR code
+	fastify.get(
+		'/users/2fa/setup',
+		{ schema: twoFactorSetupSchema },
+		async (request: FastifyRequest<{ Querystring: { username: string } }>, reply: FastifyReply) => {
+			const { username } = request.query;
+
+			try {
+				const user = await dbGetUserByUsername(fastify, username);
+
+				if (!user) {
+					return reply.code(404).send({ error: 'User not found' });
+				}
+
+				if (!user.use_2fa || !user.totp_secret) {
+					return reply.code(400).send({ error: '2FA is not enabled for this user' });
+				}
+
+				// Generate QR code
+				const otpauthUrl = speakeasy.otpauthURL({
+					secret: user.totp_secret,
+					label: username,
+					issuer: 'ft_transcendence',
+					encoding: 'base32'
+				});
+
+				const qrCodeDataURL = await QRCode.toDataURL(otpauthUrl);
+
+				return reply.code(200).send({
+					qrCode: qrCodeDataURL,
+					secret: user.totp_secret
+				});
+			} catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(500).send({ error: 'Failed to generate QR code' });
 			}
 		}
 	);
@@ -155,14 +210,25 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					});
 				}
 
+				// Check if 2FA is enabled
+				if (user.use_2fa) {
+					// Generate a temporary token for 2FA verification
+					const tempToken = generateTemp2FAToken(user.id, user.username);
+					
+					return reply.code(200).send({
+						requires2FA: true,
+						tempToken: tempToken,
+						message: 'Please provide your 2FA token'
+					});
+				}
+
 				// Generate JWT tokens
 				const accessToken = generateAccessToken(user.id, user.username);
 				const refreshToken = generateRefreshToken(user.id, user.username);
 
-				// 4) Set HttpOnly cookies (scoped per your helpers)
+				// Set HttpOnly cookies
        				setAuthCookies(reply, accessToken, refreshToken);
 
-				// Set tokens in HttpOnly cookies
 				return reply
 					.code(200)
 					.send({
@@ -176,6 +242,57 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
 				fastify.log.error(err);
 				return reply.code(500).send({ error: 'Failed to login' });
+			}
+		}
+	);
+
+	// Verify 2FA token
+	fastify.post<{ Body: { token: string; tempToken: string } }>(
+		'/users/2fa/verify',
+		{ schema: twoFactorVerifySchema },
+		async (request: FastifyRequest<{ Body: { token: string; tempToken: string } }>, reply: FastifyReply) => {
+			const { token, tempToken } = request.body;
+
+			try {
+				// Verify the temporary token
+				const decoded = verifyTemp2FAToken(tempToken);
+
+				// Get user from database
+				const user = await dbGetUserById(fastify, decoded.userId);
+
+				if (!user) {
+					return reply.code(401).send({ error: 'User not found' });
+				}
+
+				if (!user.use_2fa || !user.totp_secret) {
+					return reply.code(400).send({ error: '2FA is not enabled for this user' });
+				}
+
+				// Verify the TOTP token
+				const isValid = speakeasy.totp.verify({
+					secret: user.totp_secret,
+					encoding: 'base32',
+					token: token,
+					window: 2 // Allow 2 time steps (60 seconds) of clock drift
+				});
+
+				if (!isValid) {
+					return reply.code(401).send({ error: 'Invalid 2FA token' });
+				}
+
+				// Generate full JWT tokens
+				const accessToken = generateAccessToken(user.id, user.username);
+				const refreshToken = generateRefreshToken(user.id, user.username);
+
+				// Set HttpOnly cookies
+				setAuthCookies(reply, accessToken, refreshToken);
+
+				return reply.code(200).send({
+					message: 'Login successful'
+				});
+			} catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(401).send({ error: 'Invalid or expired 2FA token' });
 			}
 		}
 	);

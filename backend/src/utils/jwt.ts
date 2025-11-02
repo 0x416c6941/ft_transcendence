@@ -10,10 +10,17 @@ if (!jwtSecretPath) {
 const JWT_SECRET = fs.readFileSync(jwtSecretPath);
 const JWT_EXPIRES_IN = '15m'; // Token expires in 15 minutes
 const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Refresh token expires in 7 days
+const TEMP_2FA_EXPIRES_IN = '5m'; // Temporary 2FA token expires in 5 minutes
 
 export interface JwtPayload {
 	userId: number;
 	username: string;
+}
+
+export interface Temp2FAPayload {
+	userId: number;
+	username: string;
+	temp2FA: true;
 }
 
 /**
@@ -33,6 +40,14 @@ export function generateRefreshToken(userId: number, username: string): string {
 }
 
 /**
+ * Generate a temporary token for 2FA verification
+ */
+export function generateTemp2FAToken(userId: number, username: string): string {
+	const payload: Temp2FAPayload = { userId, username, temp2FA: true };
+	return jwt.sign(payload, JWT_SECRET, { expiresIn: TEMP_2FA_EXPIRES_IN, algorithm: "HS256" });
+}
+
+/**
  * Verify and decode a JWT token
  * @throws Error if token is invalid or expired
  */
@@ -42,6 +57,22 @@ export function verifyToken(token: string): JwtPayload {
 		return decoded;
 	} catch (error) {
 		throw new Error('Invalid or expired token');
+	}
+}
+
+/**
+ * Verify and decode a temporary 2FA token
+ * @throws Error if token is invalid or expired
+ */
+export function verifyTemp2FAToken(token: string): Temp2FAPayload {
+	try {
+		const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] }) as Temp2FAPayload;
+		if (!decoded.temp2FA) {
+			throw new Error('Not a 2FA token');
+		}
+		return decoded;
+	} catch (error) {
+		throw new Error('Invalid or expired 2FA token');
 	}
 }
 

@@ -1,5 +1,5 @@
 // src/auth.ts
-import { getCurrentUser, login, logout, type User } from "./api/users.js";
+import { getCurrentUser, login, logout, verify2FA, type User } from "./api/users.js";
 
 type AuthStatus = "unknown" | "authenticated" | "unauthenticated";
 type AuthState = { status: AuthStatus; user?: User };
@@ -68,8 +68,21 @@ export const auth = {
   },
 
   async signIn(username: string, password: string) {
-    await login({ username, password }); // throws on failure
-    // Force refresh of user state even if bootstrap ran before
+    const response = await login({ username, password }); // throws on failure
+    
+    // If 2FA is required, return the response for the caller to handle
+    if (response.requires2FA) {
+      return response;
+    }
+    
+    // Regular login - force refresh of user state
+    await this.bootstrap(true);
+    return response;
+  },
+
+  async verify2FA(token: string, tempToken: string) {
+    await verify2FA({ token, tempToken }); // throws on failure
+    // Force refresh of user state to complete login
     await this.bootstrap(true);
   },
 

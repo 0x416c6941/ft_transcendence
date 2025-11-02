@@ -150,10 +150,25 @@ export async function createUser(payload: CreateUserInput) {
  * @brief Logs in a user (server sets HttpOnly cookies).
  * @route POST /api/users/login
  * @param payload { username, password }
- * @returns void
+ * @returns { requires2FA?: boolean, tempToken?: string, message: string }
  */
-export async function login(payload: { username: string; password: string }): Promise<void> {
-        return request<void>("/api/users/login", {
+export async function login(payload: { username: string; password: string }): Promise<{ requires2FA?: boolean; tempToken?: string; message: string }> {
+        return request<{ requires2FA?: boolean; tempToken?: string; message: string }>("/api/users/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+                retryOn401: false
+        });
+}
+
+/**
+ * @brief Verifies 2FA token and completes login.
+ * @route POST /api/users/2fa/verify
+ * @param payload { token, tempToken }
+ * @returns { message }
+ */
+export async function verify2FA(payload: { token: string; tempToken: string }): Promise<{ message: string }> {
+        return request<{ message: string }>("/api/users/2fa/verify", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),

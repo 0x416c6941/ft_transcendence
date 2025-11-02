@@ -36,7 +36,9 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 				email TEXT NOT NULL UNIQUE COLLATE NOCASE,
 				display_name TEXT NOT NULL UNIQUE COLLATE NOCASE,
 				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-				account_id_42 INTEGER
+				account_id_42 INTEGER,
+				use_2fa BOOLEAN DEFAULT 0,
+				totp_secret TEXT
 			)
 		`, (err: Error | null) => {
 			if (err) {
@@ -46,6 +48,62 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 			}
 		});
 	});
+
+	// Migrate existing users table to add 2FA columns if they don't exist
+	await new Promise<void>((resolve, reject) => {
+		db.get(`PRAGMA table_info(users)`, (err: Error | null, rows: any) => {
+			if (err) {
+				reject(err);
+				return;
+			}
+			resolve();
+		});
+	});
+
+	// Add use_2fa column if it doesn't exist
+	await new Promise<void>((resolve, reject) => {
+		db.all(`PRAGMA table_info(users)`, (err: Error | null, columns: any[]) => {
+			if (err) {
+				reject(err);
+				return;
+			}
+			const hasUse2FA = columns.some(col => col.name === 'use_2fa');
+			if (!hasUse2FA) {
+				db.run(`ALTER TABLE users ADD COLUMN use_2fa BOOLEAN DEFAULT 0`, (err: Error | null) => {
+					if (err) {
+						reject(err);
+					} else {
+						resolve();
+					}
+				});
+			} else {
+				resolve();
+			}
+		});
+	});
+
+	// Add totp_secret column if it doesn't exist
+	await new Promise<void>((resolve, reject) => {
+		db.all(`PRAGMA table_info(users)`, (err: Error | null, columns: any[]) => {
+			if (err) {
+				reject(err);
+				return;
+			}
+			const hasTotpSecret = columns.some(col => col.name === 'totp_secret');
+			if (!hasTotpSecret) {
+				db.run(`ALTER TABLE users ADD COLUMN totp_secret TEXT`, (err: Error | null) => {
+					if (err) {
+						reject(err);
+					} else {
+						resolve();
+					}
+				});
+			} else {
+				resolve();
+			}
+		});
+	});
+
 	// Create `admins` table if it doesn't exist yet
 	await new Promise<void>((resolve, reject) => {
 		db.run(`
