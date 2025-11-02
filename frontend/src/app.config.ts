@@ -10,9 +10,8 @@ import LoginView from './views/LoginView.js';
 import ErrorView from './views/ErrorView.js';
 import FriendsView from './views/FriendsView.js';
 // Pong-related views.
-import PongView from './views/PongView.js';
-import CreateRoomView from './views/CreateRoomView.js';
-import JoinRoomView from './views/JoinRoomView.js';
+import PongRoomsView from './views/PongRoomsView.js';
+import PongTournamentView from './views/PongTournamentView.js';
 import PongLocalView from './views/PongLocalView.js';
 import PongAIView from './views/PongAIView.js';
 // Tetris-related views.
@@ -32,12 +31,12 @@ export const DIV_ID: string = "app";
  */
 export const PATHS_TO_ROUTE: PathToRegister[] = [
 	{ path: "/", constructor: HomeView },
-	{ path: "/pong", constructor: PongView },
 	{ path: "/login", constructor: LoginView, guard: 'guest' },
 	{ path: "/register", constructor: RegisterView, guard: 'guest' },
 	{ path: "/profile", constructor: ProfileView, guard: 'auth' },
-	{ path: '/rooms/new', constructor: CreateRoomView, guard: 'auth' },
-	{ path: '/rooms/join', constructor: JoinRoomView, guard: 'auth' },
+	// Tournament room functionality
+	{ path: '/tournament-room', constructor: PongRoomsView, guard: 'auth' },
+	{ path: '/tournament-lobby/:roomId', constructor: PongTournamentView, guard: 'auth' },
 	{ path: '/pong-local', constructor: PongLocalView },
 	{ path: '/pong-ai', constructor: PongAIView },
 	{ path: '/tetris', constructor: TetrisView },

@@ -26,14 +26,12 @@ async getHtml(): Promise<string> {
       <h1 class="text-5xl font-bold text-white mb-8 tracking-wide">Welcome to ${APP_NAME}</h1>
       <div class="flex flex-col gap-4 w-64">
         ${authControl}
-        <a href="/rooms/new" data-link
-           class="bg-green-600 text-white px-4 py-2 rounded shadow text-center">
-          Create Room
+        ${this.isLoggedIn ? `
+        <a href="/tournament-room" data-link
+           class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
+          Pong: Remote Game
         </a>
-        <a href="/rooms/join" data-link
-           class="bg-blue-600 text-white px-4 py-2 rounded shadow text-center">
-          Join Room
-        </a>
+        ` : ''}
         <a href="/pong-local" data-link
            class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
           Pong: Alias vs. Alias

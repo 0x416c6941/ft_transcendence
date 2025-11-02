@@ -12,6 +12,8 @@ const BALL_SIZE = 10;
 const TICK_HZ = 60;
 const WINNING_SCORE = 10;
 const AI_DECISION_INTERVAL_MS = 1000;
+const MAX_BOUNCE_ANGLE = Math.PI / 6;
+const SPEED_MULTIPLIER = 1.1;
 
 //TYPES
 // Game state types
@@ -195,25 +197,45 @@ async function step(room: Room, ns: Namespace, fastify: FastifyInstance): Promis
 
     // Player paddle collision
     if (
-        ball.x <= PADDLE_WIDTH &&
-        ball.y + BALL_SIZE >= room.gameState.paddles.playerY &&
-        ball.y <= room.gameState.paddles.playerY + PADDLE_HEIGHT
+        room.gameState.ball.x <= PADDLE_WIDTH &&
+        room.gameState.ball.y + BALL_SIZE >= room.gameState.paddles.playerY &&
+        room.gameState.ball.y <= room.gameState.paddles.playerY + PADDLE_HEIGHT
     ) {
-        ball.vx = Math.abs(ball.vx);
-        ball.x = PADDLE_WIDTH;
+        const paddleCenter = room.gameState.paddles.playerY + PADDLE_HEIGHT / 2;
+        const ballCenter = room.gameState.ball.y + BALL_SIZE / 2;
+        const deltaY = ballCenter - paddleCenter;
+        const normalizedDelta = deltaY / (PADDLE_HEIGHT / 2);
+        let bounceAngle = normalizedDelta * MAX_BOUNCE_ANGLE;
+        const randomOffset = (Math.random() - 0.5) * 0.2;
+        bounceAngle += randomOffset;
+        bounceAngle = clamp(bounceAngle, -MAX_BOUNCE_ANGLE, MAX_BOUNCE_ANGLE);
+        let speed = Math.sqrt(room.gameState.ball.vx ** 2 + room.gameState.ball.vy ** 2);
+        speed *= SPEED_MULTIPLIER;
+        room.gameState.ball.vx = speed * Math.cos(bounceAngle);
+        room.gameState.ball.vy = speed * Math.sin(bounceAngle);
+        room.gameState.ball.x = PADDLE_WIDTH;
     }
 
     // AI paddle collision
     if (
-        ball.x + BALL_SIZE >= WIDTH - PADDLE_WIDTH &&
-        ball.y + BALL_SIZE >= room.gameState.paddles.aiY &&
-        ball.y <= room.gameState.paddles.aiY + PADDLE_HEIGHT
+        room.gameState.ball.x + BALL_SIZE >= WIDTH - PADDLE_WIDTH &&
+        room.gameState.ball.y + BALL_SIZE >= room.gameState.paddles.aiY &&
+        room.gameState.ball.y <= room.gameState.paddles.aiY + PADDLE_HEIGHT
     ) {
-        ball.vx = -Math.abs(ball.vx);
-        ball.x = WIDTH - PADDLE_WIDTH - BALL_SIZE;
-    }
-
-    // Goals
+        const paddleCenter = room.gameState.paddles.aiY + PADDLE_HEIGHT / 2;
+        const ballCenter = room.gameState.ball.y + BALL_SIZE / 2;
+        const deltaY = ballCenter - paddleCenter;
+        const normalizedDelta = deltaY / (PADDLE_HEIGHT / 2);
+        let bounceAngle = normalizedDelta * MAX_BOUNCE_ANGLE;
+        const randomOffset = (Math.random() - 0.5) * 0.2;
+        bounceAngle += randomOffset;
+        bounceAngle = clamp(bounceAngle, -MAX_BOUNCE_ANGLE, MAX_BOUNCE_ANGLE);
+        let speed = Math.sqrt(room.gameState.ball.vx ** 2 + room.gameState.ball.vy ** 2);
+        speed *= SPEED_MULTIPLIER;
+        room.gameState.ball.vx = -speed * Math.cos(bounceAngle);
+        room.gameState.ball.vy = speed * Math.sin(bounceAngle);
+        room.gameState.ball.x = WIDTH - PADDLE_WIDTH - BALL_SIZE;
+    }    // Goals
     if (ball.x < 0) {
         room.gameState.score.ai++;
         resetBall(room, 1);
