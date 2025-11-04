@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { Server, Socket } from 'socket.io';
 import * as bcrypt from 'bcrypt';
+import { saveGameRecord, GameRecord } from './utils/gameStats.js';
 
 //CONSTANTS
 const WIDTH = 640;
@@ -58,6 +59,7 @@ interface Room {
     currentPlayer1: string | null;
     currentPlayer2: string | null;
     currentGameState: GameState | null;
+    currentMatchStartedAt: string | null;
 }
 
 //GLOBAL STATE
@@ -243,6 +245,7 @@ async function createRoom(name: string, password: string, creatorSocket: Socket,
         currentPlayer1: null,
         currentPlayer2: null,
         currentGameState: null,
+        currentMatchStartedAt: null,
     };
 
     rooms.set(roomId, room);
@@ -422,7 +425,7 @@ function selectRandomPlayers(roomId: string): { player1: string; player2: string
 }
 
 // Select players (if not already selected) and start the game loop
-function startMatch(roomId: string, io: Server): boolean {
+function startMatch(roomId: string, io: Server, fastify: FastifyInstance): boolean {
     const room = rooms.get(roomId);
     if (!room) return false;
 
@@ -438,6 +441,7 @@ function startMatch(roomId: string, io: Server): boolean {
     room.currentPlayer1 = players.player1;
     room.currentPlayer2 = players.player2;
     room.currentGameState = gameState;
+    room.currentMatchStartedAt = new Date().toISOString();
 
     room.gameActive = true;
     gameActivities.set(roomId, true);
@@ -462,7 +466,7 @@ function startMatch(roomId: string, io: Server): boolean {
 
         const gameEnded = step(roomId, io);
         if (gameEnded) {
-            handleMatchEnd(roomId, io);
+            handleMatchEnd(roomId, io, fastify);
         }
     }, 1000 / TICK_HZ);
 
@@ -486,14 +490,37 @@ function stopMatch(roomId: string): void {
     }
 }
 
-function handleMatchEnd(roomId: string, io: Server): void {
+function handleMatchEnd(roomId: string, io: Server, fastify: FastifyInstance): void {
     const room = rooms.get(roomId);
     const gameState = gameStates.get(roomId);
     if (!room || !room.currentPlayer1 || !room.currentPlayer2 || !gameState) return;
 
+    // Save match result to database
+    const p1 = room.players.find(p => p.socketId === room.currentPlayer1);
+    const p2 = room.players.find(p => p.socketId === room.currentPlayer2);
+    const leftWon = gameState.score.left > gameState.score.right;
+    const winnerName = leftWon ? (p1?.displayName || 'Player 1') : (p2?.displayName || 'Player 2');
+
+    if (room.currentMatchStartedAt && p1 && p2) {
+        const gameRecord: GameRecord = {
+            game_name: 'Pong Tournament',
+            started_at: room.currentMatchStartedAt,
+            finished_at: new Date().toISOString(),
+            player1_name: p1.displayName,
+            player1_is_user: true,
+            player2_name: p2.displayName,
+            player2_is_user: true,
+            winner: winnerName
+        };
+
+        // Save game record asynchronously
+        saveGameRecord(fastify, gameRecord).catch(error => {
+            fastify.log.error('Failed to save tournament match record:', error);
+        });
+    }
+
     stopMatch(roomId);
 
-    const leftWon = gameState.score.left > gameState.score.right;
     const loserSocketId = leftWon ? room.currentPlayer2 : room.currentPlayer1;
 
     const loser = room.players.find(p => p.socketId === loserSocketId);
@@ -507,8 +534,10 @@ function handleMatchEnd(roomId: string, io: Server): void {
         room.currentPlayer1 = null;
         room.currentPlayer2 = null;
         room.currentGameState = null;
+        room.currentMatchStartedAt = null;
 
         const winner = activePlayers[0];
+        
         io.to(roomId).emit('tournament_finished', {
             winner: winner.displayName,
             room: {
@@ -525,6 +554,7 @@ function handleMatchEnd(roomId: string, io: Server): void {
         room.currentPlayer1 = null;
         room.currentPlayer2 = null;
         room.currentGameState = null;
+        room.currentMatchStartedAt = null;
 
         io.to(roomId).emit('match_ended', {
             loser: loser?.displayName,
@@ -538,12 +568,12 @@ function handleMatchEnd(roomId: string, io: Server): void {
         });
 
         // Announce next match immediately and start after countdown
-        announceAndScheduleMatch(roomId, io, 3000, false);
+        announceAndScheduleMatch(roomId, io, fastify, 3000, false);
     }
 }
 
 // Announces upcoming match, shows who plays who, then starts after delayMs
-function announceAndScheduleMatch(roomId: string, io: Server, delayMs: number = 3000, isFirstMatch: boolean = false): boolean {
+function announceAndScheduleMatch(roomId: string, io: Server, fastify: FastifyInstance, delayMs: number = 3000, isFirstMatch: boolean = false): boolean {
     const room = rooms.get(roomId);
     if (!room) return false;
 
@@ -571,7 +601,7 @@ function announceAndScheduleMatch(roomId: string, io: Server, delayMs: number = 
     });
 
     setTimeout(() => {
-        const started = startMatch(roomId, io);
+        const started = startMatch(roomId, io, fastify);
         if (started) {
             const payload = {
                 room: {
@@ -774,7 +804,7 @@ export function setupTournamentPong(fastify: FastifyInstance, io: Server): void 
 
             room.status = 'in_progress';
             // Announce first match and start after a visible 3s countdown
-            const scheduled = announceAndScheduleMatch(roomId, io, 3000, true);
+            const scheduled = announceAndScheduleMatch(roomId, io, fastify, 3000, true);
             if (!scheduled) {
                 socket.emit('tournament_error', { error: 'Failed to schedule match' });
             }
