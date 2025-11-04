@@ -317,11 +317,6 @@ export default class FriendsView extends AbstractView {
 
 		this.applyStatusUI(node, friend.isOnline);
 
-		// row click → navigate
-		node.addEventListener("click", () => {
-			this.router.navigate(`/stats/${friend.username}`);
-		});
-
 		// remove (stop navigation)
 		removeBtn.addEventListener("click", async (e) => {
 			e.stopPropagation();
