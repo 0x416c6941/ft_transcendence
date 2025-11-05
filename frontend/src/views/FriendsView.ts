@@ -34,6 +34,7 @@ export default class FriendsView extends AbstractView {
 	private aborter?: AbortController;
   	private avatarObjectUrls: Set<string> = new Set();
 
+	private mounted = false;
 	// Socket + online state
 	private socket: any = io;
 	private onlineUserIds: Set<number> = new Set();
@@ -237,6 +238,7 @@ export default class FriendsView extends AbstractView {
 	}
 
 	private showMsg(msg: string, type: "info" | "ok" | "err" = "info") {
+		if (!this.mounted || !this.refs?.status) return;
 		const colors = {
 			info: "text-blue-500",
 			ok: "text-green-500",
@@ -368,6 +370,7 @@ export default class FriendsView extends AbstractView {
 			this.showMsg("Loading friends…", "info");
 
 			const friends = await this.apiList();       // fetch from backend
+			if (!this.mounted) return;		       // guard mounted
 			this.renderList(friends);                   // update DOM
 			this.refreshOnlineDots();		    // update online status
 
@@ -395,6 +398,7 @@ export default class FriendsView extends AbstractView {
 
 	setup(): void {
 		// init abort controller for this view
+		this.mounted = true;
 		this.aborter = new AbortController();
 
 		// collect refs
@@ -422,9 +426,10 @@ export default class FriendsView extends AbstractView {
 
 			try {
 				await addFriend(username);
+				if (!this.mounted) return;
 				this.refs.input.value = "";
 
-				// simplest + reliable: re-fetch from server
+				// re-fetch from server
 				await this.loadFriends();
 				this.showMsg(`Added @${username}`, "ok");
 			} catch (err) {
@@ -433,7 +438,7 @@ export default class FriendsView extends AbstractView {
 					"err"
 				);
 			} finally {
-				btn.disabled = false;
+				if (this.mounted) btn.disabled = false;
 			}
 		};
 
@@ -446,6 +451,8 @@ export default class FriendsView extends AbstractView {
 
 
 	cleanup(): void {
+		this.mounted = false;
+
 		try {
 			// Remove event listeners (only if refs were initialized)
 			if (this.refs?.form && this.onFormSubmit) {
@@ -482,7 +489,7 @@ export default class FriendsView extends AbstractView {
 			this.avatarObjectUrls.clear();
 		}
 
-		// Optional: clear DOM refs
+		// clear DOM refs
 		this.refs = undefined as any;
 		console.debug("[FriendsView] cleanup completed");
 	}
