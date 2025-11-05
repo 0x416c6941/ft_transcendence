@@ -51,7 +51,7 @@ export default class RegisterView extends AbstractView {
                 >Display name</label
               >
               <input
-                class="w-full border rounded p-2"
+                class="w-full border rounded p-2 bg-white text-black dark:bg-neutral-900 dark:text-white"
                 type="text"
                 id="nickname"
                 name="nickname"
@@ -78,7 +78,7 @@ export default class RegisterView extends AbstractView {
             <div class="mb-4">
               <label class="txt-light-dark-sans" for="username">Username</label>
               <input
-                class="w-full border rounded p-2"
+                class="w-full border rounded p-2 bg-white text-black dark:bg-neutral-900 dark:text-white"
                 type="text"
                 id="username"
                 name="username"
@@ -105,7 +105,7 @@ export default class RegisterView extends AbstractView {
             <div class="mb-4">
               <label class="txt-light-dark-sans" for="email">Email</label>
               <input
-                class="w-full border rounded p-2"
+                class="w-full border rounded p-2 bg-white text-black dark:bg-neutral-900 dark:text-white"
                 type="email"
                 id="email"
                 name="email"
@@ -126,7 +126,7 @@ export default class RegisterView extends AbstractView {
             <div class="mb-4">
               <label class="txt-light-dark-sans" for="password">Password</label>
               <input
-                class="w-full border rounded p-2"
+                class="w-full border rounded p-2 bg-white text-black dark:bg-neutral-900 dark:text-white"
                 type="password"
                 id="password"
                 name="password"
@@ -266,7 +266,7 @@ export default class RegisterView extends AbstractView {
 
       try {
         const response = await createUser(payload);
-        
+
         // Check if 2FA was enabled
         if (use2FA && (response as any).requires2FA) {
           // Fetch QR code
@@ -355,14 +355,14 @@ export default class RegisterView extends AbstractView {
   private async show2FASetup(username: string): Promise<void> {
     try {
       const response = await fetch(`https://localhost/api/users/2fa/setup?username=${encodeURIComponent(username)}`);
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to fetch 2FA setup');
       }
 
       const data = await response.json();
-      
+
       const modal = document.getElementById("twofa-modal");
       const qrImage = document.getElementById("qr-code-image") as HTMLImageElement;
       const secretText = document.getElementById("secret-text");
