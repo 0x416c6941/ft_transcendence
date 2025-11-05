@@ -80,7 +80,7 @@ export const AddFriendSchema = {
 		},
 		400: {
 			description: 'User tried to add themselves as a friend',
-			$ref: 'MessageResponse#'
+			$ref: 'ErrorResponse#'
 		},
 		401: {
 			description: "JWT token is valid, however user's been already removed from the system",
