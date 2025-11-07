@@ -117,8 +117,12 @@ export async function getPlayerStats(username: string): Promise<PlayerStats> {
 	return response.json();
 }
 
-export async function getActivity(days: number = 7): Promise<ActivityData> {
-	const response = await fetch(`${BASE_URL}/stats/activity?days=${days}`, {
+export async function getActivity(days: number = 7, game?: string): Promise<ActivityData> {
+	const params = new URLSearchParams();
+	params.append('days', days.toString());
+	if (game) params.append('game', game);
+
+	const response = await fetch(`${BASE_URL}/stats/activity?${params}`, {
 		method: 'GET',
 		credentials: 'include'
 	});

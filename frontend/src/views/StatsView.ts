@@ -435,7 +435,7 @@ export default class StatsView extends AbstractView {
 		const activityDays = document.getElementById('activity-days') as HTMLSelectElement;
 		const days = activityDays ? parseInt(activityDays.value) : 7;
 		
-		this.activityData = await getActivity(days);
+		this.activityData = await getActivity(days, this.selectedGame || undefined);
 		this.renderActivityChart();
 	}
 

@@ -16,12 +16,31 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 				params.push(`%${game.toLowerCase()}%`);
 			}
 
-			// Total users
+			// Total users (distinct players who played games matching the filter)
 			const totalUsers = await new Promise<number>((resolve, reject) => {
-				fastify.sqlite.get('SELECT COUNT(*) as count FROM users', (err: Error | null, row: any) => {
-					if (err) reject(err);
-					else resolve(row.count);
-				});
+				if (game) {
+					// Count distinct players who played the filtered game type
+					const query = `
+						SELECT COUNT(DISTINCT player_name) as count 
+						FROM (
+							SELECT player1_name as player_name FROM games 
+							WHERE finished_at IS NOT NULL AND player1_is_user = 1${gameFilter}
+							UNION
+							SELECT player2_name as player_name FROM games 
+							WHERE finished_at IS NOT NULL AND player2_is_user = 1${gameFilter}
+						)
+					`;
+					fastify.sqlite.get(query, [params[0], params[0]], (err: Error | null, row: any) => {
+						if (err) reject(err);
+						else resolve(row.count);
+					});
+				} else {
+					// No filter: count all users in database
+					fastify.sqlite.get('SELECT COUNT(*) as count FROM users', (err: Error | null, row: any) => {
+						if (err) reject(err);
+						else resolve(row.count);
+					});
+				}
 			});
 
 			// Total games played
@@ -285,23 +304,32 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 
 	// Get activity timeline (games over time)
 	fastify.get('/stats/activity', async (request: FastifyRequest<{
-		Querystring: { days?: string }
+		Querystring: { days?: string; game?: string }
 	}>, reply: FastifyReply) => {
 		try {
-			const { days = '7' } = request.query;
+			const { days = '7', game } = request.query;
 			const daysNum = Math.min(parseInt(days) || 7, 90);
 
+			// Build game filter clause
+			let gameFilter = '';
+			const params: any[] = [];
+			if (game) {
+				gameFilter = ' AND LOWER(game_name) LIKE ?';
+				params.push(`%${game.toLowerCase()}%`);
+			}
+
 			const activity = await new Promise<any[]>((resolve, reject) => {
-				fastify.sqlite.all(`
+				const query = `
 					SELECT 
 						DATE(finished_at) as date,
 						COUNT(*) as games_played
 					FROM games
 					WHERE finished_at IS NOT NULL
-					AND datetime(finished_at) >= datetime('now', '-${daysNum} days')
+					AND datetime(finished_at) >= datetime('now', '-${daysNum} days')${gameFilter}
 					GROUP BY DATE(finished_at)
 					ORDER BY date ASC
-				`, (err: Error | null, rows: any[]) => {
+				`;
+				fastify.sqlite.all(query, params, (err: Error | null, rows: any[]) => {
 					if (err) reject(err);
 					else resolve(rows);
 				});
