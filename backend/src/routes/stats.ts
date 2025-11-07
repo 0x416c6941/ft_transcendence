@@ -86,9 +86,9 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 			const params: any[] = [];
 
 			if (game) {
-				gameFilter1 = ' AND game_name = ?';
-				gameFilter2 = ' AND game_name = ?';
-				params.push(game, game); // Once for each UNION part
+				gameFilter1 = ' AND LOWER(game_name) LIKE ?';
+				gameFilter2 = ' AND LOWER(game_name) LIKE ?';
+				params.push(`%${game.toLowerCase()}%`, `%${game.toLowerCase()}%`); // Once for each UNION part
 			}
 
 			const query = `
@@ -168,13 +168,13 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 			`;
 
 			if (game) {
-				query += ` AND game_name = ?`;
+				query += ` AND LOWER(game_name) LIKE ?`;
 			}
 
 			query += ` ORDER BY finished_at DESC LIMIT ?`;
 
 			const games = await new Promise<any[]>((resolve, reject) => {
-				const params = game ? [game, limitNum] : [limitNum];
+				const params = game ? [`%${game.toLowerCase()}%`, limitNum] : [limitNum];
 				fastify.sqlite.all(query, params, (err: Error | null, rows: any[]) => {
 					if (err) reject(err);
 					else resolve(rows);
