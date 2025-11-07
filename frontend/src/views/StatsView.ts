@@ -275,7 +275,7 @@ export default class StatsView extends AbstractView {
 	}
 
 	private async loadOverview(): Promise<void> {
-		this.stats = await getOverviewStats();
+		this.stats = await getOverviewStats(this.selectedGame || undefined);
 
 		// Update stat cards
 		const statUsers = document.getElementById('stat-users');

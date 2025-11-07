@@ -50,8 +50,12 @@ export interface ActivityData {
 	days: number;
 }
 
-export async function getOverviewStats(): Promise<OverviewStats> {
-	const response = await fetch(`${BASE_URL}/stats/overview`, {
+export async function getOverviewStats(game?: string): Promise<OverviewStats> {
+	const params = new URLSearchParams();
+	if (game) params.append('game', game);
+
+	const url = `${BASE_URL}/stats/overview${params.toString() ? '?' + params : ''}`;
+	const response = await fetch(url, {
 		method: 'GET',
 		credentials: 'include'
 	});

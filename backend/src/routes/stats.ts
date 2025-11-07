@@ -2,8 +2,20 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 
 export default async function statsRoutes(fastify: FastifyInstance) {
 	// Get overall statistics
-	fastify.get('/stats/overview', async (request: FastifyRequest, reply: FastifyReply) => {
+	fastify.get('/stats/overview', async (request: FastifyRequest<{
+		Querystring: { game?: string }
+	}>, reply: FastifyReply) => {
 		try {
+			const { game } = request.query;
+
+			// Build game filter clause
+			let gameFilter = '';
+			const params: any[] = [];
+			if (game) {
+				gameFilter = ' AND LOWER(game_name) LIKE ?';
+				params.push(`%${game.toLowerCase()}%`);
+			}
+
 			// Total users
 			const totalUsers = await new Promise<number>((resolve, reject) => {
 				fastify.sqlite.get('SELECT COUNT(*) as count FROM users', (err: Error | null, row: any) => {
@@ -14,7 +26,8 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 
 			// Total games played
 			const totalGames = await new Promise<number>((resolve, reject) => {
-				fastify.sqlite.get('SELECT COUNT(*) as count FROM games WHERE finished_at IS NOT NULL', (err: Error | null, row: any) => {
+				const query = `SELECT COUNT(*) as count FROM games WHERE finished_at IS NOT NULL${gameFilter}`;
+				fastify.sqlite.get(query, params, (err: Error | null, row: any) => {
 					if (err) reject(err);
 					else resolve(row.count);
 				});
@@ -22,41 +35,35 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 
 			// Games by type
 			const gamesByType = await new Promise<any[]>((resolve, reject) => {
-				fastify.sqlite.all(
-					'SELECT game_name, COUNT(*) as count FROM games WHERE finished_at IS NOT NULL GROUP BY game_name',
-					(err: Error | null, rows: any[]) => {
-						if (err) reject(err);
-						else resolve(rows);
-					}
-				);
+				const query = `SELECT game_name, COUNT(*) as count FROM games WHERE finished_at IS NOT NULL${gameFilter} GROUP BY game_name`;
+				fastify.sqlite.all(query, params, (err: Error | null, rows: any[]) => {
+					if (err) reject(err);
+					else resolve(rows);
+				});
 			});
 
 			// Games in last 24 hours
 			const recentGames = await new Promise<number>((resolve, reject) => {
-				fastify.sqlite.get(
-					`SELECT COUNT(*) as count FROM games 
+				const query = `SELECT COUNT(*) as count FROM games 
 					WHERE finished_at IS NOT NULL 
-					AND datetime(finished_at) >= datetime('now', '-1 day')`,
-					(err: Error | null, row: any) => {
-						if (err) reject(err);
-						else resolve(row.count);
-					}
-				);
+					AND datetime(finished_at) >= datetime('now', '-1 day')${gameFilter}`;
+				fastify.sqlite.get(query, params, (err: Error | null, row: any) => {
+					if (err) reject(err);
+					else resolve(row.count);
+				});
 			});
 
 			// Average game duration
 			const avgDuration = await new Promise<number>((resolve, reject) => {
-				fastify.sqlite.get(
-					`SELECT AVG(
+				const query = `SELECT AVG(
 						(julianday(finished_at) - julianday(started_at)) * 24 * 60
 					) as avg_minutes
 					FROM games 
-					WHERE finished_at IS NOT NULL`,
-					(err: Error | null, row: any) => {
-						if (err) reject(err);
-						else resolve(row.avg_minutes ? Math.round(row.avg_minutes * 10) / 10 : 0);
-					}
-				);
+					WHERE finished_at IS NOT NULL${gameFilter}`;
+				fastify.sqlite.get(query, params, (err: Error | null, row: any) => {
+					if (err) reject(err);
+					else resolve(row.avg_minutes ? Math.round(row.avg_minutes * 10) / 10 : 0);
+				});
 			});
 
 			return reply.send({
