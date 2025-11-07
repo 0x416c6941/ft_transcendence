@@ -2,6 +2,7 @@ import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 import { io } from '../socket.js';
+import { validateRoomField } from '../utils/validators.js';
 
 export default class PongRoomsView extends AbstractView {
     private roomsList: Array<{ name: string; playerCount: number; maxPlayers: number; hasPassword: boolean; status: string }> = [];
@@ -29,9 +30,7 @@ export default class PongRoomsView extends AbstractView {
                                     type="text"
                                     id="room-name"
                                     name="room-name"
-                                    maxlength="64"
-                                    pattern="[A-Za-z0-9_]+"
-                                    title="Only letters, numbers and underscore allowed (max 64 characters)"
+                                    maxlength="15"
                                     class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                                     placeholder="Enter room name"
                                     required
@@ -45,9 +44,7 @@ export default class PongRoomsView extends AbstractView {
                                     type="password"
                                     id="room-password"
                                     name="room-password"
-                                    maxlength="64"
-                                    pattern="[A-Za-z0-9_]*"
-                                    title="Only letters, numbers and underscore allowed (max 64 characters)"
+                                    maxlength="16"
                                     class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                                     placeholder="Enter password (if required)"
                                 />
@@ -59,7 +56,8 @@ export default class PongRoomsView extends AbstractView {
                             <button
                                 type="button"
                                 id="enter-room-btn"
-                                class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 opacity-50 cursor-not-allowed"
+                                disabled
                             >
                                 Enter Room
                             </button>
@@ -88,9 +86,11 @@ export default class PongRoomsView extends AbstractView {
     }
 
     setup(): void {
-        const enterRoomBtn = document.getElementById('enter-room-btn');
+        const enterRoomBtn = document.getElementById('enter-room-btn') as HTMLButtonElement;
         const backBtn = document.getElementById('back-btn');
         const errorMessage = document.getElementById('error-message');
+        const roomNameInput = document.getElementById('room-name') as HTMLInputElement;
+        const passwordInput = document.getElementById('room-password') as HTMLInputElement;
 
         this.loadRoomsList();
 
@@ -100,54 +100,45 @@ export default class PongRoomsView extends AbstractView {
 
         (this as any).refreshInterval = refreshInterval;
 
-        const validateInputs = (): { isValid: boolean; roomName: string; password: string } => {
-            const roomNameInput = document.getElementById('room-name') as HTMLInputElement;
-            const passwordInput = document.getElementById('room-password') as HTMLInputElement;
+        const handleValidation = () => {
+            const roomNameResult = validateRoomField(roomNameInput.value, 'Room name');
+            const passwordResult = validateRoomField(passwordInput.value, 'Password');
 
-            const roomName = roomNameInput.value.trim();
-            const password = passwordInput.value.trim();
-
-            errorMessage?.classList.add('hidden');
-
-            if (!roomName) {
-                this.showError('Room name is required');
-                return { isValid: false, roomName: '', password: '' };
+            let finalError: string | null = null;
+            if (!roomNameResult.status) {
+                finalError = roomNameResult.err_msg;
+            } else if (!passwordResult.status) {
+                finalError = passwordResult.err_msg;
             }
 
-            if (roomName.length > 64) {
-                this.showError('Room name must be 64 characters or less');
-                return { isValid: false, roomName: '', password: '' };
+            if (finalError) {
+                this.showError(finalError);
+                enterRoomBtn.disabled = true;
+                enterRoomBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                errorMessage?.classList.add('hidden');
+                enterRoomBtn.disabled = false;
+                enterRoomBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             }
-
-            if (!/^[A-Za-z0-9_]+$/.test(roomName)) {
-                this.showError('Room name can only contain letters, numbers and underscore');
-                return { isValid: false, roomName: '', password: '' };
-            }
-
-            if (password && password.length > 64) {
-                this.showError('Password must be 64 characters or less');
-                return { isValid: false, roomName: '', password: '' };
-            }
-
-            if (password && !/^[A-Za-z0-9_]*$/.test(password)) {
-                this.showError('Password can only contain letters, numbers and underscore');
-                return { isValid: false, roomName: '', password: '' };
-            }
-
-            return { isValid: true, roomName, password };
         };
 
+        roomNameInput.addEventListener('input', handleValidation);
+        passwordInput.addEventListener('input', handleValidation);
+
         enterRoomBtn?.addEventListener('click', () => {
-            const { isValid, roomName, password } = validateInputs();
-            if (isValid) {
-                this.enterRoom(roomName, password);
-            }
+            handleValidation();
+            if (enterRoomBtn.disabled) return;
+            
+            this.enterRoom(roomNameInput.value.trim(), passwordInput.value.trim());
         });
 
         // Back button handler
         backBtn?.addEventListener('click', () => {
             this.router.navigate('/');
         });
+
+        // Initial validation
+        handleValidation();
     }
 
     private showError(message: string): void {

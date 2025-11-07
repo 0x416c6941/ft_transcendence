@@ -2,6 +2,10 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import bcrypt from 'bcrypt';
 import { generateAccessToken, generateRefreshToken, verifyToken } from '../src/utils/jwt.js';
 import { authenticateToken } from '../src/middleware/auth.js';
+import {
+	validateAndNormalizeRegistrationPayload,
+	RegistrationValidationError
+} from '../src/utils/registrationValidation.js';
 
 const SALT_ROUNDS = 10;
 
@@ -40,14 +44,17 @@ export default async function userRoutesNoSchema(fastify: FastifyInstance) {
 	fastify.post<{ Body: CreateUserBody }>(
 		'/users',
 		async (request: FastifyRequest<{ Body: CreateUserBody }>, reply: FastifyReply) => {
-			const { username, password, email, display_name } = request.body;
-
-			// Validate required fields
-			if (!username || !password || !email || !display_name) {
-				return reply.code(400).send({
-					error: 'Missing required fields: username, password, email, display_name'
-				});
+			let normalizedPayload;
+			try {
+				normalizedPayload = validateAndNormalizeRegistrationPayload(request.body);
+			} catch (err: unknown) {
+				if (err instanceof RegistrationValidationError) {
+					return reply.code(400).send({ error: 'Invalid registration data', details: err.messages });
+				}
+				throw err;
 			}
+
+			const { username, password, email, display_name, use_2fa } = normalizedPayload;
 
 			try {
 				// Hash the password
@@ -56,8 +63,8 @@ export default async function userRoutesNoSchema(fastify: FastifyInstance) {
 				// Insert user into database
 				await new Promise<void>((resolve, reject) => {
 					(fastify as any).sqlite.run(
-						`INSERT INTO users (username, password, email, display_name) VALUES (?, ?, ?, ?)`,
-						[username, hashedPassword, email, display_name],
+						`INSERT INTO users (username, password, email, display_name, use_2fa) VALUES (?, ?, ?, ?, ?)`,
+						[username, hashedPassword, email, display_name, use_2fa ? 1 : 0],
 						function (this: any, err: Error | null) {
 							if (err) {
 								reject(err);
@@ -70,7 +77,8 @@ export default async function userRoutesNoSchema(fastify: FastifyInstance) {
 
 				return reply.code(201).send({
 					message: 'User created successfully',
-					username: username
+					username: username,
+					requires2FA: use_2fa || false
 				});
 			} catch (err: any) {
 				if (err.message.includes('UNIQUE constraint failed')) {

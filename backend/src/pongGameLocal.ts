@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { Server, Socket, Namespace } from 'socket.io';
 import { saveGameRecord, isSocketAuthenticated, GameRecord } from './utils/gameStats.js';
+import { validateGameAlias } from './utils/validation.js';
 
 //CONSTANTS
 const WIDTH = 640;
@@ -244,8 +245,26 @@ export function setupPongGameLocal(fastify: FastifyInstance, io: Server): void {
             const room = rooms.get(roomId);
             if (!room || room.player !== socket.id) return;
             if (room.gameActive) return;
-            room.leftAlias = data.leftAlias;
-            room.rightAlias = data.rightAlias;
+
+            const leftRes = validateGameAlias(data.leftAlias);
+            if (!leftRes.valid) {
+                socket.emit('validation_error', { code: 'invalid_alias', field: 'leftAlias', message: leftRes.error });
+                return;
+            }
+
+            const rightRes = validateGameAlias(data.rightAlias);
+            if (!rightRes.valid) {
+                socket.emit('validation_error', { code: 'invalid_alias', field: 'rightAlias', message: rightRes.error });
+                return;
+            }
+
+            if (leftRes.value.toLowerCase() === rightRes.value.toLowerCase()) {
+                socket.emit('validation_error', { code: 'aliases_same', field: 'rightAlias', message: 'Aliases must be different.' });
+                return;
+            }
+
+            room.leftAlias = leftRes.value;
+            room.rightAlias = rightRes.value;
             room.gameActive = true;
             room.status = 'in_progress';
             resetGameState(room);

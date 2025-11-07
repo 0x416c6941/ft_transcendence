@@ -23,11 +23,36 @@ export const userSchemas = [
 		$id: 'CreateUserRequest',
 		type: 'object',
 		required: ['username', 'password', 'email', 'display_name'],
+		additionalProperties: false,
 		properties: {
-			username: { type: 'string', description: 'Unique username' },
-			password: { type: 'string', format: 'password', description: 'User password (will be hashed)' },
-			email: { type: 'string', format: 'email', description: 'User email address' },
-			display_name: { type: 'string', description: 'Display name' },
+			username: {
+				type: 'string',
+				minLength: 3,
+				maxLength: 20,
+				pattern: '^[a-zA-Z0-9_]+$',
+				description: 'Unique username; 3–20 letters, numbers, or underscores'
+			},
+			password: {
+				type: 'string',
+				minLength: 8,
+				maxLength: 16,
+				pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,16}$',
+				format: 'password',
+				description: 'User password (will be hashed); 8–16 chars with upper, lower, and number'
+			},
+			email: {
+				type: 'string',
+				format: 'email',
+				maxLength: 254,
+				description: 'User email address'
+			},
+			display_name: {
+				type: 'string',
+				minLength: 1,
+				maxLength: 20,
+				pattern: '^[a-zA-Z0-9_]+$',
+				description: 'Display name; 1–20 letters, numbers, or underscores'
+			},
 			use_2fa: { type: 'boolean', description: 'Enable two-factor authentication' }
 		}
 	},

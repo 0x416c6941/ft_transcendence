@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { Server, Socket } from 'socket.io';
 import * as bcrypt from 'bcrypt';
 import { saveGameRecord, GameRecord } from './utils/gameStats.js';
+import { validateRoomName, validateRoomPassword } from './utils/validation.js';
 
 //CONSTANTS
 const WIDTH = 640;
@@ -67,7 +68,6 @@ const rooms = new Map<string, Room>();
 const roomsByName = new Map<string, string>(); // name -> roomId
 const gameStates = new Map<string, GameState>(); // roomId -> gameState
 const gameLoops = new Map<string, ReturnType<typeof setInterval>>(); // roomId -> interval
-const gameActivities = new Map<string, boolean>(); // roomId -> isActive
 const playerInputs = new Map<string, InputState>(); // key: `${roomId}:${socketId}`
 
 //HELPERS
@@ -196,7 +196,6 @@ function step(roomId: string, io: Server): boolean {
     // Check for game end
     if (gameState.score.left >= WINNING_SCORE || 
         gameState.score.right >= WINNING_SCORE) {
-        gameActivities.set(roomId, false);
         const winner = gameState.score.left >= WINNING_SCORE ? 'left' : 'right';
         io.to(roomId).emit('game_end', { winner });
         return true; // Game ended
@@ -444,7 +443,6 @@ function startMatch(roomId: string, io: Server, fastify: FastifyInstance): boole
     room.currentMatchStartedAt = new Date().toISOString();
 
     room.gameActive = true;
-    gameActivities.set(roomId, true);
 
     const gameLoop = setInterval(() => {
         if (!room.gameActive || !room.currentPlayer1 || !room.currentPlayer2) {
@@ -482,7 +480,6 @@ function stopMatch(roomId: string): void {
     }
 
     gameStates.delete(roomId);
-    gameActivities.set(roomId, false);
 
     const room = rooms.get(roomId);
     if (room) {
@@ -641,17 +638,19 @@ export function setupTournamentPong(fastify: FastifyInstance, io: Server): void 
 
         socket.on('enter_tournament_room', async (data: { name: string; password: string }, callback: (result: { success: boolean; roomId?: string; error?: string }) => void) => {
             try {
-                const { name, password } = data;
-
-                if (!name || name.length > 64 || !/^[A-Za-z0-9_]+$/.test(name)) {
-                    callback({ success: false, error: 'Invalid room name' });
+                const nameValidation = validateRoomName(data.name);
+                if (!nameValidation.valid) {
+                    callback({ success: false, error: `Invalid room name: ${nameValidation.error}` });
+                    return;
+                }
+                const passwordValidation = validateRoomPassword(data.password);
+                if (!passwordValidation.valid) {
+                    callback({ success: false, error: `Invalid password: ${passwordValidation.error}` });
                     return;
                 }
 
-                if (password && (password.length > 64 || !/^[A-Za-z0-9_]*$/.test(password))) {
-                    callback({ success: false, error: 'Invalid password' });
-                    return;
-                }
+                const name = nameValidation.value;
+                const password = passwordValidation.value;
 
                 const joinResult = await joinRoom(name, password || '', socket, fastify);
 
@@ -696,75 +695,6 @@ export function setupTournamentPong(fastify: FastifyInstance, io: Server): void 
                 }
             } catch (error) {
                 fastify.log.error({ error }, 'Error entering tournament room');
-                callback({ success: false, error: 'Server error' });
-            }
-        });
-
-        socket.on('create_tournament_room', async (data: { name: string; password: string }, callback: (result: { success: boolean; roomId?: string; error?: string }) => void) => {
-            try {
-                const { name, password } = data;
-
-                if (!name || name.length > 64 || !/^[A-Za-z0-9_]+$/.test(name)) {
-                    callback({ success: false, error: 'Invalid room name' });
-                    return;
-                }
-
-                if (password && (password.length > 64 || !/^[A-Za-z0-9_]*$/.test(password))) {
-                    callback({ success: false, error: 'Invalid password' });
-                    return;
-                }
-
-                const result = await createRoom(name, password || '', socket, fastify);
-
-                if (result.success && result.roomId) {
-                    socket.join(result.roomId);
-                    const room = getRoom(result.roomId);
-
-                    callback({ success: true, roomId: result.roomId });
-
-                    socket.emit('tournament_room_state', {
-                        room: {
-                            id: room!.id,
-                            name: room!.name,
-                            creator: room!.creator,
-                            players: room!.players,
-                            status: room!.status,
-                        }
-                    });
-                } else {
-                    callback({ success: false, error: result.error });
-                }
-            } catch (error) {
-                fastify.log.error({ error }, 'Error creating tournament room');
-                callback({ success: false, error: 'Server error' });
-            }
-        });
-
-        socket.on('join_tournament_room', async (data: { name: string; password: string }, callback: (result: { success: boolean; roomId?: string; error?: string }) => void) => {
-            try {
-                const { name, password } = data;
-                const result = await joinRoom(name, password || '', socket, fastify);
-
-                if (result.success && result.roomId) {
-                    socket.join(result.roomId);
-                    const room = getRoom(result.roomId);
-
-                    callback({ success: true, roomId: result.roomId });
-
-                    io.to(result.roomId).emit('tournament_room_state', {
-                        room: {
-                            id: room!.id,
-                            name: room!.name,
-                            creator: room!.creator,
-                            players: room!.players,
-                            status: room!.status,
-                        }
-                    });
-                } else {
-                    callback({ success: false, error: result.error });
-                }
-            } catch (error) {
-                fastify.log.error({ error }, 'Error joining tournament room');
                 callback({ success: false, error: 'Server error' });
             }
         });

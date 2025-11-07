@@ -40,6 +40,11 @@ import {
 	RESERVED_42_DISPLAY_NAME_PREFIX,
 	AVATAR_IMAGE_SIZE_LIMIT
 } from '../app.config.js'
+import {
+	validateAndNormalizeRegistrationPayload,
+	RegistrationValidationError,
+	NormalizedRegistrationPayload
+} from '../utils/registrationValidation.js';
 import { URLSearchParams } from 'url';
 import path from 'node:path';
 import fsPromises from 'node:fs/promises';
@@ -88,7 +93,17 @@ export default async function userRoutes(fastify: FastifyInstance) {
 		'/users',
 		{ schema: registerUserSchema },
 		async (request: FastifyRequest<{ Body: CreateUserBody }>, reply: FastifyReply) => {
-			const { username, password, email, display_name, use_2fa } = request.body;
+			let normalizedPayload: NormalizedRegistrationPayload;
+			try {
+				normalizedPayload = validateAndNormalizeRegistrationPayload(request.body);
+			} catch (err: unknown) {
+				if (err instanceof RegistrationValidationError) {
+					return reply.code(400).send({ error: 'Invalid registration data', details: err.messages });
+				}
+				throw err;
+			}
+
+			const { username, password, email, display_name, use_2fa } = normalizedPayload;
 
 			/* Reserve some prefix for username and display name
 			 * for 42 accounts in order to prevent possible collisions with normal accounts
@@ -134,7 +149,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					requires2FA: use_2fa || false
 				});
 			} catch (err: any) {
-				if (err.message.includes('UNIQUE constraint failed')) {
+				if (typeof err.message === 'string' && err.message.includes('UNIQUE constraint failed')) {
 					return reply.code(409).send({
 						error: 'Username, display name or email already exists'
 					});

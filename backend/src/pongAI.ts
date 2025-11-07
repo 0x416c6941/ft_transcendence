@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { Server, Socket, Namespace } from 'socket.io';
 import { saveGameRecord, isSocketAuthenticated, GameRecord } from './utils/gameStats.js';
+import { validateGameAlias } from './utils/validation.js';
 
 //CONSTANTS
 const WIDTH = 640;
@@ -102,7 +103,7 @@ function predictBallYAtAI(room: Room): number {
             y = clamp(y, 0, HEIGHT - BALL_SIZE);
         }
         // If ball crosses targetX (AI side), return predicted center Y
-        if (x >= targetX) return y + BALL_SIZE / 2 + (Math.random() - 0.5) * 120;
+        if (x >= targetX) return y + BALL_SIZE / 2;
     }
     // Fallback: center of screen
     return HEIGHT / 2;
@@ -307,7 +308,13 @@ export function setupPongAI(fastify: FastifyInstance, io: Server): void {
             const room = rooms.get(roomId);
             if (!room || room.player !== socket.id || room.gameActive) return;
 
-            room.playerAlias = data.playerAlias;
+            const validation = validateGameAlias(data.playerAlias);
+            if (!validation.valid) {
+                socket.emit('validation_error', { code: 'invalid_alias', field: 'playerAlias', message: validation.error });
+                return;
+            }
+
+            room.playerAlias = validation.value;
             room.gameActive = true;
             room.status = 'in_progress';
             resetGameState(room);

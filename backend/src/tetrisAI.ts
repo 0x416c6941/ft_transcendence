@@ -23,6 +23,7 @@ import {
     updatePlayer as updatePlayerShared
 } from './tetrisShared.js';
 import { saveGameRecord, isSocketAuthenticated, GameRecord } from './utils/gameStats.js';
+import { validateGameAlias } from './utils/validation.js';
 
 // AI constants - simulate human reaction times and delays
 const AI_THINK_DELAY = 15; // Delay before AI starts moving a new piece (~0.25 seconds)
@@ -287,10 +288,13 @@ export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
         socket.emit('role', { side: 'player' });
         
         socket.on('set_alias', async (data: { alias: string }) => {
-            const alias = data.alias.trim();
-            if (!alias) return;
+            const validation = validateGameAlias(data.alias);
+            if (!validation.valid) {
+                socket.emit('validation_error', { code: 'invalid_alias', field: 'alias', message: validation.error });
+                return;
+            }
             
-            state.player.alias = alias;
+            state.player.alias = validation.value;
             
             if (!state.started) {
                 state.started = true;

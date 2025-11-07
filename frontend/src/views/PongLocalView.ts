@@ -1,6 +1,7 @@
 import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
+import { validateNickname } from '../utils/validators.js';
 
 export default class PongLocalView extends AbstractView {
     private canvas: HTMLCanvasElement | null = null;
@@ -42,7 +43,7 @@ export default class PongLocalView extends AbstractView {
                     id="left-alias" 
                     type="text" 
                     placeholder="Enter name..." 
-                    maxlength="15"
+                    maxlength="20"
                     class="w-full px-4 py-3 rounded-lg bg-neutral-800 text-white border-2 border-neutral-600 
                            focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-400"
                   />
@@ -56,7 +57,7 @@ export default class PongLocalView extends AbstractView {
                     id="right-alias" 
                     type="text" 
                     placeholder="Enter name..." 
-                    maxlength="15"
+                    maxlength="20"
                     class="w-full px-4 py-3 rounded-lg bg-neutral-800 text-white border-2 border-neutral-600 
                            focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-400"
                   />
@@ -70,7 +71,8 @@ export default class PongLocalView extends AbstractView {
                   <button 
                     id="save-alias-btn" 
                     class="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 
-                           text-white font-bold rounded-lg shadow-lg transition-colors">
+                           text-white font-bold rounded-lg shadow-lg transition-colors opacity-50 cursor-not-allowed"
+                    disabled>
                     SAVE
                   </button>
                   <button 
@@ -138,25 +140,59 @@ export default class PongLocalView extends AbstractView {
 
     private setupOverlayButtons(): void {
         const overlay = document.getElementById('alias-overlay');
-        
-        document.getElementById('save-alias-btn')?.addEventListener('click', () => {
-            const leftAlias = (document.getElementById('left-alias') as HTMLInputElement)?.value.trim() || '';
-            const rightAlias = (document.getElementById('right-alias') as HTMLInputElement)?.value.trim() || '';
-            const errorMsg = document.getElementById('alias-error');
+        const leftAliasInput = document.getElementById('left-alias') as HTMLInputElement;
+        const rightAliasInput = document.getElementById('right-alias') as HTMLInputElement;
+        const errorMsg = document.getElementById('alias-error');
+        const saveBtn = document.getElementById('save-alias-btn') as HTMLButtonElement;
 
-            if (!leftAlias || !rightAlias) {
-                errorMsg?.classList.remove('hidden');
-                return;
+        const handleValidation = () => {
+            const leftAlias = leftAliasInput.value.trim();
+            const rightAlias = rightAliasInput.value.trim();
+            const leftResult = validateNickname(leftAlias);
+            const rightResult = validateNickname(rightAlias);
+
+            let finalError: string | null = null;
+            if (!leftResult.status) {
+                finalError = `Left Player: ${leftResult.err_msg}`;
+            } else if (!rightResult.status) {
+                finalError = `Right Player: ${rightResult.err_msg}`;
+            } else if (leftAlias === rightAlias) {
+                finalError = 'Player names must be different.';
             }
 
-            errorMsg?.classList.add('hidden');
+            errorMsg!.textContent = finalError || '';
+            if (finalError) {
+                errorMsg?.classList.remove('hidden');
+                saveBtn.disabled = true;
+                saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                errorMsg?.classList.add('hidden');
+                saveBtn.disabled = false;
+                saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        };
+
+        leftAliasInput?.addEventListener('input', handleValidation);
+        rightAliasInput?.addEventListener('input', handleValidation);
+        
+        saveBtn?.addEventListener('click', () => {
+            handleValidation(); // Run validation one last time before submitting
+            if (saveBtn.disabled) return;
+
             overlay?.classList.add('hidden');
-            this.socket?.emit('start_local_game', { roomId: this.roomId, leftAlias, rightAlias });
+            this.socket?.emit('start_local_game', { 
+                roomId: this.roomId, 
+                leftAlias: leftAliasInput.value.trim(), 
+                rightAlias: rightAliasInput.value.trim() 
+            });
         });
 
         document.getElementById('cancel-alias-btn')?.addEventListener('click', () => {
             overlay?.classList.add('hidden');
         });
+
+        // Initial validation check
+        handleValidation();
     }
 
     setup(): void {
@@ -199,6 +235,16 @@ export default class PongLocalView extends AbstractView {
                 this.winner = null;
             }
             this.updateStartButton();
+        });
+
+        this.socket.on('validation_error', ({ field, message }: { field: string, message: string }) => {
+            const errorMsg = document.getElementById('alias-error');
+            const overlay = document.getElementById('alias-overlay');
+            if (errorMsg && overlay) {
+                errorMsg.textContent = `Server error on ${field}: ${message}`;
+                errorMsg.classList.remove('hidden');
+                overlay.classList.remove('hidden');
+            }
         });
 
         this.setupOverlayButtons();

@@ -1,6 +1,7 @@
 import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
+import { validateNickname } from '../utils/validators.js';
 
 /**
  * @class TetrisView
@@ -57,7 +58,7 @@ export default class TetrisView extends AbstractView {
                                         id="player1-alias" 
                                         type="text" 
                                         placeholder="Enter name..." 
-                                        maxlength="15"
+                                        maxlength="20"
                                         class="w-full px-4 py-3 rounded-lg bg-gray-800 text-white border-2 border-gray-600 
                                                focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-400"
                                     />
@@ -71,7 +72,7 @@ export default class TetrisView extends AbstractView {
                                         id="player2-alias" 
                                         type="text" 
                                         placeholder="Enter name..." 
-                                        maxlength="15"
+                                        maxlength="20"
                                         class="w-full px-4 py-3 rounded-lg bg-gray-800 text-white border-2 border-gray-600 
                                                focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-400"
                                     />
@@ -225,31 +226,61 @@ export default class TetrisView extends AbstractView {
 
     private setupButtons(): void {
         const overlay = document.getElementById('alias-overlay');
+        const saveBtn = document.getElementById('save-alias-btn') as HTMLButtonElement;
+        const player1Input = document.getElementById('player1-alias') as HTMLInputElement;
+        const player2Input = document.getElementById('player2-alias') as HTMLInputElement;
+        const errorMsg = document.getElementById('alias-error');
         
         document.getElementById('alias-game-btn')?.addEventListener('click', () => {
             overlay?.classList.remove('hidden');
-            (document.getElementById('player1-alias') as HTMLInputElement)?.focus();
+            player1Input?.focus();
         });
 
         document.getElementById('cancel-alias-btn')?.addEventListener('click', () => {
             overlay?.classList.add('hidden');
         });
 
-        document.getElementById('save-alias-btn')?.addEventListener('click', () => {
-            const alias1 = (document.getElementById('player1-alias') as HTMLInputElement)?.value.trim() || '';
-            const alias2 = (document.getElementById('player2-alias') as HTMLInputElement)?.value.trim() || '';
-            const errorMsg = document.getElementById('alias-error');
+        const handleValidation = () => {
+            const alias1Result = validateNickname(player1Input.value);
+            const alias2Result = validateNickname(player2Input.value);
 
-            if (!alias1 || !alias2) {
-                errorMsg?.classList.remove('hidden');
-                return;
+            let finalError: string | null = null;
+            if (!alias1Result.status) {
+                finalError = `Player 1 alias: ${alias1Result.err_msg}`;
+            } else if (!alias2Result.status) {
+                finalError = `Player 2 alias: ${alias2Result.err_msg}`;
             }
+
+            if (finalError) {
+                errorMsg?.classList.remove('hidden');
+                errorMsg!.textContent = finalError;
+                saveBtn.disabled = true;
+                saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                errorMsg?.classList.add('hidden');
+                saveBtn.disabled = false;
+                saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        };
+
+        player1Input.addEventListener('input', handleValidation);
+        player2Input.addEventListener('input', handleValidation);
+
+        saveBtn?.addEventListener('click', () => {
+            handleValidation();
+            if (saveBtn.disabled) return;
+            
+            const alias1 = player1Input.value.trim();
+            const alias2 = player2Input.value.trim();
 
             errorMsg?.classList.add('hidden');
             overlay?.classList.add('hidden');
             document.getElementById('start-section')?.classList.add('hidden');
             this.socket?.emit('set_aliases', { alias1, alias2 });
         });
+
+        // Initial validation
+        handleValidation();
 
         document.getElementById('back-button')?.addEventListener('click', () => {
             this.router.navigate('/');

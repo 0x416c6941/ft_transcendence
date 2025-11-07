@@ -11,8 +11,10 @@ const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
 const NICKNAME_RE = /^[a-zA-Z0-9_]{1,20}$/;
 /** Email: simple RFC-like sanity check (keep it lightweight client-side) */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** Password: at least 8 chars incl. lower, upper, and a digit (single-pass) */
-const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+/** Password: 8–16 chars incl. lower, upper, and a digit (single-pass) */
+const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,16}$/;
+/** Room name/Game alias: 2–15 ASCII letters, digits, underscore */
+const ROOM_RE = /^[a-zA-Z0-9_]{2,15}$/;
 
 /** Small helpers to keep code concise */
 const ok = (): FieldResult => ({ status: true });
@@ -62,7 +64,7 @@ export function validatePassword(val: string): FieldResult {
 	if (!value) return err("Password is required.");
 	return PASSWORD_RE.test(value)
 		? ok()
-		: err("Min 8 chars with upper, lower, and a number.");
+		: err("8–16 chars with upper, lower, and a number.");
 }
 
 /**
@@ -75,4 +77,29 @@ export function validateNickname(val: string): FieldResult {
 	return NICKNAME_RE.test(value)
 		? ok()
 		: err("Use 1–20 letters, numbers, or underscores.");
+}
+
+/**
+ * Validates a room name.
+ * Rules: 2–15 chars, ASCII letters/digits/underscore only.
+ */
+export function validateRoomName(val: string): FieldResult {
+	const value = normId(val);
+	if (!value) return err("Room name is required.");
+	return ROOM_RE.test(value)
+		? ok()
+		: err("Use 2–15 letters, numbers or underscores.");
+}
+
+/**
+ * Validates a tournament room field (name or password).
+ * Rules: For name - 2–15 chars, ASCII letters/digits/underscore. For password - optional, ≥8 chars with upper/lower/digit.
+ */
+export function validateRoomField(val: string, fieldName: 'Room name' | 'Password'): FieldResult {
+	if (fieldName === 'Password') {
+		if (!val) return ok();
+		return validatePassword(val);
+	} else {
+		return validateRoomName(val);
+	}
 }

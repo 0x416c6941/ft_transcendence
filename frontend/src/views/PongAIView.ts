@@ -1,6 +1,7 @@
 import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
+import { validateNickname } from '../utils/validators.js';
 
 export default class PongAIView extends AbstractView {
     private canvas: HTMLCanvasElement | null = null;
@@ -41,7 +42,7 @@ export default class PongAIView extends AbstractView {
                     id="player-alias" 
                     type="text" 
                     placeholder="Enter your name..." 
-                    maxlength="15"
+                    maxlength="20"
                     class="w-full px-4 py-3 rounded-lg bg-neutral-800 text-white border-2 border-neutral-600 
                            focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-400"
                   />
@@ -55,7 +56,8 @@ export default class PongAIView extends AbstractView {
                   <button 
                     id="save-alias-btn" 
                     class="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 
-                           text-white font-bold rounded-lg shadow-lg transition-colors">
+                           text-white font-bold rounded-lg shadow-lg transition-colors opacity-50 cursor-not-allowed"
+                    disabled>
                     SAVE
                   </button>
                   <button 
@@ -119,24 +121,40 @@ export default class PongAIView extends AbstractView {
 
     private setupOverlayButtons(): void {
         const overlay = document.getElementById('alias-overlay');
-        
-        document.getElementById('save-alias-btn')?.addEventListener('click', () => {
-            const playerAlias = (document.getElementById('player-alias') as HTMLInputElement)?.value.trim() || '';
-            const errorMsg = document.getElementById('alias-error');
+        const aliasInput = document.getElementById('player-alias') as HTMLInputElement;
+        const errorMsg = document.getElementById('alias-error');
+        const saveBtn = document.getElementById('save-alias-btn') as HTMLButtonElement;
 
-            if (!playerAlias) {
+        const handleValidation = () => {
+            const result = validateNickname(aliasInput.value);
+            if (result.status) {
+                errorMsg?.classList.add('hidden');
+                saveBtn.disabled = false;
+                saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                errorMsg!.textContent = result.err_msg;
                 errorMsg?.classList.remove('hidden');
-                return;
+                saveBtn.disabled = true;
+                saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
             }
+        };
 
-            errorMsg?.classList.add('hidden');
+         aliasInput?.addEventListener('input', handleValidation);
+        
+        saveBtn?.addEventListener('click', () => {
+            handleValidation();
+            if (saveBtn.disabled) return;
+
             overlay?.classList.add('hidden');
-            this.socket?.emit('start_ai_game', { playerAlias });
+            this.socket?.emit('start_ai_game', { playerAlias: aliasInput.value.trim() });
         });
 
         document.getElementById('cancel-alias-btn')?.addEventListener('click', () => {
             overlay?.classList.add('hidden');
         });
+
+        // Initial validation check in case the field is pre-filled
+        handleValidation();
     }
 
     setup(): void {
@@ -181,6 +199,17 @@ export default class PongAIView extends AbstractView {
                 this.winner = null;
             }
             this.updateStartButton();
+        });
+
+        this.socket.on('validation_error', ({ message }: { message: string }) => {
+            const errorMsg = document.getElementById('alias-error');
+            const overlay = document.getElementById('alias-overlay');
+            if (errorMsg && overlay) {
+                errorMsg.textContent = `Server error: ${message}`;
+                errorMsg.classList.remove('hidden');
+                overlay.classList.remove('hidden');
+                (document.getElementById('player-alias') as HTMLInputElement)?.focus();
+            }
         });
 
         this.setupOverlayButtons();

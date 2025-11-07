@@ -12,6 +12,7 @@ import {
     createPlayerSnapshot
 } from './tetrisShared.js';
 import { saveGameRecord, isSocketAuthenticated, GameRecord } from './utils/gameStats.js';
+import { validateGameAlias } from './utils/validation.js';
 
 interface GameState {
     player1: PlayerState;
@@ -82,16 +83,29 @@ export function setupTetrisGame(fastify: FastifyInstance, io: Server): void {
             const player = players.get(socket.id);
             if (!player) return;
             
-            const alias1 = data.alias1.trim();
-            const alias2 = data.alias2.trim();
-            if (!alias1 || !alias2) return;
+            const validationAlias1 = validateGameAlias(data.alias1);
+            const validationAlias2 = validateGameAlias(data.alias2);
+            
+            if (!validationAlias1.valid) {
+                socket.emit('validation_error', { code: 'invalid_alias', field: 'alias1', message: validationAlias1.error });
+                return;
+            }
+            if (!validationAlias2.valid) {
+                socket.emit('validation_error', { code: 'invalid_alias', field: 'alias2', message: validationAlias2.error });
+                return;
+            }
+            if (validationAlias1.value.toLowerCase() === validationAlias2.value.toLowerCase()) {
+                socket.emit('validation_error', { code: 'aliases_same', field: 'alias2', message: 'Aliases must be different.' });
+                return;
+            }
+            
             
             // Set both aliases
-            state.player1.alias = alias1;
-            state.player2.alias = alias2;
+            state.player1.alias = validationAlias1.value;
+            state.player2.alias = validationAlias2.value;
             
             // Mark the controlling player as having both aliases
-            player.alias = alias1; // Mark as set
+            player.alias = validationAlias1.value; // Mark as set
             
             // Start the game immediately for local multiplayer
             if (!state.started) {
