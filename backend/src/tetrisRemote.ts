@@ -60,8 +60,8 @@ export function setupTetrisRemote(fastify: FastifyInstance, io: Server): void {
     tetrisRemoteNamespace.use(async (socket, next) => {
         try {
             const token = socket.handshake.auth.token || socket.handshake.headers.cookie
-                ?.split('; ')
-                .find((row: string) => row.startsWith('accessToken='))
+                ?.split(';')
+                .find((row: string) => row.trim().startsWith('accessToken='))
                 ?.split('=')[1];
             
             if (!token) return next(new Error('Authentication required'));
