@@ -39,6 +39,15 @@ const players = new Map<string, RemotePlayer>();
 let gameInterval: NodeJS.Timeout | null = null;
 let currentGameRecord: Partial<GameRecord> | null = null;
 
+async function getDisplayName(fastify: FastifyInstance, userId: number): Promise<string> {
+    return new Promise((resolve) => {
+        fastify.sqlite.get('SELECT display_name FROM users WHERE id = ?', [userId], (err: Error | null, row: any) => {
+            if (err || !row) resolve('Player');
+            else resolve(row.display_name);
+        });
+    });
+}
+
 function resetGame(): void {
     resetPlayerState(state.player1);
     resetPlayerState(state.player2);
@@ -80,23 +89,26 @@ export function setupTetrisRemote(fastify: FastifyInstance, io: Server): void {
         }
     });
     
-	tetrisRemoteNamespace.on('connection', (socket: Socket) => {
+	tetrisRemoteNamespace.on('connection', async (socket: Socket) => {
 		const userId = (socket as any).userId;
 		const username = (socket as any).username;
 		
-		fastify.log.info(`Tetris Remote player connected: ${username} (${userId}), current players: ${players.size}`);
+		// Fetch display name from database
+		const displayName = await getDisplayName(fastify, userId);
+		
+		fastify.log.info(`Tetris Remote player connected: ${displayName} (${userId}), current players: ${players.size}`);
 		
 		// Check if this user is already in the game (reconnection)
 		const existingPlayer = Array.from(players.values()).find(p => p.userId === userId);
 		if (existingPlayer) {
 			// Remove old socket entry and add new one (reconnection)
 			players.delete(existingPlayer.socketId);
-			fastify.log.info(`Player ${username} reconnecting, removing old socket ${existingPlayer.socketId}`);
+			fastify.log.info(`Player ${displayName} reconnecting, removing old socket ${existingPlayer.socketId}`);
 		}
 		
 		// Check if game is full (and user is not reconnecting)
 		if (players.size >= 2 && !existingPlayer) {
-			fastify.log.warn(`Game is full, rejecting ${username}`);
+			fastify.log.warn(`Game is full, rejecting ${displayName}`);
 			socket.emit('connection_error', { message: 'Game is full' });
 			socket.disconnect();
 			return;
@@ -104,8 +116,8 @@ export function setupTetrisRemote(fastify: FastifyInstance, io: Server): void {
         const side: PlayerSide = players.size === 0 ? 'player1' : 'player2';
         players.set(socket.id, { socketId: socket.id, userId, username, side });
         
-        // Set player alias to username
-        state[side].alias = username;
+        // Set player alias to display name (not username)
+        state[side].alias = displayName;
         
         // Notify player of their role
         socket.emit('role_assigned', { side });
@@ -150,7 +162,10 @@ export function setupTetrisRemote(fastify: FastifyInstance, io: Server): void {
         
         // Handle disconnect
         socket.on('disconnect', async () => {
-            fastify.log.info(`Tetris Remote player disconnected: ${username}`);
+            const disconnectedPlayer = players.get(socket.id);
+            const playerDisplayName = disconnectedPlayer ? state[disconnectedPlayer.side].alias : 'Unknown';
+            
+            fastify.log.info(`Tetris Remote player disconnected: ${playerDisplayName}`);
             players.delete(socket.id);
             
             // If a player disconnects during game, end it
