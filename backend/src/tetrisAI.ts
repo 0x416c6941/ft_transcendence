@@ -235,24 +235,55 @@ function updateAI(aiState: AIState): void {
     }
 }
 
-const state: GameState = {
-    player: createPlayerState(),
-    ai: {
-        ...createPlayerState(),
-        alias: 'AI',
-        thinkCounter: 0,
-        targetX: null,
-        targetRotation: 0,
-        currentRotation: 0,
-        moveDelay: 0,
-        rotateDelay: 0,
-        hasDecided: false
-    },
-    started: false
-};
+// Room-based game state (one room per player)
+interface TetrisAIRoom {
+    id: string;
+    playerId: string;
+    state: GameState;
+    interval: NodeJS.Timeout | null;
+    currentGameRecord: Partial<GameRecord> | null;
+}
 
-let gameInterval: NodeJS.Timeout | null = null;
-let currentGameRecord: Partial<GameRecord> | null = null;
+const rooms = new Map<string, TetrisAIRoom>();
+
+function createAIRoom(playerId: string): TetrisAIRoom {
+    const id = 'tetris_ai_' + Date.now().toString() + Math.random().toString(36).slice(2, 9);
+    const room: TetrisAIRoom = {
+        id,
+        playerId,
+        state: {
+            player: createPlayerState(),
+            ai: {
+                ...createPlayerState(),
+                alias: 'AI',
+                thinkCounter: 0,
+                targetX: null,
+                targetRotation: 0,
+                currentRotation: 0,
+                moveDelay: 0,
+                rotateDelay: 0,
+                hasDecided: false
+            },
+            started: false
+        },
+        interval: null,
+        currentGameRecord: null
+    };
+    rooms.set(id, room);
+    return room;
+}
+
+function leaveAIRoom(roomId: string): void {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    
+    if (room.interval) {
+        clearInterval(room.interval);
+        room.interval = null;
+    }
+    
+    rooms.delete(roomId);
+}
 
 // Helper to reset AI-specific state
 function resetAIState(aiState: AIState): void {
@@ -267,17 +298,17 @@ function resetAIState(aiState: AIState): void {
     aiState.hasDecided = false;
 }
 
-function resetGame(): void {
-    resetPlayerState(state.player);
-    resetAIState(state.ai);
-    state.started = false;
+function resetGame(room: TetrisAIRoom): void {
+    resetPlayerState(room.state.player);
+    resetAIState(room.state.ai);
+    room.state.started = false;
 }
 
-function step(): void {
-    if (!state.started) return;
+function step(room: TetrisAIRoom): void {
+    if (!room.state.started) return;
     
-    updatePlayerShared(state.player);
-    updateAI(state.ai);
+    updatePlayerShared(room.state.player);
+    updateAI(room.state.ai);
 }
 
 export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
@@ -307,6 +338,11 @@ export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
     tetrisAINamespace.on('connection', async (socket: Socket) => {
         fastify.log.info(`Tetris AI player connected: ${socket.id}`);
         
+        // Create a new room for this player
+        const room = createAIRoom(socket.id);
+        socket.join(room.id);
+        (socket as any).roomId = room.id;
+        
         const isAuthenticated = isSocketAuthenticated(socket);
         const userId = isAuthenticated ? (socket as any).userId : null;
         
@@ -325,6 +361,11 @@ export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
         socket.emit('auth_status', { isAuthenticated, displayName });
         
         socket.on('set_alias', async (data: { alias?: string }) => {
+            const roomId = (socket as any).roomId;
+            if (!roomId) return;
+            const room = rooms.get(roomId);
+            if (!room) return;
+            
             let playerName: string;
             let playerIsUser = false;
             
@@ -344,112 +385,120 @@ export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
                 playerName = validation.value;
             }
             
-            state.player.alias = playerName;
+            room.state.player.alias = playerName;
             
-            if (!state.started) {
-                state.started = true;
-                spawnNewPiece(state.player);
-                spawnNewPiece(state.ai);
+            if (!room.state.started) {
+                room.state.started = true;
+                spawnNewPiece(room.state.player);
+                spawnNewPiece(room.state.ai);
                 
-                currentGameRecord = {
+                room.currentGameRecord = {
                     game_name: 'Tetris AI',
                     started_at: new Date().toISOString(),
                     player1_name: playerName,
                     player1_is_user: playerIsUser,
-                    player2_name: state.ai.alias,
+                    player2_name: room.state.ai.alias,
                     player2_is_user: false
                 };
                 
-                tetrisAINamespace.emit('game_started', {
-                    playerAlias: state.player.alias,
-                    aiAlias: state.ai.alias
+                socket.emit('game_started', {
+                    playerAlias: room.state.player.alias,
+                    aiAlias: room.state.ai.alias
                 });
+                
+                // Start game loop for this room
+                if (!room.interval) {
+                    room.interval = setInterval(async () => {
+                        step(room);
+                        
+                        const snapshot = {
+                            player: createPlayerSnapshot(room.state.player),
+                            ai: createPlayerSnapshot(room.state.ai),
+                            started: room.state.started
+                        };
+                        
+                        socket.emit('game_state', snapshot);
+                        
+                        if (room.state.started && (room.state.player.gameOver || room.state.ai.gameOver) && room.currentGameRecord) {
+                            const winner = room.state.player.gameOver ? room.state.ai.alias : room.state.player.alias;
+                            
+                            const recordToSave = room.currentGameRecord;
+                            room.currentGameRecord = null;
+                            
+                            recordToSave.finished_at = new Date().toISOString();
+                            recordToSave.winner = winner;
+                            recordToSave.data = JSON.stringify({
+                                reason: 'game_over',
+                                winner: winner,
+                                player: {
+                                    alias: room.state.player.alias,
+                                    score: room.state.player.score,
+                                    linesCleared: room.state.player.linesCleared,
+                                    gameOver: room.state.player.gameOver
+                                },
+                                ai: {
+                                    alias: room.state.ai.alias,
+                                    score: room.state.ai.score,
+                                    linesCleared: room.state.ai.linesCleared,
+                                    gameOver: room.state.ai.gameOver
+                                }
+                            });
+                            
+                            await saveGameRecord(fastify, recordToSave as GameRecord);
+                            
+                            socket.emit('game_ended', { reason: 'game_over', winner });
+                            resetGame(room);
+                        }
+                    }, 1000 / TICK_HZ);
+                }
             }
         });
         
         socket.on('input', (data: { keys: Partial<PlayerState['input']> }) => {
-            if (data.keys.left !== undefined) state.player.input.left = data.keys.left;
-            if (data.keys.right !== undefined) state.player.input.right = data.keys.right;
-            if (data.keys.down !== undefined) state.player.input.down = data.keys.down;
-            if (data.keys.rotate !== undefined) state.player.input.rotate = data.keys.rotate;
-            if (data.keys.drop !== undefined) state.player.input.drop = data.keys.drop;
+            const roomId = (socket as any).roomId;
+            if (!roomId) return;
+            const room = rooms.get(roomId);
+            if (!room) return;
+            
+            if (data.keys.left !== undefined) room.state.player.input.left = data.keys.left;
+            if (data.keys.right !== undefined) room.state.player.input.right = data.keys.right;
+            if (data.keys.down !== undefined) room.state.player.input.down = data.keys.down;
+            if (data.keys.rotate !== undefined) room.state.player.input.rotate = data.keys.rotate;
+            if (data.keys.drop !== undefined) room.state.player.input.drop = data.keys.drop;
         });
         
         socket.on('disconnect', async () => {
             fastify.log.info(`Tetris AI player disconnected: ${socket.id}`);
             
-            if (state.started && currentGameRecord) {
-                // Save game record on disconnect
-                currentGameRecord.finished_at = new Date().toISOString();
-                currentGameRecord.winner = undefined; // No winner on disconnect
-                currentGameRecord.data = JSON.stringify({
+            const roomId = (socket as any).roomId;
+            if (!roomId) return;
+            const room = rooms.get(roomId);
+            if (!room) return;
+            
+            if (room.state.started && room.currentGameRecord) {
+                room.currentGameRecord.finished_at = new Date().toISOString();
+                room.currentGameRecord.winner = undefined;
+                room.currentGameRecord.data = JSON.stringify({
                     reason: 'player_disconnected',
                     player: {
-                        alias: state.player.alias,
-                        score: state.player.score,
-                        linesCleared: state.player.linesCleared
+                        alias: room.state.player.alias,
+                        score: room.state.player.score,
+                        linesCleared: room.state.player.linesCleared
                     },
                     ai: {
-                        alias: state.ai.alias,
-                        score: state.ai.score,
-                        linesCleared: state.ai.linesCleared
+                        alias: room.state.ai.alias,
+                        score: room.state.ai.score,
+                        linesCleared: room.state.ai.linesCleared
                     }
                 });
                 
-                await saveGameRecord(fastify, currentGameRecord as GameRecord);
-                currentGameRecord = null;
-                
-                resetGame();
-                tetrisAINamespace.emit('game_ended', { reason: 'player_disconnected' });
+                await saveGameRecord(fastify, room.currentGameRecord as GameRecord);
+                room.currentGameRecord = null;
             }
+            
+            leaveAIRoom(roomId);
         });
     });
-    
-    if (!gameInterval) {
-        gameInterval = setInterval(async () => {
-            step();
-            
-            const snapshot = {
-                player: createPlayerSnapshot(state.player),
-                ai: createPlayerSnapshot(state.ai),
-                started: state.started
-            };
-            
-            tetrisAINamespace.emit('game_state', snapshot);
-            
-            if (state.started && (state.player.gameOver || state.ai.gameOver) && currentGameRecord) {
-                const winner = state.player.gameOver ? state.ai.alias : state.player.alias;
-                
-                // Capture the record and clear it immediately to prevent duplicate saves
-                const recordToSave = currentGameRecord;
-                currentGameRecord = null;
-                
-                recordToSave.finished_at = new Date().toISOString();
-                recordToSave.winner = winner;
-                recordToSave.data = JSON.stringify({
-                    reason: 'game_over',
-                    winner: winner,
-                    player: {
-                        alias: state.player.alias,
-                        score: state.player.score,
-                        linesCleared: state.player.linesCleared,
-                        gameOver: state.player.gameOver
-                    },
-                    ai: {
-                        alias: state.ai.alias,
-                        score: state.ai.score,
-                        linesCleared: state.ai.linesCleared,
-                        gameOver: state.ai.gameOver
-                    }
-                });
-                
-                await saveGameRecord(fastify, recordToSave as GameRecord);
-                
-                tetrisAINamespace.emit('game_ended', { reason: 'game_over', winner });
-                resetGame();
-            }
-        }, 1000 / TICK_HZ);
-    }
     
     fastify.log.info('Tetris AI game server initialized');
 }
