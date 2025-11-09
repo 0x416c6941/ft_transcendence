@@ -283,6 +283,8 @@ export default class ChatPanel {
 			this.updateBadgeAndRefresh();
 			this.showNotification(`${data.byDisplayName} accepted your invite!`, 'success');
 			
+			if (this.isOpen) this.toggle(); // Close chat panel
+			
 			setTimeout(() => {
 				if (data.roomId) {
 					// Navigate to the specific room with roomId as query parameter
@@ -300,6 +302,8 @@ export default class ChatPanel {
 
 		this.socket.on('game:invite_room_created', (data: { inviteId: number; gameType: string; roomId?: string }) => {
 			// This event is received by the player who accepted the invite
+			if (this.isOpen) this.toggle(); // Close chat panel
+			
 			if (data.roomId) {
 				setTimeout(() => {
 					if (data.gameType === 'pong') {
