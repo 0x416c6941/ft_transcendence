@@ -26,10 +26,10 @@ import { saveGameRecord, isSocketAuthenticated, GameRecord } from './utils/gameS
 import { validateGameAlias } from './utils/validation.js';
 import { verifyToken } from './utils/jwt.js';
 
-// AI constants - simulate human reaction times and delays
-const AI_THINK_DELAY = 15; // Delay before AI starts moving a new piece (~0.25 seconds)
-const AI_MOVE_DELAY = 6; // Delay between moves (~0.1 seconds)
-const AI_ROTATION_DELAY = 10; // Delay between rotations (~0.17 seconds)
+// AI constants - simulate human reaction times and delays (tuned to be beatable)
+const AI_THINK_DELAY = 20; // Delay before AI starts moving a new piece (~0.33 seconds)
+const AI_MOVE_DELAY = 8; // Delay between moves (~0.13 seconds)
+const AI_ROTATION_DELAY = 12; // Delay between rotations (~0.2 seconds)
 
 interface AIState extends PlayerState {
     thinkCounter: number;
@@ -45,6 +45,7 @@ interface GameState {
     player: PlayerState;
     ai: AIState;
     started: boolean;
+    currentGravityTicks: number; // Dynamic gravity speed (starts at GRAVITY_TICKS)
 }
 
 // AI-specific helper functions
@@ -106,10 +107,10 @@ function evaluatePosition(board: number[][], piece: Piece, rotation: number, tar
     const bumpiness = heights.slice(0, -1).reduce((sum, h, i) => sum + Math.abs(h - heights[i + 1]), 0);
     const completeLines = testBoard.filter(row => row.every(cell => cell !== 0)).length;
     
-    // Apply scoring
-    score -= holes * 50;
-    score -= totalHeight * 2;
-    score -= bumpiness * 5;
+    // Apply scoring (reduced penalties to make AI less optimal)
+    score -= holes * 35; // Reduced from 50
+    score -= totalHeight * 1.5; // Reduced from 2
+    score -= bumpiness * 3; // Reduced from 5
     score += completeLines * 100;
     
     return score;
@@ -134,13 +135,13 @@ function calculateAIMove(aiState: AIState): void {
         return;
     }
     
-    // Pick move based on skill level
+    // Pick move based on skill level (tuned to be beatable by good players)
     positions.sort((a, b) => b.score - a.score);
     const rand = Math.random();
     
-    const chosenMove = rand < 0.85 ? positions[0] // 85% best move
-        : rand < 0.97 ? positions.slice(0, Math.min(3, positions.length))[Math.floor(Math.random() * Math.min(3, positions.length))] // 12% top 3
-        : positions[Math.floor(Math.random() * positions.length)]; // 3% random
+    const chosenMove = rand < 0.60 ? positions[0] // 60% best move (reduced from 85%)
+        : rand < 0.85 ? positions.slice(0, Math.min(5, positions.length))[Math.floor(Math.random() * Math.min(5, positions.length))] // 25% top 5 (increased from 12% top 3)
+        : positions[Math.floor(Math.random() * positions.length)]; // 15% random (increased from 3%)
     
     aiState.targetX = chosenMove.x;
     aiState.targetRotation = chosenMove.rotation;
@@ -154,8 +155,8 @@ function resetAIForNewPiece(aiState: AIState): void {
     aiState.input.down = false;
 }
 
-function updateAI(aiState: AIState): void {
-    if (aiState.gameOver || !aiState.currentPiece) return;
+function updateAI(aiState: AIState, currentGravityTicks: number): number {
+    if (aiState.gameOver || !aiState.currentPiece) return currentGravityTicks;
     
     const piece = aiState.currentPiece;
     
@@ -204,7 +205,7 @@ function updateAI(aiState: AIState): void {
         }
     }
     
-    // Handle soft drop
+    // Handle soft drop with dynamic gravity
     if (aiState.input.down) {
         if (!checkCollision(aiState.board, piece, 0, 1)) {
             piece.y++;
@@ -212,27 +213,31 @@ function updateAI(aiState: AIState): void {
             aiState.gravityCounter = 0;
         } else {
             mergePiece(aiState.board, piece);
-            clearLines(aiState);
+            const result = clearLines(aiState, currentGravityTicks);
             spawnNewPiece(aiState);
             resetAIForNewPiece(aiState);
+            return result.newGravityTicks;
         }
-        return;
+        return currentGravityTicks;
     }
     
-    // Normal gravity
+    // Normal gravity with dynamic speed
     aiState.gravityCounter++;
-    if (aiState.gravityCounter >= GRAVITY_TICKS) {
+    if (aiState.gravityCounter >= currentGravityTicks) {
         aiState.gravityCounter = 0;
         
         if (!checkCollision(aiState.board, piece, 0, 1)) {
             piece.y++;
         } else {
             mergePiece(aiState.board, piece);
-            clearLines(aiState);
+            const result = clearLines(aiState, currentGravityTicks);
             spawnNewPiece(aiState);
             resetAIForNewPiece(aiState);
+            return result.newGravityTicks;
         }
     }
+    
+    return currentGravityTicks;
 }
 
 // Room-based game state (one room per player)
@@ -264,7 +269,8 @@ function createAIRoom(playerId: string): TetrisAIRoom {
                 rotateDelay: 0,
                 hasDecided: false
             },
-            started: false
+            started: false,
+            currentGravityTicks: GRAVITY_TICKS // Start at initial speed
         },
         interval: null,
         currentGameRecord: null
@@ -302,13 +308,18 @@ function resetGame(room: TetrisAIRoom): void {
     resetPlayerState(room.state.player);
     resetAIState(room.state.ai);
     room.state.started = false;
+    room.state.currentGravityTicks = GRAVITY_TICKS; // Reset speed to initial
 }
 
 function step(room: TetrisAIRoom): void {
     if (!room.state.started) return;
     
-    updatePlayerShared(room.state.player);
-    updateAI(room.state.ai);
+    // Update both players and collect new gravity speed from line clears
+    const newGravityPlayer = updatePlayerShared(room.state.player, room.state.currentGravityTicks);
+    const newGravityAI = updateAI(room.state.ai, room.state.currentGravityTicks);
+    
+    // Use the minimum (fastest) gravity from either player's line clears
+    room.state.currentGravityTicks = Math.min(newGravityPlayer, newGravityAI);
 }
 
 export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {

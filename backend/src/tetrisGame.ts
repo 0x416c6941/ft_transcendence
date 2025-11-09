@@ -3,6 +3,7 @@ import { FastifyInstance } from 'fastify';
 import { Server, Socket } from 'socket.io';
 import {
     TICK_HZ,
+    GRAVITY_TICKS,
     PlayerState,
     PlayerSide,
     createPlayerState,
@@ -18,6 +19,7 @@ interface GameState {
     player1: PlayerState;
     player2: PlayerState;
     started: boolean;
+    currentGravityTicks: number; // Dynamic gravity speed
 }
 
 interface PlayerInfo {
@@ -30,7 +32,8 @@ interface PlayerInfo {
 const state: GameState = {
     player1: createPlayerState(),
     player2: createPlayerState(),
-    started: false
+    started: false,
+    currentGravityTicks: GRAVITY_TICKS // Start at initial speed
 };
 
 // Player tracking
@@ -41,15 +44,19 @@ let currentGameRecord: Partial<GameRecord> | null = null;
 function step(): void {
     if (!state.started) return;
     
-    // Update both players using their input from state (for local multiplayer)
-    updatePlayer(state.player1);
-    updatePlayer(state.player2);
+    // Update both players and collect new gravity speed
+    const newGravityP1 = updatePlayer(state.player1, state.currentGravityTicks);
+    const newGravityP2 = updatePlayer(state.player2, state.currentGravityTicks);
+    
+    // Use the minimum (fastest) gravity from either player's line clears
+    state.currentGravityTicks = Math.min(newGravityP1, newGravityP2);
 }
 
 function resetGame(): void {
     resetPlayerState(state.player1);
     resetPlayerState(state.player2);
     state.started = false;
+    state.currentGravityTicks = GRAVITY_TICKS; // Reset speed to initial
 }
 
 export function setupTetrisGame(fastify: FastifyInstance, io: Server): void {

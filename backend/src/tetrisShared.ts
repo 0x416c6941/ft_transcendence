@@ -6,9 +6,11 @@
 export const BOARD_WIDTH = 10;
 export const BOARD_HEIGHT = 20;
 export const TICK_HZ = 60;
-export const GRAVITY_TICKS = 30;
+export const GRAVITY_TICKS = 30; // Initial gravity (pieces fall every 30 ticks = 0.5s)
 export const MOVE_DELAY_INITIAL = 12;
 export const MOVE_DELAY_REPEAT = 3;
+export const GRAVITY_SPEED_MULTIPLIER = 0.9; // Speeds up by ~11% per line clear (like Pong's 1.1x)
+export const MIN_GRAVITY_TICKS = 3; // Minimum speed cap (0.05s between falls)
 
 // Tetromino shapes (standard Tetris pieces)
 export const SHAPES = {
@@ -114,7 +116,7 @@ export function mergePiece(board: number[][], piece: Piece): void {
     }
 }
 
-export function clearLines(playerState: PlayerState): number {
+export function clearLines(playerState: PlayerState, currentGravityTicks: number): { linesCleared: number, newGravityTicks: number } {
     let linesCleared = 0;
     
     for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
@@ -132,7 +134,13 @@ export function clearLines(playerState: PlayerState): number {
         playerState.score += points;
     }
     
-    return linesCleared;
+    // Apply speed increase when lines are cleared (just like Pong ball speed-up)
+    let newGravityTicks = currentGravityTicks;
+    if (linesCleared > 0) {
+        newGravityTicks = Math.max(MIN_GRAVITY_TICKS, currentGravityTicks * GRAVITY_SPEED_MULTIPLIER);
+    }
+    
+    return { linesCleared, newGravityTicks };
 }
 
 export function spawnNewPiece(playerState: PlayerState): void {
@@ -145,8 +153,9 @@ export function spawnNewPiece(playerState: PlayerState): void {
 }
 
 // Core player update logic - used by all game modes
-export function updatePlayer(playerState: PlayerState): void {
-    if (playerState.gameOver || !playerState.currentPiece) return;
+// Returns new gravity ticks if speed changed due to line clears
+export function updatePlayer(playerState: PlayerState, currentGravityTicks: number): number {
+    if (playerState.gameOver || !playerState.currentPiece) return currentGravityTicks;
     
     const piece = playerState.currentPiece;
     const input = playerState.input;
@@ -167,11 +176,11 @@ export function updatePlayer(playerState: PlayerState): void {
             piece.y++;
         }
         mergePiece(playerState.board, piece);
-        clearLines(playerState);
+        const result = clearLines(playerState, currentGravityTicks);
         spawnNewPiece(playerState);
         playerState.input.drop = false;
         playerState.dropPressed = false;
-        return;
+        return result.newGravityTicks;
     }
     if (!input.drop) {
         playerState.dropPressed = false;
@@ -199,8 +208,8 @@ export function updatePlayer(playerState: PlayerState): void {
         playerState.moveCounter++;
     }
     
-    // Handle gravity (down movement)
-    const gravitySpeed = input.down ? 3 : GRAVITY_TICKS;
+    // Handle gravity (down movement) - use dynamic gravity speed
+    const gravitySpeed = input.down ? 3 : currentGravityTicks;
     playerState.gravityCounter++;
     
     if (playerState.gravityCounter >= gravitySpeed) {
@@ -210,10 +219,13 @@ export function updatePlayer(playerState: PlayerState): void {
             piece.y++;
         } else {
             mergePiece(playerState.board, piece);
-            clearLines(playerState);
+            const result = clearLines(playerState, currentGravityTicks);
             spawnNewPiece(playerState);
+            return result.newGravityTicks;
         }
     }
+    
+    return currentGravityTicks;
 }
 
 // Helper to create a fresh PlayerState object
