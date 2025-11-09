@@ -24,6 +24,7 @@ import {
 } from './tetrisShared.js';
 import { saveGameRecord, isSocketAuthenticated, GameRecord } from './utils/gameStats.js';
 import { validateGameAlias } from './utils/validation.js';
+import { verifyToken } from './utils/jwt.js';
 
 // AI constants - simulate human reaction times and delays
 const AI_THINK_DELAY = 15; // Delay before AI starts moving a new piece (~0.25 seconds)
@@ -282,34 +283,81 @@ function step(): void {
 export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
     const tetrisAINamespace = io.of('/tetris-ai');
     
-    tetrisAINamespace.on('connection', (socket: Socket) => {
+    // Optional JWT Authentication middleware - allows both authenticated and non-authenticated users
+    tetrisAINamespace.use(async (socket, next) => {
+        try {
+            const token = socket.handshake.auth.token || socket.handshake.headers.cookie
+                ?.split(';')
+                .find((row: string) => row.trim().startsWith('accessToken='))
+                ?.split('=')[1];
+            
+            if (token) {
+                const decoded = verifyToken(token);
+                if (decoded?.userId && decoded?.username) {
+                    (socket as any).userId = decoded.userId;
+                    (socket as any).username = decoded.username;
+                }
+            }
+            next();
+        } catch (error) {
+            next();
+        }
+    });
+    
+    tetrisAINamespace.on('connection', async (socket: Socket) => {
         fastify.log.info(`Tetris AI player connected: ${socket.id}`);
         
-        socket.emit('role', { side: 'player' });
+        const isAuthenticated = isSocketAuthenticated(socket);
+        const userId = isAuthenticated ? (socket as any).userId : null;
         
-        socket.on('set_alias', async (data: { alias: string }) => {
-            const validation = validateGameAlias(data.alias);
-            if (!validation.valid) {
-                socket.emit('validation_error', { code: 'invalid_alias', field: 'alias', message: validation.error });
-                return;
+        // Get display name if authenticated
+        let displayName: string | null = null;
+        if (userId) {
+            displayName = await new Promise<string>((resolve) => {
+                fastify.sqlite.get('SELECT display_name FROM users WHERE id = ?', [userId], (err: Error | null, row: any) => {
+                    if (err || !row) resolve('Player');
+                    else resolve(row.display_name);
+                });
+            });
+        }
+        
+        socket.emit('role', { side: 'player' });
+        socket.emit('auth_status', { isAuthenticated, displayName });
+        
+        socket.on('set_alias', async (data: { alias?: string }) => {
+            let playerName: string;
+            let playerIsUser = false;
+            
+            if (isAuthenticated && userId && displayName) {
+                playerName = displayName;
+                playerIsUser = true;
+            } else {
+                if (!data.alias) {
+                    socket.emit('validation_error', { code: 'missing_alias', field: 'alias', message: 'Alias required' });
+                    return;
+                }
+                const validation = validateGameAlias(data.alias);
+                if (!validation.valid) {
+                    socket.emit('validation_error', { code: 'invalid_alias', field: 'alias', message: validation.error });
+                    return;
+                }
+                playerName = validation.value;
             }
             
-            state.player.alias = validation.value;
+            state.player.alias = playerName;
             
             if (!state.started) {
                 state.started = true;
                 spawnNewPiece(state.player);
                 spawnNewPiece(state.ai);
                 
-                // Initialize game record
-                const player1IsUser = isSocketAuthenticated(socket);
                 currentGameRecord = {
                     game_name: 'Tetris AI',
                     started_at: new Date().toISOString(),
-                    player1_name: state.player.alias,
-                    player1_is_user: player1IsUser,
+                    player1_name: playerName,
+                    player1_is_user: playerIsUser,
                     player2_name: state.ai.alias,
-                    player2_is_user: false // AI is not a registered user
+                    player2_is_user: false
                 };
                 
                 tetrisAINamespace.emit('game_started', {
@@ -369,33 +417,33 @@ export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
             
             tetrisAINamespace.emit('game_state', snapshot);
             
-            if (state.started && (state.player.gameOver || state.ai.gameOver)) {
+            if (state.started && (state.player.gameOver || state.ai.gameOver) && currentGameRecord) {
                 const winner = state.player.gameOver ? state.ai.alias : state.player.alias;
                 
-                // Save game record
-                if (currentGameRecord) {
-                    currentGameRecord.finished_at = new Date().toISOString();
-                    currentGameRecord.winner = winner;
-                    currentGameRecord.data = JSON.stringify({
-                        reason: 'game_over',
-                        winner: winner,
-                        player: {
-                            alias: state.player.alias,
-                            score: state.player.score,
-                            linesCleared: state.player.linesCleared,
-                            gameOver: state.player.gameOver
-                        },
-                        ai: {
-                            alias: state.ai.alias,
-                            score: state.ai.score,
-                            linesCleared: state.ai.linesCleared,
-                            gameOver: state.ai.gameOver
-                        }
-                    });
-                    
-                    await saveGameRecord(fastify, currentGameRecord as GameRecord);
-                    currentGameRecord = null;
-                }
+                // Capture the record and clear it immediately to prevent duplicate saves
+                const recordToSave = currentGameRecord;
+                currentGameRecord = null;
+                
+                recordToSave.finished_at = new Date().toISOString();
+                recordToSave.winner = winner;
+                recordToSave.data = JSON.stringify({
+                    reason: 'game_over',
+                    winner: winner,
+                    player: {
+                        alias: state.player.alias,
+                        score: state.player.score,
+                        linesCleared: state.player.linesCleared,
+                        gameOver: state.player.gameOver
+                    },
+                    ai: {
+                        alias: state.ai.alias,
+                        score: state.ai.score,
+                        linesCleared: state.ai.linesCleared,
+                        gameOver: state.ai.gameOver
+                    }
+                });
+                
+                await saveGameRecord(fastify, recordToSave as GameRecord);
                 
                 tetrisAINamespace.emit('game_ended', { reason: 'game_over', winner });
                 resetGame();

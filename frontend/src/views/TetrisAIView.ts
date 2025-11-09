@@ -11,6 +11,7 @@ export default class TetrisAIView extends AbstractView {
     private socket: any = null;
     private gameState: GameSnapshot | null = null;
     private animationFrameId: number | null = null;
+    private isAuthenticated: boolean = false;
     
     // Key state tracking
     private keys = {
@@ -32,15 +33,6 @@ export default class TetrisAIView extends AbstractView {
                     <h1 class="text-4xl font-bold text-white mb-8 text-center tracking-wider">
                         TETRIS vs AI
                     </h1>
-                    
-                    <!-- Alias Setup Button (shown before game starts) -->
-                    <div id="start-section" class="mb-6">
-                        <button id="alias-game-btn" 
-                                class="px-8 py-4 bg-blue-600 hover:bg-blue-700 
-                                       text-white text-xl font-bold rounded-lg shadow-lg transition-colors">
-                            START GAME
-                        </button>
-                    </div>
 
                     <!-- Alias Input Overlay -->
                     <div id="alias-overlay" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center">
@@ -168,6 +160,18 @@ export default class TetrisAIView extends AbstractView {
             // Single player, always playing
         });
 
+        this.socket.on('auth_status', ({ isAuthenticated }: { isAuthenticated: boolean; displayName: string | null }) => {
+            this.isAuthenticated = isAuthenticated;
+            
+            // Auto-start if authenticated, show alias prompt if not
+            if (this.isAuthenticated) {
+                this.socket.emit('set_alias', {});
+            } else {
+                document.getElementById('alias-overlay')?.classList.remove('hidden');
+                (document.getElementById('player-alias') as HTMLInputElement)?.focus();
+            }
+        });
+
         this.socket.on('game_started', (data: { playerAlias: string; aiAlias: string }) => {
             document.getElementById('player-name')!.textContent = data.playerAlias;
             document.getElementById('ai-name')!.textContent = data.aiAlias;
@@ -185,7 +189,6 @@ export default class TetrisAIView extends AbstractView {
                     : 'Game disconnected';
             }
             document.getElementById('game-over')?.classList.remove('hidden');
-            document.getElementById('start-section')?.classList.remove('hidden');
         });
     }
 
@@ -194,14 +197,9 @@ export default class TetrisAIView extends AbstractView {
         const saveBtn = document.getElementById('save-alias-btn') as HTMLButtonElement;
         const playerInput = document.getElementById('player-alias') as HTMLInputElement;
         const errorMsg = document.getElementById('alias-error');
-        
-        document.getElementById('alias-game-btn')?.addEventListener('click', () => {
-            overlay?.classList.remove('hidden');
-            playerInput?.focus();
-        });
 
         document.getElementById('cancel-alias-btn')?.addEventListener('click', () => {
-            overlay?.classList.add('hidden');
+            this.router.navigate('/');
         });
 
         const handleValidation = () => {
@@ -229,7 +227,6 @@ export default class TetrisAIView extends AbstractView {
 
             errorMsg?.classList.add('hidden');
             overlay?.classList.add('hidden');
-            document.getElementById('start-section')?.classList.add('hidden');
             this.socket?.emit('set_alias', { alias });
         });
 
