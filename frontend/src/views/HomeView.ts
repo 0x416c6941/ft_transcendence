@@ -38,7 +38,7 @@ async getHtml(): Promise<string> {
         </a>
         <a href="/pong-ai" data-link
            class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
-          Pong: Alias vs AI
+          Pong: ${this.isLoggedIn ? 'User' : 'Alias'} vs AI
         </a>
         <a href="/tetris" data-link
            class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
@@ -46,7 +46,7 @@ async getHtml(): Promise<string> {
         </a>
         <a href="/tetris-ai" data-link
            class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
-          Tetris: Alias vs AI
+          Tetris: ${this.isLoggedIn ? 'User' : 'Alias'} vs AI
         </a>
       </div>
     </main>

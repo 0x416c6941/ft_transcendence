@@ -13,6 +13,7 @@ export default class PongAIView extends AbstractView {
     private gameActive: boolean = false;
     private winner: 'player' | 'ai' | null = null;
     private gameEnded: boolean = false;
+    private isAuthenticated: boolean = false;
 
     constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
         super(router, pathParams, queryParams);
@@ -98,9 +99,13 @@ export default class PongAIView extends AbstractView {
     };
 
     private handleStartClick = (): void => {
-        const overlay = document.getElementById('alias-overlay');
-        overlay?.classList.remove('hidden');
-        (document.getElementById('player-alias') as HTMLInputElement)?.focus();
+        if (this.isAuthenticated) {
+            this.socket?.emit('start_ai_game', {});
+        } else {
+            const overlay = document.getElementById('alias-overlay');
+            overlay?.classList.remove('hidden');
+            (document.getElementById('player-alias') as HTMLInputElement)?.focus();
+        }
     };
 
     private handleKeyDown = (e: KeyboardEvent): void => {
@@ -159,7 +164,8 @@ export default class PongAIView extends AbstractView {
 
     setup(): void {
         this.socket = (window as any).io(window.location.origin + '/pong-ai', {
-            path: '/api/socket.io/'
+            path: '/api/socket.io/',
+            withCredentials: true
         });
 
         this.canvas = document.getElementById('pong') as HTMLCanvasElement;
@@ -170,6 +176,10 @@ export default class PongAIView extends AbstractView {
 
         this.socket.on('connect', () => {
             this.socket.emit('create_ai_room');
+        });
+
+        this.socket.on('auth_status', ({ isAuthenticated }: { isAuthenticated: boolean; displayName: string | null }) => {
+            this.isAuthenticated = isAuthenticated;
         });
 
         this.socket.on('ai_room_created', () => {
@@ -234,6 +244,7 @@ export default class PongAIView extends AbstractView {
         // sockets
         if (this.socket) {
             this.socket.off('connect');
+            this.socket.off('auth_status');
             this.socket.off('ai_room_created');
             this.socket.off('game_state');
             this.socket.off('game_stopped');
@@ -261,7 +272,7 @@ export default class PongAIView extends AbstractView {
     };
 
     private updateStartButton(): void {
-        const startButton = document.getElementById('start-button');
+        const startButton = document.getElementById('start-button') as HTMLButtonElement;
         if (!startButton) return;
 
         if (this.gameActive) {

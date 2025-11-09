@@ -2,6 +2,16 @@ import { FastifyInstance } from 'fastify';
 import { Server, Socket, Namespace } from 'socket.io';
 import { saveGameRecord, isSocketAuthenticated, GameRecord } from './utils/gameStats.js';
 import { validateGameAlias } from './utils/validation.js';
+import { verifyToken } from './utils/jwt.js';
+
+async function getDisplayName(fastify: FastifyInstance, userId: number): Promise<string> {
+    return new Promise((resolve) => {
+        fastify.sqlite.get('SELECT display_name FROM users WHERE id = ?', [userId], (err: Error | null, row: any) => {
+            if (err || !row) resolve('Player');
+            else resolve(row.display_name);
+        });
+    });
+}
 
 //CONSTANTS
 const WIDTH = 640;
@@ -278,8 +288,36 @@ function stopGame(room: Room, ns: Namespace): void {
 //SERVER SETUP
 export function setupPongAI(fastify: FastifyInstance, io: Server): void {
     const ns = io.of('/pong-ai');
+    
+    // Optional JWT Authentication middleware - allows both authenticated and non-authenticated users
+    ns.use(async (socket, next) => {
+        try {
+            const token = socket.handshake.auth.token || socket.handshake.headers.cookie
+                ?.split(';')
+                .find((row: string) => row.trim().startsWith('accessToken='))
+                ?.split('=')[1];
+            
+            if (token) {
+                const decoded = verifyToken(token);
+                if (decoded?.userId && decoded?.username) {
+                    // Attach user info to socket if valid token
+                    (socket as any).userId = decoded.userId;
+                    (socket as any).username = decoded.username;
+                }
+            }
+            // Continue even without token - non-authenticated users allowed
+            next();
+        } catch (error) {
+            // Invalid token - continue as non-authenticated
+            next();
+        }
+    });
 
-    ns.on('connection', (socket: Socket) => {
+    ns.on('connection', async (socket: Socket) => {
+        const isAuthenticated = await isSocketAuthenticated(socket);
+        const userId = isAuthenticated ? (socket as any).userId : null;
+        const displayName = userId ? await getDisplayName(fastify, userId) : null;
+        
         socket.on('create_ai_room', () => {
             // Leave previous room if any
             if (socket.data.roomId) {
@@ -290,7 +328,9 @@ export function setupPongAI(fastify: FastifyInstance, io: Server): void {
             const room = createAIRoom(socket.id);
             socket.join(room.id);
             socket.data.roomId = room.id;
+            
             socket.emit('ai_room_created', { roomId: room.id });
+            socket.emit('auth_status', { isAuthenticated, displayName });
         });
 
         socket.on('leave_ai_room', () => {
@@ -302,30 +342,37 @@ export function setupPongAI(fastify: FastifyInstance, io: Server): void {
             socket.emit('ai_room_left');
         });
 
-        socket.on('start_ai_game', async (data: { playerAlias: string }) => {
+        socket.on('start_ai_game', async (data: { playerAlias?: string }) => {
             const roomId = socket.data.roomId;
             if (!roomId) return;
             const room = rooms.get(roomId);
             if (!room || room.player !== socket.id || room.gameActive) return;
 
-            const validation = validateGameAlias(data.playerAlias);
-            if (!validation.valid) {
-                socket.emit('validation_error', { code: 'invalid_alias', field: 'playerAlias', message: validation.error });
-                return;
+            let playerName: string;
+            let playerIsUser = false;
+            
+            if (isAuthenticated && userId) {
+                playerName = displayName!;
+                playerIsUser = true;
+            } else {
+                if (!data.playerAlias) {
+                    socket.emit('validation_error', { code: 'missing_alias', field: 'playerAlias', message: 'Alias required' });
+                    return;
+                }
+                const validation = validateGameAlias(data.playerAlias);
+                if (!validation.valid) {
+                    socket.emit('validation_error', { code: 'invalid_alias', field: 'playerAlias', message: validation.error });
+                    return;
+                }
+                playerName = validation.value;
             }
 
-            room.playerAlias = validation.value;
+            room.playerAlias = playerName;
             room.gameActive = true;
             room.status = 'in_progress';
             resetGameState(room);
             
             // Initialize game record
-            const playerIsUser = await isSocketAuthenticated(socket);
-            let playerName = room.playerAlias;
-            if (playerIsUser && (socket as any).username) {
-                playerName = (socket as any).username;
-            }
-            
             room.currentGameRecord = {
                 game_name: 'pong-ai',
                 started_at: new Date().toISOString(),
