@@ -339,6 +339,8 @@ export default class ChatPanel {
 			// Wait for friends to be fetched before requesting online status
 			await this.fetchFriends();
 			this.socket.emit('request_online_users');
+			// Request game invites on mount to ensure badge count is accurate
+			this.socket.emit('game:get_invites');
 		};
 
 		this.socket.connected ? setTimeout(requestData, 50) : this.socket.once('connect', () => setTimeout(requestData, 100));
