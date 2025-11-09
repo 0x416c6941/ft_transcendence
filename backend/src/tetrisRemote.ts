@@ -1,7 +1,6 @@
 // Tetris Remote Game Server Logic - for authenticated remote multiplayer
 import { FastifyInstance } from 'fastify';
 import { Server, Socket } from 'socket.io';
-import { verifyToken } from './utils/jwt.js';
 import {
     TICK_HZ,
     GRAVITY_TICKS,
@@ -15,32 +14,34 @@ import {
 } from './tetrisShared.js';
 import { saveGameRecord, GameRecord } from './utils/gameStats.js';
 
-interface GameState {
-    player1: PlayerState;
-    player2: PlayerState;
-    started: boolean;
-    currentGravityTicks: number; // Dynamic gravity speed
-}
+const COUNTDOWN_SECONDS = 3;
 
 interface RemotePlayer {
     socketId: string;
     userId: number;
-    username: string;
-    side: PlayerSide;
+    displayName: string;
 }
 
-// Game state
-const state: GameState = {
-    player1: createPlayerState(),
-    player2: createPlayerState(),
-    started: false,
-    currentGravityTicks: GRAVITY_TICKS // Start at initial speed
-};
+interface RemoteRoom {
+    id: string;
+    player1: RemotePlayer | null;
+    player2: RemotePlayer | null;
+    status: 'waiting' | 'countdown' | 'playing' | 'finished';
+    gameState: GameState | null;
+    countdownTimer: NodeJS.Timeout | null;
+    gameInterval: NodeJS.Timeout | null;
+    startedAt: Date | null;
+}
 
-// Player tracking - only 2 players allowed
-const players = new Map<string, RemotePlayer>();
-let gameInterval: NodeJS.Timeout | null = null;
-let currentGameRecord: Partial<GameRecord> | null = null;
+interface GameState {
+    player1: PlayerState;
+    player2: PlayerState;
+    started: boolean;
+    currentGravityTicks: number;
+}
+
+// Store active rooms
+const rooms = new Map<string, RemoteRoom>();
 
 async function getDisplayName(fastify: FastifyInstance, userId: number): Promise<string> {
     return new Promise((resolve) => {
@@ -51,206 +52,345 @@ async function getDisplayName(fastify: FastifyInstance, userId: number): Promise
     });
 }
 
-function resetGame(): void {
-    resetPlayerState(state.player1);
-    resetPlayerState(state.player2);
-    state.started = false;
-    state.currentGravityTicks = GRAVITY_TICKS; // Reset speed to initial
-    players.clear();
+function createGameState(): GameState {
+    return {
+        player1: createPlayerState(),
+        player2: createPlayerState(),
+        started: false,
+        currentGravityTicks: GRAVITY_TICKS
+    };
 }
 
-function step(): void {
-    if (!state.started) return;
+function resetGame(room: RemoteRoom): void {
+    if (!room.gameState) return;
+    resetPlayerState(room.gameState.player1);
+    resetPlayerState(room.gameState.player2);
+    room.gameState.started = false;
+    room.gameState.currentGravityTicks = GRAVITY_TICKS;
+}
+
+function step(room: RemoteRoom): void {
+    if (!room.gameState || !room.gameState.started) return;
     
     // Update both players and collect new gravity speed
-    const newGravityP1 = updatePlayer(state.player1, state.currentGravityTicks);
-    const newGravityP2 = updatePlayer(state.player2, state.currentGravityTicks);
+    const newGravityP1 = updatePlayer(room.gameState.player1, room.gameState.currentGravityTicks);
+    const newGravityP2 = updatePlayer(room.gameState.player2, room.gameState.currentGravityTicks);
     
     // Use the minimum (fastest) gravity from either player's line clears
-    state.currentGravityTicks = Math.min(newGravityP1, newGravityP2);
+    room.gameState.currentGravityTicks = Math.min(newGravityP1, newGravityP2);
+}
+
+function updateGame(room: RemoteRoom): boolean {
+    if (!room.gameState) return false;
+    
+    step(room);
+    
+    // Check if game should end
+    return room.gameState.player1.gameOver || room.gameState.player2.gameOver;
+}
+
+function startCountdown(room: RemoteRoom, io: Server, fastify: FastifyInstance): void {
+    if (!room.player1 || !room.player2) return;
+
+    room.status = 'countdown';
+    let countdown = COUNTDOWN_SECONDS;
+
+    io.to(room.id).emit('remote_tetris_match_announced', {
+        player1: room.player1.displayName,
+        player2: room.player2.displayName,
+        countdown: countdown
+    });
+
+    room.countdownTimer = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+            if (room.countdownTimer) {
+                clearInterval(room.countdownTimer);
+                room.countdownTimer = null;
+            }
+            startGame(room, io, fastify);
+        }
+    }, 1000);
+}
+
+function startGame(room: RemoteRoom, io: Server, fastify: FastifyInstance): void {
+    room.status = 'playing';
+    room.gameState = createGameState();
+    room.gameState.started = true;
+    room.startedAt = new Date();
+
+    // Set player aliases
+    if (room.player1) room.gameState.player1.alias = room.player1.displayName;
+    if (room.player2) room.gameState.player2.alias = room.player2.displayName;
+
+    // Spawn initial pieces
+    spawnNewPiece(room.gameState.player1);
+    spawnNewPiece(room.gameState.player2);
+
+    io.to(room.id).emit('remote_tetris_match_started', {
+        player1Alias: room.gameState.player1.alias,
+        player2Alias: room.gameState.player2.alias
+    });
+
+    room.gameInterval = setInterval(async () => {
+        if (!room.gameState) return;
+
+        const gameEnded = updateGame(room);
+
+        // Send game state snapshot
+        const snapshot = {
+            player1: createPlayerSnapshot(room.gameState.player1),
+            player2: createPlayerSnapshot(room.gameState.player2),
+            started: room.gameState.started
+        };
+        
+        io.to(room.id).emit('remote_tetris_game_state', snapshot);
+
+        // Check for winner
+        if (gameEnded) {
+            await endGame(room, io, fastify);
+        }
+    }, 1000 / TICK_HZ);
+
+    fastify.log.info(`Remote tetris game started in room ${room.id}: ${room.gameState.player1.alias} vs ${room.gameState.player2.alias}`);
+}
+
+async function endGame(room: RemoteRoom, io: Server, fastify: FastifyInstance): Promise<void> {
+    if (room.gameInterval) {
+        clearInterval(room.gameInterval);
+        room.gameInterval = null;
+    }
+
+    if (!room.gameState || !room.player1 || !room.player2) return;
+
+    const winner = room.gameState.player1.gameOver ? room.player2.displayName : room.player1.displayName;
+    room.status = 'finished';
+
+    io.to(room.id).emit('remote_tetris_match_ended', { winner });
+
+    // Save game record
+    const gameRecord: GameRecord = {
+        game_name: 'Tetris Remote',
+        started_at: room.startedAt?.toISOString() || new Date().toISOString(),
+        finished_at: new Date().toISOString(),
+        player1_name: room.player1.displayName,
+        player1_is_user: true,
+        player2_name: room.player2.displayName,
+        player2_is_user: true,
+        winner: winner,
+        data: JSON.stringify({
+            reason: 'game_over',
+            winner: winner,
+            player1: {
+                alias: room.gameState.player1.alias,
+                score: room.gameState.player1.score,
+                linesCleared: room.gameState.player1.linesCleared,
+                gameOver: room.gameState.player1.gameOver
+            },
+            player2: {
+                alias: room.gameState.player2.alias,
+                score: room.gameState.player2.score,
+                linesCleared: room.gameState.player2.linesCleared,
+                gameOver: room.gameState.player2.gameOver
+            }
+        })
+    };
+
+    try {
+        await saveGameRecord(fastify, gameRecord);
+        fastify.log.info(`Remote tetris game saved: ${room.player1.displayName} vs ${room.player2.displayName}, winner: ${winner}`);
+    } catch (error) {
+        fastify.log.error({ err: error }, 'Failed to save remote tetris game record');
+    }
+
+    // Clean up room after a delay
+    setTimeout(() => {
+        rooms.delete(room.id);
+        fastify.log.info(`Remote tetris room ${room.id} cleaned up`);
+    }, 10000);
 }
 
 export function setupTetrisRemote(fastify: FastifyInstance, io: Server): void {
-    const tetrisRemoteNamespace = io.of('/tetris-remote');
-    
-    // JWT Authentication middleware
-    tetrisRemoteNamespace.use(async (socket, next) => {
-        try {
-            const token = socket.handshake.auth.token || socket.handshake.headers.cookie
-                ?.split(';')
-                .find((row: string) => row.trim().startsWith('accessToken='))
-                ?.split('=')[1];
-            
-            if (!token) return next(new Error('Authentication required'));
-            
-            const decoded = await verifyToken(token);
-            if (!decoded?.userId || !decoded?.username) {
-                return next(new Error('Invalid token'));
+    io.on('connection', (socket: Socket) => {
+        socket.on('remote_tetris_join', async (data: { roomId: string }) => {
+            const userId = (socket as any).userId;
+            const username = (socket as any).username;
+
+            if (!userId || !username) {
+                socket.emit('remote_tetris_error', { message: 'Authentication required' });
+                return;
             }
-            
-            // Attach user info to socket
-            (socket as any).userId = decoded.userId;
-            (socket as any).username = decoded.username;
-            next();
-        } catch (error) {
-            next(new Error('Authentication failed'));
-        }
-    });
-    
-	tetrisRemoteNamespace.on('connection', async (socket: Socket) => {
-		const userId = (socket as any).userId;
-		const username = (socket as any).username;
-		
-		// Fetch display name from database
-		const displayName = await getDisplayName(fastify, userId);
-		
-		fastify.log.info(`Tetris Remote player connected: ${displayName} (${userId}), current players: ${players.size}`);
-		
-		// Check if this user is already in the game (reconnection)
-		const existingPlayer = Array.from(players.values()).find(p => p.userId === userId);
-		if (existingPlayer) {
-			// Remove old socket entry and add new one (reconnection)
-			players.delete(existingPlayer.socketId);
-			fastify.log.info(`Player ${displayName} reconnecting, removing old socket ${existingPlayer.socketId}`);
-		}
-		
-		// Check if game is full (and user is not reconnecting)
-		if (players.size >= 2 && !existingPlayer) {
-			fastify.log.warn(`Game is full, rejecting ${displayName}`);
-			socket.emit('connection_error', { message: 'Game is full' });
-			socket.disconnect();
-			return;
-		}        // Assign player side
-        const side: PlayerSide = players.size === 0 ? 'player1' : 'player2';
-        players.set(socket.id, { socketId: socket.id, userId, username, side });
-        
-        // Set player alias to display name (not username)
-        state[side].alias = displayName;
-        
-        // Notify player of their role
-        socket.emit('role_assigned', { side });
-        
-        // Start game if both players are connected
-        if (players.size === 2 && !state.started) {
-            state.started = true;
-            spawnNewPiece(state.player1);
-            spawnNewPiece(state.player2);
-            
-            // Initialize game record (both players are authenticated users in remote game)
-            currentGameRecord = {
-                game_name: 'Tetris Remote',
-                started_at: new Date().toISOString(),
-                player1_name: state.player1.alias,
-                player1_is_user: true,
-                player2_name: state.player2.alias,
-                player2_is_user: true
-            };
-            
-            tetrisRemoteNamespace.emit('game_started', {
-                player1Alias: state.player1.alias,
-                player2Alias: state.player2.alias
-            });
-            
-            fastify.log.info(`Tetris Remote game started: ${state.player1.alias} vs ${state.player2.alias}`);
-        }
-        
-        // Handle input - each socket only controls their assigned player
-        socket.on('input', (data: { keys: Partial<PlayerState['input']> }) => {
-            const player = players.get(socket.id);
-            if (!player) return;
-            
-            const targetPlayer = state[player.side];
-            
+
+            const displayName = await getDisplayName(fastify, userId);
+
+            let room = rooms.get(data.roomId);
+
+            // Create room if it doesn't exist
+            if (!room) {
+                room = {
+                    id: data.roomId,
+                    player1: {
+                        socketId: socket.id,
+                        userId: userId,
+                        displayName: displayName
+                    },
+                    player2: null,
+                    status: 'waiting',
+                    gameState: null,
+                    countdownTimer: null,
+                    gameInterval: null,
+                    startedAt: null
+                };
+                rooms.set(data.roomId, room);
+                socket.join(data.roomId);
+                
+                io.to(data.roomId).emit('remote_tetris_room_state', { room });
+                
+                fastify.log.info(`Remote tetris room created: ${data.roomId} by ${displayName}`);
+            } else if (!room.player2) {
+                // Join as player 2
+                room.player2 = {
+                    socketId: socket.id,
+                    userId: userId,
+                    displayName: displayName
+                };
+                socket.join(data.roomId);
+
+                io.to(data.roomId).emit('remote_tetris_room_state', { room });
+
+                fastify.log.info(`Player 2 joined remote tetris room: ${data.roomId} - ${displayName}`);
+
+                // Start countdown since both players are present
+                startCountdown(room, io, fastify);
+            } else {
+                socket.emit('remote_tetris_error', { message: 'Room is full' });
+            }
+        });
+
+        socket.on('remote_tetris_input', (data: { roomId: string; keys: Partial<PlayerState['input']> }) => {
+            const room = rooms.get(data.roomId);
+            if (!room || !room.gameState || room.status !== 'playing') return;
+
+            // Determine which player this socket controls
+            let targetPlayer: PlayerState | null = null;
+            if (room.player1 && socket.id === room.player1.socketId) {
+                targetPlayer = room.gameState.player1;
+            } else if (room.player2 && socket.id === room.player2.socketId) {
+                targetPlayer = room.gameState.player2;
+            }
+
+            if (!targetPlayer) return;
+
+            // Update input state
             if (data.keys.left !== undefined) targetPlayer.input.left = data.keys.left;
             if (data.keys.right !== undefined) targetPlayer.input.right = data.keys.right;
             if (data.keys.down !== undefined) targetPlayer.input.down = data.keys.down;
             if (data.keys.rotate !== undefined) targetPlayer.input.rotate = data.keys.rotate;
             if (data.keys.drop !== undefined) targetPlayer.input.drop = data.keys.drop;
         });
-        
-        // Handle disconnect
-        socket.on('disconnect', async () => {
-            const disconnectedPlayer = players.get(socket.id);
-            const playerDisplayName = disconnectedPlayer ? state[disconnectedPlayer.side].alias : 'Unknown';
-            
-            fastify.log.info(`Tetris Remote player disconnected: ${playerDisplayName}`);
-            players.delete(socket.id);
-            
-            // If a player disconnects during game, end it
-            if (state.started && currentGameRecord) {
-                // Save game record on disconnect
-                currentGameRecord.finished_at = new Date().toISOString();
-                currentGameRecord.data = JSON.stringify({
-                    reason: 'player_disconnected',
-                    player1: {
-                        alias: state.player1.alias,
-                        score: state.player1.score,
-                        linesCleared: state.player1.linesCleared
-                    },
-                    player2: {
-                        alias: state.player2.alias,
-                        score: state.player2.score,
-                        linesCleared: state.player2.linesCleared
+
+        socket.on('remote_tetris_leave', async (data: { roomId: string }) => {
+            const room = rooms.get(data.roomId);
+            if (!room) return;
+
+            // If game is active, end it
+            if (room.status === 'playing' && room.gameState) {
+                // Determine winner (the player who didn't leave)
+                let winner = 'Nobody';
+                if (room.player1 && socket.id !== room.player1.socketId) {
+                    winner = room.player1.displayName;
+                } else if (room.player2 && socket.id !== room.player2.socketId) {
+                    winner = room.player2.displayName;
+                }
+
+                // Save game record with disconnect reason
+                if (room.player1 && room.player2 && room.startedAt) {
+                    const gameRecord: GameRecord = {
+                        game_name: 'Tetris Remote',
+                        started_at: room.startedAt.toISOString(),
+                        finished_at: new Date().toISOString(),
+                        player1_name: room.player1.displayName,
+                        player1_is_user: true,
+                        player2_name: room.player2.displayName,
+                        player2_is_user: true,
+                        winner: winner !== 'Nobody' ? winner : undefined,
+                        data: JSON.stringify({
+                            reason: 'player_left',
+                            winner: winner
+                        })
+                    };
+
+                    try {
+                        await saveGameRecord(fastify, gameRecord);
+                    } catch (error) {
+                        fastify.log.error({ err: error }, 'Failed to save game record on leave');
                     }
-                });
-                
-                await saveGameRecord(fastify, currentGameRecord as GameRecord);
-                currentGameRecord = null;
-                
-                resetGame();
-                tetrisRemoteNamespace.emit('game_ended', { reason: 'player_disconnected' });
+                }
+
+                io.to(room.id).emit('remote_tetris_match_ended', { winner, reason: 'player_left' });
+            }
+
+            // Clean up
+            if (room.countdownTimer) clearInterval(room.countdownTimer);
+            if (room.gameInterval) clearInterval(room.gameInterval);
+            rooms.delete(data.roomId);
+
+            socket.leave(data.roomId);
+            fastify.log.info(`Player left remote tetris room: ${data.roomId}`);
+        });
+
+        socket.on('disconnect', async () => {
+            // Find and clean up any rooms this socket was in
+            for (const [roomId, room] of rooms.entries()) {
+                if ((room.player1 && room.player1.socketId === socket.id) ||
+                    (room.player2 && room.player2.socketId === socket.id)) {
+                    
+                    // If game is active, end it
+                    if (room.status === 'playing' && room.gameState) {
+                        let winner = 'Nobody';
+                        if (room.player1 && socket.id !== room.player1.socketId) {
+                            winner = room.player1.displayName;
+                        } else if (room.player2 && socket.id !== room.player2.socketId) {
+                            winner = room.player2.displayName;
+                        }
+
+                        // Save game record
+                        if (room.player1 && room.player2 && room.startedAt) {
+                            const gameRecord: GameRecord = {
+                                game_name: 'Tetris Remote',
+                                started_at: room.startedAt.toISOString(),
+                                finished_at: new Date().toISOString(),
+                                player1_name: room.player1.displayName,
+                                player1_is_user: true,
+                                player2_name: room.player2.displayName,
+                                player2_is_user: true,
+                                winner: winner !== 'Nobody' ? winner : undefined,
+                                data: JSON.stringify({
+                                    reason: 'player_disconnected',
+                                    winner: winner
+                                })
+                            };
+
+                            try {
+                                await saveGameRecord(fastify, gameRecord);
+                            } catch (error) {
+                                fastify.log.error({ err: error }, 'Failed to save game record on disconnect');
+                            }
+                        }
+
+                        io.to(room.id).emit('remote_tetris_match_ended', { winner, reason: 'player_disconnected' });
+                    }
+
+                    // Clean up
+                    if (room.countdownTimer) clearInterval(room.countdownTimer);
+                    if (room.gameInterval) clearInterval(room.gameInterval);
+                    rooms.delete(roomId);
+                    
+                    fastify.log.info(`Player disconnected from remote tetris room: ${roomId}`);
+                }
             }
         });
     });
-    
-    // Game loop
-    if (!gameInterval) {
-        gameInterval = setInterval(async () => {
-            step();
-            
-            // Create snapshot for clients
-            const snapshot = {
-                player1: createPlayerSnapshot(state.player1),
-                player2: createPlayerSnapshot(state.player2),
-                started: state.started
-            };
-            
-            tetrisRemoteNamespace.emit('game_state', snapshot);
-            
-            // Check if game should end
-            if (state.started && (state.player1.gameOver || state.player2.gameOver)) {
-                const winner = state.player1.gameOver ? state.player2.alias : state.player1.alias;
-                
-                // Save game record
-                if (currentGameRecord) {
-                    currentGameRecord.finished_at = new Date().toISOString();
-                    currentGameRecord.winner = winner;
-                    currentGameRecord.data = JSON.stringify({
-                        reason: 'game_over',
-                        winner: winner,
-                        player1: {
-                            alias: state.player1.alias,
-                            score: state.player1.score,
-                            linesCleared: state.player1.linesCleared,
-                            gameOver: state.player1.gameOver
-                        },
-                        player2: {
-                            alias: state.player2.alias,
-                            score: state.player2.score,
-                            linesCleared: state.player2.linesCleared,
-                            gameOver: state.player2.gameOver
-                        }
-                    });
-                    
-                    await saveGameRecord(fastify, currentGameRecord as GameRecord);
-                    currentGameRecord = null;
-                }
-                
-                tetrisRemoteNamespace.emit('game_ended', { reason: 'game_over', winner });
-                resetGame();
-            }
-        }, 1000 / TICK_HZ);
-    }
-    
+
     fastify.log.info('Tetris Remote game server initialized');
 }

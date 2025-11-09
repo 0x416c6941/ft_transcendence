@@ -285,9 +285,9 @@ export default class ChatPanel {
 			
 			setTimeout(() => {
 				if (data.roomId) {
-					// Navigate to the specific room
+					// Navigate to the specific room with roomId as query parameter
 					if (data.gameType === 'tetris') {
-						this.router.navigate(`/tetris-remote`);
+						this.router.navigate(`/tetris-remote?roomId=${data.roomId}`);
 					} else if (data.gameType === 'pong') {
 						this.router.navigate(`/pong-remote/${data.roomId}`);
 					}
@@ -300,9 +300,13 @@ export default class ChatPanel {
 
 		this.socket.on('game:invite_room_created', (data: { inviteId: number; gameType: string; roomId?: string }) => {
 			// This event is received by the player who accepted the invite
-			if (data.roomId && data.gameType === 'pong') {
+			if (data.roomId) {
 				setTimeout(() => {
-					this.router.navigate(`/pong-remote/${data.roomId}`);
+					if (data.gameType === 'pong') {
+						this.router.navigate(`/pong-remote/${data.roomId}`);
+					} else if (data.gameType === 'tetris') {
+						this.router.navigate(`/tetris-remote?roomId=${data.roomId}`);
+					}
 				}, 1000);
 			}
 		});		this.socket.on('game:invite_declined', (data: { inviteId: number; byDisplayName: string }) => {

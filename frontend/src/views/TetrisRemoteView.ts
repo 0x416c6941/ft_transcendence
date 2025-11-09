@@ -11,89 +11,76 @@ import { io } from '../socket.js';
 export default class TetrisRemoteView extends AbstractView {
     private canvas: HTMLCanvasElement | null = null;
     private ctx: CanvasRenderingContext2D | null = null;
-    private socket: any = null;
+    private socket = io;
     private gameState: GameSnapshot | null = null;
     private mySide: 'player1' | 'player2' | null = null;
     private animationFrameId: number | null = null;
+    private roomId: string | null = null;
     
     // Key state tracking (single player controls based on assigned side)
     private keys = { left: false, right: false, down: false, rotate: false, drop: false };
 
     constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
         super(router, pathParams, queryParams);
-        // Authentication is handled by socket middleware on connection
+        // Extract roomId from URL query parameter
+        this.roomId = queryParams.get('invite') || queryParams.get('roomId');
+        
+        if (!this.roomId) {
+            console.error('No roomId provided in URL');
+        }
     }
 
     async getHtml(): Promise<string> {
         return `
-            <main class="min-h-screen flex flex-col items-center bg-gray-800 py-8 overflow-x-hidden">
-                <div class="w-full max-w-[1200px] mx-auto px-5 flex flex-col items-center">
-                    <h1 class="text-4xl font-bold text-white mb-8 text-center tracking-wider">
-                        REMOTE TETRIS BATTLE
-                    </h1>
-                    
-                    <!-- Waiting for opponent message -->
-                    <div id="waiting-section" class="mb-6 p-6 bg-gray-700 rounded-lg shadow-lg">
-                        <p class="text-xl text-white text-center">Waiting for opponent to connect...</p>
-                    </div>
+            <main class="flex-1 min-h-0 flex flex-col bg-gray-800 p-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h1 class="text-3xl font-bold text-white">Tetris - Remote Battle</h1>
+                    <button id="leave-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors">
+                        Leave Game
+                    </button>
+                </div>
 
-                    <!-- Game Canvas Container -->
-                    <div class="w-full flex gap-6 mb-6 justify-center flex-wrap">
-                        <!-- Player 1 Board -->
-                        <div class="flex flex-col items-center">
-                            <div class="bg-gray-700 px-6 py-3 rounded-t-lg border-2 border-b-0 border-gray-600">
-                                <h3 id="player1-name" class="text-xl font-bold text-white">Player 1</h3>
-                                <div class="text-gray-300 text-sm mt-1">
-                                    <span class="font-semibold">Score:</span> <span id="player1-score" class="text-yellow-400 font-bold">0</span>
+                <div class="flex-1 bg-gray-900 rounded-lg shadow-lg flex flex-col items-center justify-center relative p-4" id="game-container">
+                    <div id="match-info" class="w-full text-center text-white mb-3 hidden">
+                        <div class="bg-black bg-opacity-70 inline-block px-6 py-2 rounded-lg">
+                            <span id="player1-name" class="font-bold text-blue-400 text-lg">Player 1</span>
+                            <span class="text-gray-300 mx-2">vs</span>
+                            <span id="player2-name" class="font-bold text-gray-100 text-lg">Player 2</span>
+                        </div>
+                    </div>
+                    <div id="waiting-message" class="text-gray-500 text-xl text-center">
+                        <p>Waiting for opponent to join...</p>
+                    </div>
+                    <div class="hidden" id="canvas-wrapper">
+                        <div class="flex gap-6 justify-center">
+                            <!-- Player 1 Board -->
+                            <div class="flex flex-col items-center">
+                                <div class="bg-gray-700 px-4 py-2 rounded-t-lg border-2 border-b-0 border-gray-600">
+                                    <div class="text-gray-300 text-sm">
+                                        <span class="font-semibold">Score:</span> <span id="player1-score" class="text-yellow-400 font-bold">0</span>
+                                    </div>
+                                    <div class="text-gray-300 text-sm">
+                                        <span class="font-semibold">Lines:</span> <span id="player1-lines" class="text-green-400 font-bold">0</span>
+                                    </div>
                                 </div>
-                                <div class="text-gray-300 text-sm">
-                                    <span class="font-semibold">Lines:</span> <span id="player1-lines" class="text-green-400 font-bold">0</span>
-                                </div>
+                                <canvas id="tetris-player1" width="300" height="600" 
+                                        class="border-2 border-gray-600 bg-black shadow-lg rounded-b-lg"></canvas>
                             </div>
-                            <canvas id="tetris-player1" width="300" height="600" 
-                                    class="border-2 border-gray-600 bg-black shadow-lg rounded-b-lg"></canvas>
-                        </div>
 
-                        <!-- Player 2 Board -->
-                        <div class="flex flex-col items-center">
-                            <div class="bg-gray-700 px-6 py-3 rounded-t-lg border-2 border-b-0 border-gray-600">
-                                <h3 id="player2-name" class="text-xl font-bold text-white">Player 2</h3>
-                                <div class="text-gray-300 text-sm mt-1">
-                                    <span class="font-semibold">Score:</span> <span id="player2-score" class="text-yellow-400 font-bold">0</span>
+                            <!-- Player 2 Board -->
+                            <div class="flex flex-col items-center">
+                                <div class="bg-gray-700 px-4 py-2 rounded-t-lg border-2 border-b-0 border-gray-600">
+                                    <div class="text-gray-300 text-sm">
+                                        <span class="font-semibold">Score:</span> <span id="player2-score" class="text-yellow-400 font-bold">0</span>
+                                    </div>
+                                    <div class="text-gray-300 text-sm">
+                                        <span class="font-semibold">Lines:</span> <span id="player2-lines" class="text-green-400 font-bold">0</span>
+                                    </div>
                                 </div>
-                                <div class="text-gray-300 text-sm">
-                                    <span class="font-semibold">Lines:</span> <span id="player2-lines" class="text-green-400 font-bold">0</span>
-                                </div>
+                                <canvas id="tetris-player2" width="300" height="600" 
+                                        class="border-2 border-gray-600 bg-black shadow-lg rounded-b-lg"></canvas>
                             </div>
-                            <canvas id="tetris-player2" width="300" height="600" 
-                                    class="border-2 border-gray-600 bg-black shadow-lg rounded-b-lg"></canvas>
                         </div>
-                    </div>
-
-                    <!-- Game Over Message -->
-                    <div id="game-over" class="hidden mb-6 p-6 bg-red-600 rounded-lg shadow-lg border-2 border-red-700">
-                        <h2 class="text-3xl font-bold text-white text-center mb-2">GAME OVER!</h2>
-                        <p id="winner-text" class="text-xl text-white text-center font-semibold"></p>
-                    </div>
-
-                    <!-- Controls Info -->
-                    <div class="bg-gray-700 p-5 rounded-lg shadow-lg border border-gray-600 max-w-md">
-                        <h3 class="text-lg font-bold text-white mb-3 text-center">Your Controls</h3>
-                        <div class="text-gray-300 text-sm space-y-1">
-                            <p><span class="font-bold text-white">← / →</span> - Move Left/Right</p>
-                            <p><span class="font-bold text-white">↓</span> - Soft Drop</p>
-                            <p><span class="font-bold text-white">↑</span> - Rotate</p>
-                            <p><span class="font-bold text-white">Space</span> - Hard Drop</p>
-                        </div>
-                    </div>
-
-                    <!-- Back Button -->
-                    <div class="mt-6">
-                        <button id="back-button" 
-                                class="px-6 py-3 bg-gray-600 hover:bg-gray-700 
-                                       text-white rounded-lg shadow-lg transition-colors font-semibold">
-                            ← Back to Home
-                        </button>
                     </div>
                 </div>
             </main>
@@ -105,77 +92,121 @@ export default class TetrisRemoteView extends AbstractView {
     }
 
     setup(): void {
-        this.setupSocket();
+        this.setupSocketListeners();
         this.setupButtons();
         this.setupKeyboardControls();
         this.animationFrameId = requestAnimationFrame(this.loop);
+        
+        // Join the game room
+        if (this.roomId) {
+            this.socket.emit('remote_tetris_join', { roomId: this.roomId });
+        } else {
+            alert('No room ID provided');
+            this.router.navigate('/');
+        }
     }
 
-    private setupSocket(): void {
-        this.socket = (window as any).io(window.location.origin + '/tetris-remote', {
-            path: '/api/socket.io/',
-            withCredentials: true
-        });
-
-        this.socket.on('connect', () => {
-            console.log('Connected to /tetris-remote namespace');
-        });
-
-        this.socket.on('role_assigned', (data: { side: 'player1' | 'player2' | null }) => {
-            console.log('Role assigned:', data.side);
-            this.mySide = data.side;
-            if (!this.mySide) {
-                alert('Game is full. Only 2 players can play at once.');
-                this.router.navigate('/');
+    private setupSocketListeners(): void {
+        this.socket.on('remote_tetris_room_state', (data: { room: any }) => {
+            if (data.room.player1 && data.room.player2 && data.room.status === 'waiting') {
+                document.getElementById('waiting-message')?.classList.add('hidden');
             }
         });
 
-        this.socket.on('connection_error', (data: { message: string }) => {
-            console.error('Connection error:', data);
-            alert(data.message || 'Connection error occurred');
+        this.socket.on('remote_tetris_error', (data: { message: string }) => {
+            alert(data.message || 'Failed to join game');
             this.router.navigate('/');
         });
 
-        this.socket.on('game_started', (data: { player1Alias: string; player2Alias: string }) => {
-            document.getElementById('waiting-section')?.classList.add('hidden');
-            
-            const p1El = document.getElementById('player1-name');
-            const p2El = document.getElementById('player2-name');
-            if (p1El) p1El.textContent = data.player1Alias;
-            if (p2El) p2El.textContent = data.player2Alias;
+        this.socket.on('remote_tetris_match_announced', (data: { player1: string; player2: string; countdown: number }) => {
+            ['match-info', 'canvas-wrapper', 'waiting-message'].forEach(id => 
+                document.getElementById(id)?.classList.add('hidden')
+            );
+            this.showCountdownOverlay(`${data.player1} vs ${data.player2}`, data.countdown || 3);
         });
 
-        this.socket.on('game_state', (snapshot: GameSnapshot) => {
+        this.socket.on('remote_tetris_match_started', (data: { player1Alias: string; player2Alias: string }) => {
+            this.removeOverlay();
+            this.startGame(data.player1Alias, data.player2Alias);
+        });
+
+        this.socket.on('remote_tetris_game_state', (snapshot: GameSnapshot) => {
             this.gameState = snapshot;
         });
 
-        this.socket.on('game_ended', (data: { reason: string; winner?: string }) => {
-            const gameOverDiv = document.getElementById('game-over');
-            const winnerText = document.getElementById('winner-text');
-            
-            if (winnerText) {
-                winnerText.textContent = data.reason === 'game_over' && data.winner 
-                    ? `${data.winner} WINS!` 
-                    : 'A player disconnected';
-            }
-            gameOverDiv?.classList.remove('hidden');
+        this.socket.on('remote_tetris_match_ended', (data: { winner?: string }) => {
+            this.showMatchResult(data.winner || 'Nobody');
         });
 
         this.socket.on('connect_error', (err: Error) => {
-            console.error('Connect error:', err);
-            alert('Failed to connect to game server: ' + err.message);
+            alert('Failed to connect: ' + err.message);
             this.router.navigate('/');
-        });
-
-        this.socket.on('disconnect', (reason: string) => {
-            console.log('Disconnected:', reason);
         });
     }
 
+    private startGame(player1Name: string, player2Name: string): void {
+        document.getElementById('player1-name')!.textContent = player1Name;
+        document.getElementById('player2-name')!.textContent = player2Name;
+        document.getElementById('match-info')?.classList.remove('hidden');
+        document.getElementById('canvas-wrapper')?.classList.remove('hidden');
+        document.getElementById('waiting-message')?.classList.add('hidden');
+        this.removeOverlay();
+    }
+
+    private showCountdownOverlay(matchText: string, countdown: number): void {
+        const gameContainer = document.getElementById('game-container');
+        if (!gameContainer) return;
+
+        let overlay = document.getElementById('countdown-overlay') as HTMLDivElement;
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'countdown-overlay';
+            overlay.className = 'absolute inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-10 rounded-lg';
+            gameContainer.appendChild(overlay);
+        }
+
+        overlay.innerHTML = `<div class="text-white text-center">
+            <div class="text-3xl font-bold mb-4">${matchText}</div>
+            <div class="text-7xl font-bold" id="countdown-number">${countdown}</div>
+        </div>`;
+
+        let currentCount = countdown;
+        const countdownInterval = setInterval(() => {
+            const countdownNumber = document.getElementById('countdown-number');
+            if (!countdownNumber) return clearInterval(countdownInterval);
+            
+            if (--currentCount > 0) {
+                countdownNumber.textContent = currentCount.toString();
+            } else {
+                countdownNumber.textContent = 'GO!';
+                clearInterval(countdownInterval);
+            }
+        }, 1000);
+    }
+
+    private removeOverlay(): void {
+        const overlay = document.getElementById('countdown-overlay');
+        if (overlay) overlay.remove();
+    }
+
+    private showMatchResult(winner: string): void {
+        const gameContainer = document.getElementById('game-container');
+        if (!gameContainer) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'absolute inset-0 bg-black bg-opacity-90 flex flex-col items-center justify-center z-20 rounded-lg';
+        overlay.innerHTML = `<div class="text-white text-center">
+            <div class="text-6xl font-bold mb-4">🏆</div>
+            <div class="text-3xl font-bold mb-2">${winner} Wins!</div>
+            <div class="text-lg text-gray-300 mt-4">Returning to home in 5 seconds...</div>
+        </div>`;
+        gameContainer.appendChild(overlay);
+
+        setTimeout(() => this.router.navigate('/'), 5000);
+    }
+
     private setupButtons(): void {
-        document.getElementById('back-button')?.addEventListener('click', () => {
-            this.router.navigate('/');
-        });
+        document.getElementById('leave-btn')?.addEventListener('click', () => this.router.navigate('/'));
     }
 
     private setupKeyboardControls(): void {
@@ -187,20 +218,12 @@ export default class TetrisRemoteView extends AbstractView {
         window.removeEventListener('keydown', this.handleKeyDown);
         window.removeEventListener('keyup', this.handleKeyUp);
 
-        if (this.socket) {
-            this.socket.off('role_assigned');
-            this.socket.off('connection_error');
-            this.socket.off('game_started');
-            this.socket.off('game_state');
-            this.socket.off('game_ended');
-            this.socket.off('connect_error');
-            this.socket.disconnect();
-            this.socket = null;
-        }
+        ['remote_tetris_room_state', 'remote_tetris_error', 'remote_tetris_match_announced',
+         'remote_tetris_match_started', 'remote_tetris_game_state', 'remote_tetris_match_ended', 
+         'connect_error'].forEach(event => this.socket.off(event));
 
-        if (this.animationFrameId !== null) {
-            cancelAnimationFrame(this.animationFrameId);
-        }
+        if (this.roomId) this.socket.emit('remote_tetris_leave', { roomId: this.roomId });
+        if (this.animationFrameId !== null) cancelAnimationFrame(this.animationFrameId);
     }
 
     private handleKeyDown = (e: KeyboardEvent): void => {
@@ -232,8 +255,8 @@ export default class TetrisRemoteView extends AbstractView {
     };
 
     private sendInput(): void {
-        if (!this.mySide) return;
-        this.socket?.emit('input', { keys: this.keys });
+        if (!this.roomId) return;
+        this.socket?.emit('remote_tetris_input', { roomId: this.roomId, keys: this.keys });
     }
 
     private loop = (): void => {

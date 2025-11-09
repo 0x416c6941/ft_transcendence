@@ -147,8 +147,8 @@ export default class PongRemoteView extends AbstractView {
         const p1Name = document.getElementById('player1-name');
         const p2Name = document.getElementById('player2-name');
         
-        if (p1Name) p1Name.textContent = this.leftAlias;
-        if (p2Name) p2Name.textContent = this.rightAlias;
+        if (p1Name) p1Name.textContent = this.leftPlayerName;
+        if (p2Name) p2Name.textContent = this.rightPlayerName;
         if (matchInfo) matchInfo.classList.remove('hidden');
 
         const canvasWrapper = document.getElementById('canvas-wrapper');
@@ -172,27 +172,21 @@ export default class PongRemoteView extends AbstractView {
             gameContainer.appendChild(overlay);
         }
 
-        overlay.innerHTML = `
-            <div class="text-white text-center">
-                <div class="text-3xl font-bold mb-4">${matchText}</div>
-                <div class="text-7xl font-bold" id="countdown-number">${countdown}</div>
-            </div>
-        `;
+        overlay.innerHTML = `<div class="text-white text-center">
+            <div class="text-3xl font-bold mb-4">${matchText}</div>
+            <div class="text-7xl font-bold" id="countdown-number">${countdown}</div>
+        </div>`;
 
         let currentCount = countdown;
         const countdownInterval = setInterval(() => {
-            currentCount--;
             const countdownNumber = document.getElementById('countdown-number');
-            if (countdownNumber) {
-                if (currentCount > 0) {
-                    countdownNumber.textContent = currentCount.toString();
-                } else {
-                    countdownNumber.textContent = 'GO!';
-                    setTimeout(() => {
-                        this.removeOverlay();
-                        clearInterval(countdownInterval);
-                    }, 500);
-                }
+            if (!countdownNumber) return clearInterval(countdownInterval);
+            
+            if (--currentCount > 0) {
+                countdownNumber.textContent = currentCount.toString();
+            } else {
+                countdownNumber.textContent = 'GO!';
+                clearInterval(countdownInterval);
             }
         }, 1000);
     }
