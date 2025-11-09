@@ -10,6 +10,7 @@ import userRoutes from "./routes/users.js";
 import { allSchemas } from "./schemas/index.js";
 import { registerSwagger } from "./swagger/config.js";
 import { setupTournamentPong } from "./TournamentPongGame.js";
+import { setupRemotePong } from "./pongRemote.js";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import path from 'node:path';
@@ -260,6 +261,9 @@ const start = async () => {
 
 		// Set up Tournament Pong game server
 		setupTournamentPong(fastify, io);
+
+		// Set up Remote Pong game server (for invites)
+		setupRemotePong(fastify, io);
 
 		// Set up Pong Local game server
 		setupPongGameLocal(fastify, io);

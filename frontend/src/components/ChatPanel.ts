@@ -276,7 +276,7 @@ export default class ChatPanel {
 
 		this.socket.on('game:invite_sent', () => this.socket.emit('game:get_invites'));
 
-		this.socket.on('game:invite_accepted', (data: { inviteId: number; byDisplayName: string; gameType: string }) => {
+		this.socket.on('game:invite_accepted', (data: { inviteId: number; byDisplayName: string; gameType: string; roomId?: string }) => {
 			const invite = this.gameInvites.find(inv => inv.id === data.inviteId);
 			if (invite) invite.status = 'accepted';
 			
@@ -284,11 +284,28 @@ export default class ChatPanel {
 			this.showNotification(`${data.byDisplayName} accepted your invite!`, 'success');
 			
 			setTimeout(() => {
-				this.router.navigate(data.gameType === 'tetris' ? '/tetris-remote' : '/pong');
+				if (data.roomId) {
+					// Navigate to the specific room
+					if (data.gameType === 'tetris') {
+						this.router.navigate(`/tetris-remote`);
+					} else if (data.gameType === 'pong') {
+						this.router.navigate(`/pong-remote/${data.roomId}`);
+					}
+				} else {
+					// Fallback to old behavior
+					this.router.navigate(data.gameType === 'tetris' ? '/tetris-remote' : '/pong');
+				}
 			}, 1000);
 		});
 
-		this.socket.on('game:invite_declined', (data: { inviteId: number; byDisplayName: string }) => {
+		this.socket.on('game:invite_room_created', (data: { inviteId: number; gameType: string; roomId?: string }) => {
+			// This event is received by the player who accepted the invite
+			if (data.roomId && data.gameType === 'pong') {
+				setTimeout(() => {
+					this.router.navigate(`/pong-remote/${data.roomId}`);
+				}, 1000);
+			}
+		});		this.socket.on('game:invite_declined', (data: { inviteId: number; byDisplayName: string }) => {
 			const invite = this.gameInvites.find(inv => inv.id === data.inviteId);
 			if (invite) invite.status = 'declined';
 			
@@ -844,7 +861,7 @@ export default class ChatPanel {
 				this.showNotification('Invite accepted! Starting game...', 'success');
 				
 				if (this.currentTab === 'games') this.renderMessages();
-				setTimeout(() => this.router.navigate(gameType === 'tetris' ? '/tetris-remote' : '/pong'), 1000);
+				// Navigation will be handled by the socket event response
 			});
 		});
 

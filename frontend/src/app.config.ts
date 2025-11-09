@@ -14,6 +14,7 @@ import PongRoomsView from './views/PongRoomsView.js';
 import PongTournamentView from './views/PongTournamentView.js';
 import PongLocalView from './views/PongLocalView.js';
 import PongAIView from './views/PongAIView.js';
+import PongRemoteView from './views/PongRemoteView.js';
 // Tetris-related views.
 import TetrisView from './views/TetrisView.js';
 import TetrisAIView from './views/TetrisAIView.js';
@@ -38,6 +39,7 @@ export const PATHS_TO_ROUTE: PathToRegister[] = [
 	// Tournament room functionality
 	{ path: '/tournament-room', constructor: PongRoomsView, guard: 'auth' },
 	{ path: '/tournament-lobby/:roomId', constructor: PongTournamentView, guard: 'auth' },
+	{ path: '/pong-remote/:roomId', constructor: PongRemoteView, guard: 'auth' },
 	{ path: '/pong-local', constructor: PongLocalView },
 	{ path: '/pong-ai', constructor: PongAIView },
 	{ path: '/tetris', constructor: TetrisView },

@@ -571,6 +571,12 @@ export function setupChatSocket(fastify: FastifyInstance, io: Server): void {
 					});
 				});
 
+				// Create a unique room ID for remote games
+				let roomId: string | undefined;
+				if (data.gameType === 'pong' || data.gameType === 'tetris') {
+					roomId = `${data.gameType}-invite-${data.inviteId}-${Date.now()}`;
+				}
+
 				// Notify sender
 				if (invite) {
 					const sockets = await io.fetchSockets();
@@ -581,12 +587,20 @@ export function setupChatSocket(fastify: FastifyInstance, io: Server): void {
 							inviteId: data.inviteId,
 							byUsername: username,
 							byDisplayName: (socket as any).displayName || username,
-							gameType: data.gameType
+							gameType: data.gameType,
+							roomId: roomId
 						});
 					}
 				}
 
-				fastify.log.info(`Game invite accepted: ${username} accepted invite ${data.inviteId}`);
+				// Send roomId back to accepter
+				socket.emit('game:invite_room_created', {
+					inviteId: data.inviteId,
+					gameType: data.gameType,
+					roomId: roomId
+				});
+
+				fastify.log.info(`Game invite accepted: ${username} accepted invite ${data.inviteId}, room: ${roomId}`);
 			} catch (error) {
 				fastify.log.error({ err: error }, 'Error accepting game invite');
 			}
