@@ -133,9 +133,9 @@ export default class ChatPanel {
 				}
 			});
 			
-			// Re-render conversation list if we're viewing it (DM tab with no active conversation)
-			// This ensures online status updates are immediately visible
-			if (this.container && this.currentTab === 'dm' && !this.activeConversationId) {
+			// Re-render if viewing DM or Games tab to show updated online status
+			// This ensures online status updates are immediately visible in both tabs
+			if (this.container && (this.currentTab === 'dm' || this.currentTab === 'games') && !this.activeConversationId) {
 				this.renderMessages();
 			}
 		});
