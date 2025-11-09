@@ -453,6 +453,10 @@ export default class ChatPanel {
 
 		this.attachEventListeners();
 		
+		// Update badges after render to ensure they're visible with correct counts
+		// Use setTimeout to ensure DOM elements are available
+		setTimeout(() => this.updateUnreadBadge(), 0);
+		
 		// Render messages after DOM is ready if we have data
 		if (!this.isInGame && this.currentTab === 'global' && this.globalMessages.length > 0) {
 			setTimeout(() => {
@@ -862,7 +866,8 @@ export default class ChatPanel {
 				this.socket.emit('game:accept_invite', { inviteId, gameType });
 				this.showNotification('Invite accepted! Starting game...', 'success');
 				
-				if (this.currentTab === 'games') this.renderMessages();
+				// Update badge counter immediately
+				this.updateBadgeAndRefresh();
 				// Navigation will be handled by the socket event response
 			});
 		});
@@ -876,7 +881,8 @@ export default class ChatPanel {
 				this.socket.emit('game:decline_invite', { inviteId });
 				this.showNotification('Invite declined', 'info');
 				
-				if (this.currentTab === 'games') this.renderMessages();
+				// Update badge counter immediately
+				this.updateBadgeAndRefresh();
 			});
 		});
 
