@@ -1,16 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { Server, Socket } from 'socket.io';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'node:crypto';
 import { validateRoomName, validateRoomPassword } from './utils/validation.js';
 import { saveGameRecord, GameRecord } from './utils/gameStats.js';
-
-function generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
 import {
     TICK_HZ,
     GRAVITY_TICKS,
@@ -185,7 +178,7 @@ async function createRoom(name: string, password: string, creatorSocket: Socket,
         countdownTimer: null,
         currentMatchStartedAt: null,
         tournamentDbId: null,
-        tournamentUuid: generateUUID(),
+        tournamentUuid: randomUUID(),
         gameIds: []
     };
 
