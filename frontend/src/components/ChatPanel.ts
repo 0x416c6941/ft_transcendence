@@ -5,6 +5,7 @@
 
 import Router from '../router.js';
 import { io } from '../socket.js';
+import { getLeaderboard } from '../api/stats.js';
 
 interface ChatMessage {
 	id: number;
@@ -66,6 +67,7 @@ export default class ChatPanel {
 	private cachedOnlineUserIds: Set<number> = new Set(); // Cache online user IDs
 	private dmUnreadCount: number = 0;
 	private gameInviteCount: number = 0;
+	private winRates: Map<string, number> = new Map(); // username -> win_rate
 
 	constructor(router: Router) {
 		this.router = router;
@@ -107,6 +109,15 @@ export default class ChatPanel {
 			
 			// Store online users list
 			this.onlineUsers = users;
+			
+			// If on games tab, fetch win rates and re-render
+			if (this.currentTab === 'games') {
+				this.fetchWinRates().then(() => {
+					if (this.currentTab === 'games') {
+						this.renderMessages();
+					}
+				});
+			}
 			
 			// Cache the online user IDs for when friends are fetched
 			this.cachedOnlineUserIds = onlineUserIds;
@@ -386,6 +397,19 @@ export default class ChatPanel {
 		}
 	}
 
+	private async fetchWinRates(): Promise<void> {
+		try {
+			const result = await getLeaderboard();
+			this.winRates.clear();
+			result.leaderboard.forEach(entry => {
+				// Store with lowercase key for case-insensitive matching
+				this.winRates.set(entry.player_name.toLowerCase(), entry.win_rate);
+			});
+		} catch (error) {
+			console.error('Failed to fetch win rates:', error);
+		}
+	}
+
 	public unmount(): void {
 		this.container?.remove();
 		this.container = null;
@@ -625,11 +649,17 @@ export default class ChatPanel {
 					<p class="text-xs text-gray-500">No other users online</p>
 				` : `
 					<div class="space-y-2">
-						${availableUsers.map(user => `
+						${availableUsers.map(user => {
+							const winRate = this.winRates.get(user.username.toLowerCase());
+							const winRateText = winRate !== undefined ? `${winRate.toFixed(1)}%` : '—';
+							return `
 							<div class="flex items-center justify-between bg-gray-700 rounded-lg p-3">
 								<div class="flex items-center gap-3">
 									<div class="w-2 h-2 bg-green-500 rounded-full"></div>
-									<span class="text-sm text-white">${this.escapeHtml(user.displayName)}</span>
+									<div class="flex flex-col">
+										<span class="text-sm text-white">${this.escapeHtml(user.displayName)}</span>
+										<span class="text-xs text-gray-400">${winRateText}</span>
+									</div>
 								</div>
 								<div class="flex gap-2">
 									<button 
@@ -648,7 +678,7 @@ export default class ChatPanel {
 									</button>
 								</div>
 							</div>
-						`).join('')}
+						`;}).join('')}
 					</div>
 				`}
 			</div>
@@ -929,6 +959,12 @@ export default class ChatPanel {
 			// Switching to Games tab - request game invites list and online users
 			this.socket.emit('game:get_invites');
 			this.socket.emit('request_online_users');
+			// Fetch win rates in background and re-render when ready
+			this.fetchWinRates().then(() => {
+				if (this.currentTab === 'games') {
+					this.renderMessages();
+				}
+			});
 			// Clear game invite count when viewing
 			this.gameInviteCount = 0;
 			this.updateUnreadBadge();
