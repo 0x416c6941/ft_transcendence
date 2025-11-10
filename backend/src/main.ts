@@ -20,6 +20,7 @@ import { setupPongAI } from './pongAI.js';
 import { setupTetrisGame } from './tetrisGame.js';
 import { setupTetrisAI } from './tetrisAI.js';
 import { setupTetrisRemote } from './tetrisRemote.js';
+import { setupTetrisTournamentHandlers } from './tetrisTournament.js';
 import { seedDatabase } from './seedDatabase.js';
 import { verifyToken } from './utils/jwt.js';
 import friendsRoutes from './routes/friends.js';
@@ -258,6 +259,7 @@ const start = async () => {
 		setupTetrisGame(fastify, io);
 		setupTetrisAI(fastify, io);
 		setupTetrisRemote(fastify, io);
+		setupTetrisTournamentHandlers(io, fastify);
 
 		// Set up Tournament Pong game server
 		setupTournamentPong(fastify, io);

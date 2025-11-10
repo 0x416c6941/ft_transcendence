@@ -29,7 +29,7 @@ async getHtml(): Promise<string> {
         ${this.isLoggedIn ? `
         <a href="/tournament-room" data-link
            class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
-          Pong: Remote Game
+          Pong: Tournament
         </a>
         ` : ''}
         <a href="/pong-local" data-link
@@ -48,6 +48,12 @@ async getHtml(): Promise<string> {
            class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
           Tetris: ${this.isLoggedIn ? 'User' : 'Alias'} vs AI
         </a>
+        ${this.isLoggedIn ? `
+        <a href="/tetris-tournament-room" data-link
+           class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
+          Tetris: Tournament
+        </a>
+        ` : ''}
       </div>
     </main>
     `;
