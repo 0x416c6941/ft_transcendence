@@ -173,6 +173,50 @@ const fastifySqlite: FastifyPluginAsync<FastifySqliteOptions> = async (fastify: 
 		});
 	});
 
+	// Create tournaments table
+	await new Promise<void>((resolve, reject) => {
+		db.run(`
+			CREATE TABLE IF NOT EXISTS tournaments (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				uuid TEXT NOT NULL UNIQUE,
+				started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				finished_at DATETIME,
+				player_count INTEGER NOT NULL,
+				winner TEXT,
+				game_type TEXT NOT NULL
+			)
+		`, (err: Error | null) => {
+			if (err) {
+				fastify.log.error(`Failed to create tournaments table: ${err.message}`);
+				reject(err);
+			} else {
+				fastify.log.info('Tournaments table ready');
+				resolve();
+			}
+		});
+	});
+
+	// Create tournament_games join table
+	await new Promise<void>((resolve, reject) => {
+		db.run(`
+			CREATE TABLE IF NOT EXISTS tournament_games (
+				tournament_id INTEGER NOT NULL,
+				game_id INTEGER NOT NULL,
+				PRIMARY KEY (tournament_id, game_id),
+				FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+				FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+			)
+		`, (err: Error | null) => {
+			if (err) {
+				fastify.log.error(`Failed to create tournament_games table: ${err.message}`);
+				reject(err);
+			} else {
+				fastify.log.info('Tournament games join table ready');
+				resolve();
+			}
+		});
+	});
+
 	// Create conversations table for DM threads
 	await new Promise<void>((resolve, reject) => {
 		db.run(`
