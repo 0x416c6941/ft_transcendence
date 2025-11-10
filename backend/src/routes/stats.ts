@@ -341,4 +341,52 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 			return reply.code(500).send({ error: 'Failed to fetch activity data' });
 		}
 	});
+
+	// Get tournaments
+	fastify.get('/stats/tournaments', async (request: FastifyRequest<{
+		Querystring: { game?: string; limit?: string }
+	}>, reply: FastifyReply) => {
+		try {
+			const { game, limit = '50' } = request.query;
+			const limitNum = parseInt(limit, 10);
+
+			let gameFilter = '';
+			const params: any[] = [limitNum];
+			
+			if (game) {
+				gameFilter = ' AND LOWER(game_type) = LOWER(?)';
+				params.unshift(game);
+			}
+
+			// Get tournaments with match count
+			const tournaments = await new Promise<any[]>((resolve, reject) => {
+				const query = `
+					SELECT 
+						t.id,
+						t.uuid,
+						t.started_at,
+						t.finished_at,
+						t.player_count,
+						t.winner,
+						t.game_type,
+						COUNT(tg.game_id) as match_count
+					FROM tournaments t
+					LEFT JOIN tournament_games tg ON t.id = tg.tournament_id
+					WHERE 1=1${gameFilter}
+					GROUP BY t.id
+					ORDER BY t.started_at DESC
+					LIMIT ?
+				`;
+				fastify.sqlite.all(query, params, (err: Error | null, rows: any[]) => {
+					if (err) reject(err);
+					else resolve(rows);
+				});
+			});
+
+			return reply.send({ tournaments });
+		} catch (err: any) {
+			fastify.log.error(err);
+			return reply.code(500).send({ error: 'Failed to fetch tournaments' });
+		}
+	});
 }

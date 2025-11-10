@@ -16,16 +16,17 @@ export interface GameRecord {
 /**
  * Save a game record to the database
  * Called internally by game servers
+ * Returns the ID of the inserted game record
  */
 export async function saveGameRecord(
 	fastify: FastifyInstance,
 	gameRecord: GameRecord
-): Promise<void> {
+): Promise<number> {
 	try {
 		// Log the game record before saving
 		fastify.log.info({ gameRecord }, 'Saving game record');
 
-		await new Promise<void>((resolve, reject) => {
+		const gameId = await new Promise<number>((resolve, reject) => {
 			fastify.sqlite.run(
 				`INSERT INTO games (game_name, started_at, finished_at, player1_name, player1_is_user, player2_name, player2_is_user, winner, data)
 				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -40,17 +41,18 @@ export async function saveGameRecord(
 					gameRecord.winner || null,
 					gameRecord.data || null
 				],
-				function (err: Error | null) {
+				function (this: any, err: Error | null) {
 					if (err) {
 						reject(err);
 					} else {
-						resolve();
+						resolve(this.lastID);
 					}
 				}
 			);
 		});
 
-		fastify.log.info(`Game record saved: ${gameRecord.player1_name} vs ${gameRecord.player2_name}`);
+		fastify.log.info(`Game record saved with ID ${gameId}: ${gameRecord.player1_name} vs ${gameRecord.player2_name}`);
+		return gameId;
 	} catch (error) {
 		fastify.log.error(`Failed to save game record: ${error}`);
 		throw error;

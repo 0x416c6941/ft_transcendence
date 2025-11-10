@@ -7,19 +7,22 @@ import {
 	getLeaderboard,
 	getRecentGames,
 	getActivity,
+	getTournaments,
 	type OverviewStats,
 	type LeaderboardEntry,
 	type RecentGame,
-	type ActivityData
+	type ActivityData,
+	type Tournament
 } from "../api/stats.js";
 
 export default class StatsView extends AbstractView {
-	private currentTab: 'overview' | 'leaderboard' | 'recent' | 'activity' = 'overview';
+	private currentTab: 'overview' | 'leaderboard' | 'recent' | 'activity' | 'tournaments' = 'overview';
 	private selectedGame: string = '';
 	private stats: OverviewStats | null = null;
 	private leaderboard: LeaderboardEntry[] = [];
 	private recentGames: RecentGame[] = [];
 	private activityData: ActivityData | null = null;
+	private tournaments: Tournament[] = [];
 
 	constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
 		super(router, pathParams, queryParams);
@@ -51,6 +54,9 @@ export default class StatsView extends AbstractView {
 						</button>
 						<button id="tab-activity" class="tab-btn px-4 py-2 txt-light-dark-sans font-semibold border-b-2 border-transparent hover:border-neutral-400 transition-colors">
 							Activity
+						</button>
+						<button id="tab-tournaments" class="tab-btn px-4 py-2 txt-light-dark-sans font-semibold border-b-2 border-transparent hover:border-neutral-400 transition-colors">
+							Tournaments
 						</button>
 					</div>
 
@@ -172,6 +178,29 @@ export default class StatsView extends AbstractView {
 								</div>
 							</div>
 						</div>
+
+						<!-- Tournaments Tab -->
+						<div id="content-tournaments" class="tab-content hidden">
+							<div class="bg-white dark:bg-neutral-800 rounded-lg shadow overflow-hidden">
+								<div class="overflow-x-auto">
+									<table class="w-full">
+										<thead class="bg-neutral-200 dark:bg-neutral-700">
+											<tr>
+												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold">Game Type</th>
+												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold">Players</th>
+												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold">Matches</th>
+												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold">Winner</th>
+												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold">Duration</th>
+												<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold">Date</th>
+											</tr>
+										</thead>
+										<tbody id="tournaments-body" class="divide-y divide-neutral-200 dark:divide-neutral-700">
+											<!-- Dynamic content -->
+										</tbody>
+									</table>
+								</div>
+							</div>
+						</div>
 					</div>
 
 					<div id="error-msg" class="text-red-500 txt-light-dark-sans text-center mt-4" hidden></div>
@@ -267,6 +296,9 @@ export default class StatsView extends AbstractView {
 					break;
 				case 'activity':
 					await this.loadActivityData();
+					break;
+				case 'tournaments':
+					await this.loadTournaments();
 					break;
 			}
 		} catch (err: any) {
@@ -474,6 +506,70 @@ export default class StatsView extends AbstractView {
 						</div>
 					</div>
 				</div>
+			`;
+		}).join('');
+	}
+
+	private async loadTournaments(): Promise<void> {
+		const data = await getTournaments(100, this.selectedGame || undefined);
+		this.tournaments = data.tournaments;
+		this.renderTournaments();
+	}
+
+	private renderTournaments(): void {
+		const tbody = document.getElementById('tournaments-body');
+		if (!tbody) return;
+
+		if (this.tournaments.length === 0) {
+			tbody.innerHTML = `
+				<tr>
+					<td colspan="6" class="px-4 py-8 text-center txt-light-dark-sans opacity-70">
+						No tournaments yet
+					</td>
+				</tr>
+			`;
+			return;
+		}
+
+		tbody.innerHTML = this.tournaments.map(tournament => {
+			const startDate = new Date(tournament.started_at);
+			const formattedStart = startDate.toLocaleDateString() + ' ' + startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+			
+			let duration = 'In Progress';
+			if (tournament.finished_at) {
+				const endDate = new Date(tournament.finished_at);
+				const durationMs = endDate.getTime() - startDate.getTime();
+				const durationMin = Math.round(durationMs / 60000);
+				duration = `${durationMin} min`;
+			}
+
+			const gameTypeColor = tournament.game_type.toLowerCase() === 'pong' 
+				? 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200'
+				: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
+
+			return `
+				<tr class="hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors">
+					<td class="px-4 py-3 txt-light-dark-sans">
+						<span class="inline-block px-2 py-1 rounded ${gameTypeColor} text-sm capitalize font-semibold">
+							${tournament.game_type}
+						</span>
+					</td>
+					<td class="px-4 py-3 txt-light-dark-sans">
+						<span class="font-medium">${tournament.player_count}</span> players
+					</td>
+					<td class="px-4 py-3 txt-light-dark-sans">
+						${tournament.match_count} ${tournament.match_count === 1 ? 'match' : 'matches'}
+					</td>
+					<td class="px-4 py-3 txt-light-dark-sans">
+						${tournament.winner ? `<span class="font-bold text-green-600 dark:text-green-400">🏆 ${tournament.winner}</span>` : '<span class="opacity-50">-</span>'}
+					</td>
+					<td class="px-4 py-3 txt-light-dark-sans opacity-70">
+						${duration}
+					</td>
+					<td class="px-4 py-3 txt-light-dark-sans text-right opacity-70 text-sm">
+						${formattedStart}
+					</td>
+				</tr>
 			`;
 		}).join('');
 	}

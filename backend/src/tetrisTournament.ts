@@ -3,6 +3,14 @@ import { Server, Socket } from 'socket.io';
 import * as bcrypt from 'bcrypt';
 import { validateRoomName, validateRoomPassword } from './utils/validation.js';
 import { saveGameRecord, GameRecord } from './utils/gameStats.js';
+
+function generateUUID(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
 import {
     TICK_HZ,
     GRAVITY_TICKS,
@@ -48,10 +56,73 @@ interface TournamentRoom {
     gameInterval: ReturnType<typeof setInterval> | null;
     countdownTimer: ReturnType<typeof setInterval> | null;
     currentMatchStartedAt: string | null;
+    tournamentDbId: number | null;
+    tournamentUuid: string;
+    gameIds: number[];
 }
 
 const rooms = new Map<string, TournamentRoom>();
 const roomsByName = new Map<string, string>(); // name -> roomId
+
+async function saveTournamentStart(room: TournamentRoom, fastify: FastifyInstance): Promise<void> {
+    return new Promise((resolve, reject) => {
+        (fastify as any).sqlite.run(
+            'INSERT INTO tournaments (uuid, started_at, player_count, game_type) VALUES (?, ?, ?, ?)',
+            [room.tournamentUuid, new Date().toISOString(), room.players.length, 'Tetris'],
+            function (this: any, err: Error | null) {
+                if (err) {
+                    fastify.log.error(err, 'Failed to save tournament start');
+                    reject(err);
+                } else {
+                    room.tournamentDbId = this.lastID;
+                    fastify.log.info(`Tetris tournament ${room.tournamentUuid} saved with ID ${this.lastID}`);
+                    resolve();
+                }
+            }
+        );
+    });
+}
+
+async function saveTournamentEnd(room: TournamentRoom, winner: string, fastify: FastifyInstance): Promise<void> {
+    if (!room.tournamentDbId) return;
+    
+    return new Promise((resolve, reject) => {
+        (fastify as any).sqlite.run(
+            'UPDATE tournaments SET finished_at = ?, winner = ? WHERE id = ?',
+            [new Date().toISOString(), winner, room.tournamentDbId],
+            (err: Error | null) => {
+                if (err) {
+                    fastify.log.error(err, 'Failed to save tournament end');
+                    reject(err);
+                } else {
+                    fastify.log.info(`Tetris tournament ${room.tournamentDbId} finished. Winner: ${winner}`);
+                    resolve();
+                }
+            }
+        );
+    });
+}
+
+async function linkGameToTournament(room: TournamentRoom, gameId: number, fastify: FastifyInstance): Promise<void> {
+    if (!room.tournamentDbId) return;
+    
+    room.gameIds.push(gameId);
+    
+    return new Promise((resolve, reject) => {
+        (fastify as any).sqlite.run(
+            'INSERT INTO tournament_games (tournament_id, game_id) VALUES (?, ?)',
+            [room.tournamentDbId, gameId],
+            (err: Error | null) => {
+                if (err) {
+                    fastify.log.error(err, 'Failed to link game to tournament');
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            }
+        );
+    });
+}
 
 async function getDisplayName(fastify: FastifyInstance, userId: number): Promise<string | null> {
     return await new Promise((resolve) => {
@@ -112,7 +183,10 @@ async function createRoom(name: string, password: string, creatorSocket: Socket,
         gameState: null,
         gameInterval: null,
         countdownTimer: null,
-        currentMatchStartedAt: null
+        currentMatchStartedAt: null,
+        tournamentDbId: null,
+        tournamentUuid: generateUUID(),
+        gameIds: []
     };
 
     rooms.set(roomId, room);
@@ -202,7 +276,7 @@ export function setupTetrisTournamentHandlers(io: Server, fastify: FastifyInstan
             }
         });
 
-        socket.on('tetris_tournament_start', (data: { roomId: string }) => {
+        socket.on('tetris_tournament_start', async (data: { roomId: string }) => {
             const room = rooms.get(data.roomId);
             if (!room) return;
 
@@ -217,6 +291,9 @@ export function setupTetrisTournamentHandlers(io: Server, fastify: FastifyInstan
             }
 
             room.status = 'in_progress';
+            
+            // Save tournament start to DB
+            await saveTournamentStart(room, fastify);
 
             io.to(data.roomId).emit('tetris_tournament_started', { room: getClientSafeRoom(room) });
             
@@ -341,7 +418,7 @@ function announceAndScheduleMatch(roomId: string, io: Server, fastify: FastifyIn
     return true;
 }
 
-function startMatch(room: TournamentRoom, io: Server, fastify: FastifyInstance): void {
+async function startMatch(room: TournamentRoom, io: Server, fastify: FastifyInstance): Promise<void> {
     if (!room.currentMatch) return;
 
     room.gameState = {
@@ -362,7 +439,7 @@ function startMatch(room: TournamentRoom, io: Server, fastify: FastifyInstance):
     // Emit initial game state immediately so pieces appear
     io.to(room.id).emit('tetris_game_state', room.gameState);
 
-    room.gameInterval = setInterval(() => {
+    room.gameInterval = setInterval(async () => {
         if (!room.gameState || !room.currentMatch) return;
 
         const newGravityTicks1 = updatePlayer(room.gameState.player1, room.gameState.currentGravityTicks);
@@ -429,9 +506,15 @@ function startMatch(room: TournamentRoom, io: Server, fastify: FastifyInstance):
                     })
                 };
 
-                saveGameRecord(fastify, gameRecord).catch(error => {
-                    fastify.log.error('Failed to save tetris tournament match record:', error);
-                });
+                saveGameRecord(fastify, gameRecord)
+                    .then(async (gameId) => {
+                        if (room.tournamentDbId && gameId) {
+                            await linkGameToTournament(room, gameId, fastify);
+                        }
+                    })
+                    .catch(error => {
+                        fastify.log.error(error, 'Failed to save tetris tournament match record');
+                    });
             }
 
             io.to(room.id).emit('tetris_match_ended', {
@@ -440,14 +523,18 @@ function startMatch(room: TournamentRoom, io: Server, fastify: FastifyInstance):
             });
 
             room.gameState = null;
+            room.gameState = null;
             room.currentMatch = null;
-            room.currentMatchStartedAt = null;
 
             // Check if tournament is over
             const activePlayers = room.players.filter(p => !p.isEliminated);
             if (activePlayers.length === 1) {
                 // Tournament finished
                 room.status = 'finished';
+                
+                // Save tournament end to database
+                await saveTournamentEnd(room, activePlayers[0].displayName, fastify);
+                
                 io.to(room.id).emit('tetris_tournament_finished', {
                     winner: activePlayers[0].displayName,
                     room: getClientSafeRoom(room)
@@ -520,9 +607,15 @@ function handlePlayerLeave(socket: Socket, roomId: string, io: Server, fastify: 
                     })
                 };
 
-                saveGameRecord(fastify, gameRecord).catch(error => {
-                    fastify.log.error('Failed to save tetris tournament match record (forfeit):', error);
-                });
+                saveGameRecord(fastify, gameRecord)
+                    .then(async (gameId) => {
+                        if (room.tournamentDbId && gameId) {
+                            await linkGameToTournament(room, gameId, fastify);
+                        }
+                    })
+                    .catch(error => {
+                        fastify.log.error(error, 'Failed to save tetris tournament match record (forfeit)');
+                    });
             }
 
             io.to(roomId).emit('tetris_match_ended', {

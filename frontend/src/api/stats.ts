@@ -50,6 +50,18 @@ export interface ActivityData {
 	days: number;
 }
 
+export interface Tournament {
+	id: number;
+	uuid: string;
+	started_at: string;
+	finished_at: string | null;
+	player_count: number;
+	winner: string | null;
+	game_type: string;
+	match_count: number;
+}
+
+
 export async function getOverviewStats(game?: string): Promise<OverviewStats> {
 	const params = new URLSearchParams();
 	if (game) params.append('game', game);
@@ -129,6 +141,23 @@ export async function getActivity(days: number = 7, game?: string): Promise<Acti
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch activity data');
+	}
+
+	return response.json();
+}
+
+export async function getTournaments(limit: number = 50, game?: string): Promise<{ tournaments: Tournament[] }> {
+	const params = new URLSearchParams();
+	params.append('limit', limit.toString());
+	if (game) params.append('game', game);
+
+	const response = await fetch(`${BASE_URL}/stats/tournaments?${params}`, {
+		method: 'GET',
+		credentials: 'include'
+	});
+
+	if (!response.ok) {
+		throw new Error('Failed to fetch tournaments');
 	}
 
 	return response.json();

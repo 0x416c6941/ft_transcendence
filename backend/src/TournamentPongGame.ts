@@ -4,6 +4,77 @@ import * as bcrypt from 'bcrypt';
 import { saveGameRecord, GameRecord } from './utils/gameStats.js';
 import { validateRoomName, validateRoomPassword } from './utils/validation.js';
 
+// UUID generator
+function generateUUID(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// Tournament database functions
+async function saveTournamentStart(room: Room, fastify: FastifyInstance): Promise<void> {
+    return new Promise((resolve, reject) => {
+        (fastify as any).sqlite.run(
+            'INSERT INTO tournaments (uuid, started_at, player_count, game_type) VALUES (?, ?, ?, ?)',
+            [room.tournamentUuid, new Date().toISOString(), room.players.length, 'Pong'],
+            function (this: any, err: Error | null) {
+                if (err) {
+                    fastify.log.error(err, 'Failed to save tournament start');
+                    reject(err);
+                } else {
+                    room.tournamentDbId = this.lastID;
+                    fastify.log.info(`Pong tournament ${room.tournamentUuid} saved with ID ${this.lastID}`);
+                    resolve();
+                }
+            }
+        );
+    });
+}
+
+async function saveTournamentEnd(room: Room, winner: string, fastify: FastifyInstance): Promise<void> {
+    if (!room.tournamentDbId) return;
+    
+    return new Promise((resolve, reject) => {
+        (fastify as any).sqlite.run(
+            'UPDATE tournaments SET finished_at = ?, winner = ? WHERE id = ?',
+            [new Date().toISOString(), winner, room.tournamentDbId],
+            (err: Error | null) => {
+                if (err) {
+                    fastify.log.error(err, 'Failed to save tournament end');
+                    reject(err);
+                } else {
+                    fastify.log.info(`Pong tournament ${room.tournamentDbId} finished. Winner: ${winner}`);
+                    resolve();
+                }
+            }
+        );
+    });
+}
+
+async function linkGameToTournament(room: Room, gameId: number, fastify: FastifyInstance): Promise<void> {
+    if (!room.tournamentDbId) return;
+    
+    room.gameIds.push(gameId);
+    
+    return new Promise((resolve, reject) => {
+        (fastify as any).sqlite.run(
+            'INSERT INTO tournament_games (tournament_id, game_id) VALUES (?, ?)',
+            [room.tournamentDbId, gameId],
+            (err: Error | null) => {
+                if (err) {
+                    fastify.log.error(err, 'Failed to link game to tournament');
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            }
+        );
+    });
+}
+
+
 //CONSTANTS
 const WIDTH = 640;
 const HEIGHT = 360;
@@ -61,6 +132,9 @@ interface Room {
     currentPlayer2: string | null;
     currentGameState: GameState | null;
     currentMatchStartedAt: string | null;
+    tournamentDbId: number | null;
+    tournamentUuid: string;
+    gameIds: number[];
 }
 
 //GLOBAL STATE
@@ -245,6 +319,9 @@ async function createRoom(name: string, password: string, creatorSocket: Socket,
         currentPlayer2: null,
         currentGameState: null,
         currentMatchStartedAt: null,
+        tournamentDbId: null,
+        tournamentUuid: generateUUID(),
+        gameIds: [],
     };
 
     rooms.set(roomId, room);
@@ -444,7 +521,7 @@ function startMatch(roomId: string, io: Server, fastify: FastifyInstance): boole
 
     room.gameActive = true;
 
-    const gameLoop = setInterval(() => {
+    const gameLoop = setInterval(async () => {
         if (!room.gameActive || !room.currentPlayer1 || !room.currentPlayer2) {
             stopMatch(roomId);
             return;
@@ -464,7 +541,7 @@ function startMatch(roomId: string, io: Server, fastify: FastifyInstance): boole
 
         const gameEnded = step(roomId, io);
         if (gameEnded) {
-            handleMatchEnd(roomId, io, fastify);
+            await handleMatchEnd(roomId, io, fastify);
         }
     }, 1000 / TICK_HZ);
 
@@ -487,7 +564,7 @@ function stopMatch(roomId: string): void {
     }
 }
 
-function handleMatchEnd(roomId: string, io: Server, fastify: FastifyInstance): void {
+async function handleMatchEnd(roomId: string, io: Server, fastify: FastifyInstance): Promise<void> {
     const room = rooms.get(roomId);
     const gameState = gameStates.get(roomId);
     if (!room || !room.currentPlayer1 || !room.currentPlayer2 || !gameState) return;
@@ -511,9 +588,15 @@ function handleMatchEnd(roomId: string, io: Server, fastify: FastifyInstance): v
         };
 
         // Save game record asynchronously
-        saveGameRecord(fastify, gameRecord).catch(error => {
-            fastify.log.error('Failed to save tournament match record:', error);
-        });
+        saveGameRecord(fastify, gameRecord)
+            .then(async (gameId) => {
+                if (room.tournamentDbId && gameId) {
+                    await linkGameToTournament(room, gameId, fastify);
+                }
+            })
+            .catch(error => {
+                fastify.log.error(error, 'Failed to save tournament match record');
+            });
     }
 
     stopMatch(roomId);
@@ -534,6 +617,9 @@ function handleMatchEnd(roomId: string, io: Server, fastify: FastifyInstance): v
         room.currentMatchStartedAt = null;
 
         const winner = activePlayers[0];
+        
+        // Save tournament end to database
+        await saveTournamentEnd(room, winner.displayName, fastify);
         
         io.to(roomId).emit('tournament_finished', {
             winner: winner.displayName,
@@ -716,7 +802,7 @@ export function setupTournamentPong(fastify: FastifyInstance, io: Server): void 
             }
         });
 
-        socket.on('tournament_start', (data: { roomId: string }) => {
+        socket.on('tournament_start', async (data: { roomId: string }) => {
             const { roomId } = data;
             const room = getRoom(roomId);
 
@@ -733,6 +819,10 @@ export function setupTournamentPong(fastify: FastifyInstance, io: Server): void 
             }
 
             room.status = 'in_progress';
+            
+            // Save tournament start to database
+            await saveTournamentStart(room, fastify);
+            
             // Announce first match and start after a visible 3s countdown
             const scheduled = announceAndScheduleMatch(roomId, io, fastify, 3000, true);
             if (!scheduled) {
