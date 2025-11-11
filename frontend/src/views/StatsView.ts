@@ -20,9 +20,13 @@ export default class StatsView extends AbstractView {
 	private selectedGame: string = '';
 	private stats: OverviewStats | null = null;
 	private leaderboard: LeaderboardEntry[] = [];
+	private filteredLeaderboard: LeaderboardEntry[] = [];
 	private recentGames: RecentGame[] = [];
 	private activityData: ActivityData | null = null;
 	private tournaments: Tournament[] = [];
+	private searchQuery: string = '';
+	private caseSensitive: boolean = false;
+	private searchTimeout: number | null = null;
 
 	constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
 		super(router, pathParams, queryParams);
@@ -102,42 +106,63 @@ export default class StatsView extends AbstractView {
 							</div>
 						</div>
 
-						<!-- Leaderboard Tab -->
-						<div id="content-leaderboard" class="tab-content hidden">
-							<div class="bg-white dark:bg-neutral-800 rounded-lg shadow overflow-hidden">
-								<div class="overflow-x-auto">
-									<table class="w-full">
-										<thead class="bg-neutral-200 dark:bg-neutral-700">
-											<tr>
-												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="rank">
-													Rank
-												</th>
-												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="player">
-													Player
-												</th>
-												<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="games">
-													Games
-												</th>
-												<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="wins">
-													Wins
-												</th>
-												<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="losses">
-													Losses
-												</th>
-												<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="winrate">
-													Win Rate
-												</th>
-											</tr>
-										</thead>
-										<tbody id="leaderboard-body" class="divide-y divide-neutral-200 dark:divide-neutral-700">
-											<!-- Dynamic content -->
-										</tbody>
-									</table>
-								</div>
+					<!-- Leaderboard Tab -->
+					<div id="content-leaderboard" class="tab-content hidden">
+						<!-- Search Bar -->
+						<div class="mb-4 flex items-center gap-3">
+							<div class="flex-1 relative">
+								<input 
+									type="text" 
+									id="player-search" 
+									placeholder="Search players..." 
+									class="w-full px-4 py-2 pl-10 txt-light-dark-sans bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+								/>
+								<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+								</svg>
 							</div>
+							<button 
+								id="case-toggle" 
+								class="px-3 py-2 txt-light-dark-sans text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors flex items-center gap-2"
+								title="Toggle case sensitivity"
+							>
+								<span class="font-mono font-bold">Aa</span>
+								<span id="case-indicator" class="text-xs opacity-70">insensitive</span>
+							</button>
 						</div>
 
-						<!-- Recent Games Tab -->
+						<div class="bg-white dark:bg-neutral-800 rounded-lg shadow overflow-hidden">
+							<div class="overflow-x-auto">
+								<table class="w-full">
+									<thead class="bg-neutral-200 dark:bg-neutral-700">
+										<tr>
+											<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="rank">
+												Rank
+											</th>
+											<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="player">
+												Player
+											</th>
+											<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="games">
+												Games
+											</th>
+											<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="wins">
+												Wins
+											</th>
+											<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="losses">
+												Losses
+											</th>
+											<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort="winrate">
+												Win Rate
+											</th>
+										</tr>
+									</thead>
+									<tbody id="leaderboard-body" class="divide-y divide-neutral-200 dark:divide-neutral-700">
+										<!-- Dynamic content -->
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</div>						<!-- Recent Games Tab -->
 						<div id="content-recent" class="tab-content hidden">
 							<div class="bg-white dark:bg-neutral-800 rounded-lg shadow overflow-hidden">
 								<div class="overflow-x-auto">
@@ -251,8 +276,80 @@ export default class StatsView extends AbstractView {
 			});
 		});
 
+		// Setup player search
+		const playerSearch = document.getElementById('player-search') as HTMLInputElement;
+		if (playerSearch) {
+			playerSearch.addEventListener('input', (e) => {
+				const target = e.target as HTMLInputElement;
+				this.searchQuery = target.value;
+				this.debouncedSearch();
+			});
+		}
+
+		// Setup case sensitivity toggle
+		const caseToggle = document.getElementById('case-toggle') as HTMLButtonElement;
+		if (caseToggle) {
+			caseToggle.addEventListener('click', () => {
+				this.caseSensitive = !this.caseSensitive;
+				this.updateCaseIndicator();
+				this.filterLeaderboard();
+				this.renderLeaderboard();
+			});
+		}
+
 		// Load initial data
 		await this.loadCurrentTabData();
+	}
+
+	private debouncedSearch(): void {
+		// Clear existing timeout
+		if (this.searchTimeout !== null) {
+			window.clearTimeout(this.searchTimeout);
+		}
+
+		// Set new timeout (300ms delay)
+		this.searchTimeout = window.setTimeout(() => {
+			this.filterLeaderboard();
+			this.renderLeaderboard();
+		}, 300);
+	}
+
+	private filterLeaderboard(): void {
+		if (!this.searchQuery.trim()) {
+			this.filteredLeaderboard = [...this.leaderboard];
+			return;
+		}
+
+		const query = this.caseSensitive 
+			? this.searchQuery 
+			: this.searchQuery.toLowerCase();
+
+		this.filteredLeaderboard = this.leaderboard.filter(entry => {
+			const playerName = this.caseSensitive 
+				? entry.player_name 
+				: entry.player_name.toLowerCase();
+			
+			return playerName.includes(query);
+		});
+	}
+
+	private updateCaseIndicator(): void {
+		const indicator = document.getElementById('case-indicator');
+		const toggle = document.getElementById('case-toggle');
+		
+		if (indicator) {
+			indicator.textContent = this.caseSensitive ? 'sensitive' : 'insensitive';
+		}
+		
+		if (toggle) {
+			if (this.caseSensitive) {
+				toggle.classList.add('ring-2', 'ring-sky-500');
+				toggle.classList.remove('border-neutral-300', 'dark:border-neutral-700');
+			} else {
+				toggle.classList.remove('ring-2', 'ring-sky-500');
+				toggle.classList.add('border-neutral-300', 'dark:border-neutral-700');
+			}
+		}
 	}
 
 	private async switchTab(tab: typeof this.currentTab): Promise<void> {
@@ -351,12 +448,17 @@ export default class StatsView extends AbstractView {
 	private async loadLeaderboard(): Promise<void> {
 		const data = await getLeaderboard(this.selectedGame || undefined);
 		this.leaderboard = data.leaderboard;
+		this.filterLeaderboard();
 		this.renderLeaderboard();
 	}
 
 	private renderLeaderboard(): void {
 		const tbody = document.getElementById('leaderboard-body');
 		if (!tbody) return;
+
+		const dataToRender = this.filteredLeaderboard.length > 0 || this.searchQuery.trim() 
+			? this.filteredLeaderboard 
+			: this.leaderboard;
 
 		if (this.leaderboard.length === 0) {
 			tbody.innerHTML = `
@@ -369,14 +471,43 @@ export default class StatsView extends AbstractView {
 			return;
 		}
 
-		tbody.innerHTML = this.leaderboard.map((entry, index) => {
-			const rankEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+		if (this.searchQuery.trim() && dataToRender.length === 0) {
+			tbody.innerHTML = `
+				<tr>
+					<td colspan="6" class="px-4 py-8 text-center txt-light-dark-sans opacity-70">
+						No players found matching "${this.searchQuery}"
+					</td>
+				</tr>
+			`;
+			return;
+		}
+
+		tbody.innerHTML = dataToRender.map((entry, index) => {
+			// Use original index from full leaderboard for ranking
+			const originalIndex = this.leaderboard.indexOf(entry);
+			const rankEmoji = originalIndex === 0 ? '🥇' : originalIndex === 1 ? '🥈' : originalIndex === 2 ? '🥉' : '';
+			
+			// Highlight matching text
+			let displayName = entry.player_name;
+			if (this.searchQuery.trim()) {
+				const query = this.caseSensitive ? this.searchQuery : this.searchQuery.toLowerCase();
+				const name = this.caseSensitive ? entry.player_name : entry.player_name.toLowerCase();
+				const matchIndex = name.indexOf(query);
+				
+				if (matchIndex !== -1) {
+					const before = entry.player_name.substring(0, matchIndex);
+					const match = entry.player_name.substring(matchIndex, matchIndex + this.searchQuery.length);
+					const after = entry.player_name.substring(matchIndex + this.searchQuery.length);
+					displayName = `${before}<span class="bg-yellow-200 dark:bg-yellow-700 px-1 rounded">${match}</span>${after}`;
+				}
+			}
+			
 			return `
 				<tr class="hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors">
 					<td class="px-4 py-3 txt-light-dark-sans">
-						<span class="text-lg">${rankEmoji}</span> ${index + 1}
+						<span class="text-lg">${rankEmoji}</span> ${originalIndex + 1}
 					</td>
-					<td class="px-4 py-3 txt-light-dark-sans font-medium">${entry.player_name}</td>
+					<td class="px-4 py-3 txt-light-dark-sans font-medium">${displayName}</td>
 					<td class="px-4 py-3 txt-light-dark-sans text-right">${entry.total_games}</td>
 					<td class="px-4 py-3 txt-light-dark-sans text-right text-green-600 dark:text-green-400">${entry.wins}</td>
 					<td class="px-4 py-3 txt-light-dark-sans text-right text-red-600 dark:text-red-400">${entry.losses}</td>
@@ -406,6 +537,7 @@ export default class StatsView extends AbstractView {
 
 		if (sortMap[sortBy]) {
 			this.leaderboard.sort(sortMap[sortBy]);
+			this.filterLeaderboard();
 			this.renderLeaderboard();
 		}
 	}
@@ -586,6 +718,10 @@ export default class StatsView extends AbstractView {
 	}
 
 	cleanup(): void {
-		// Clean up event listeners if needed
+		// Clear search timeout if it exists
+		if (this.searchTimeout !== null) {
+			window.clearTimeout(this.searchTimeout);
+			this.searchTimeout = null;
+		}
 	}
 }
