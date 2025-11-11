@@ -16,7 +16,8 @@ export const userSchemas = [
 			username: { type: 'string', description: 'Unique username' },
 			email: { type: 'string', format: 'email', description: 'User email address' },
 			display_name: { type: 'string', description: 'Display name' },
-			created_at: { type: 'string', format: 'date-time', description: 'Account creation timestamp' }
+			created_at: { type: 'string', format: 'date-time', description: 'Account creation timestamp' },
+			use_2fa: { type: 'boolean', description: 'Whether 2FA is enabled for this user' }
 		}
 	},
 	{

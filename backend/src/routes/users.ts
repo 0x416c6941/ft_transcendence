@@ -62,6 +62,7 @@ type PublicUserInfo = {
 	email: string;
 	display_name: string;
 	created_at: string;
+	use_2fa: boolean;
 };
 
 interface CreateUserBody {
@@ -77,6 +78,7 @@ interface UpdateUserBody {
 	password?: string;
 	email?: string;
 	display_name?: string;
+	use_2fa?: boolean;
 }
 
 interface LoginBody {
@@ -182,6 +184,54 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				const otpauthUrl = speakeasy.otpauthURL({
 					secret: user.totp_secret,
 					label: username,
+					issuer: 'ft_transcendence',
+					encoding: 'base32'
+				});
+
+				const qrCodeDataURL = await QRCode.toDataURL(otpauthUrl);
+
+				return reply.code(200).send({
+					qrCode: qrCodeDataURL,
+					secret: user.totp_secret
+				});
+			} catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(500).send({ error: 'Failed to generate QR code' });
+			}
+		}
+	);
+
+	// Get current user's 2FA QR code (authenticated)
+	fastify.get(
+		'/users/me/2fa/qrcode',
+		{ preHandler: authenticateToken },
+		async (request: FastifyRequest, reply: FastifyReply) => {
+			const userId = request.user!.userId;
+
+			try {
+				const user = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(
+						'SELECT username, use_2fa, totp_secret FROM users WHERE id = ?',
+						[userId],
+						(err: Error | null, row: any) => {
+							if (err) reject(err);
+							else resolve(row);
+						}
+					);
+				});
+
+				if (!user) {
+					return reply.code(404).send({ error: 'User not found' });
+				}
+
+				if (!user.use_2fa || !user.totp_secret) {
+					return reply.code(400).send({ error: '2FA is not enabled or not set up' });
+				}
+
+				// Generate QR code
+				const otpauthUrl = speakeasy.otpauthURL({
+					secret: user.totp_secret,
+					label: user.username,
 					issuer: 'ft_transcendence',
 					encoding: 'base32'
 				});
@@ -457,7 +507,8 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					username: userData.username,
 					email: userData.email,
 					display_name: userData.display_name,
-					created_at: userData.created_at
+					created_at: userData.created_at,
+					use_2fa: userData.use_2fa ? true : false
 				};
 
 				return reply.code(200).send({ user });
@@ -483,7 +534,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			reply: FastifyReply
 		) => {
 			const userId = request.user!.userId;
-			const { username, password, email, display_name } = request.body;
+			const { username, password, email, display_name, use_2fa } = request.body;
 
 			/* Reserve some prefix for username and display name
 			 * for 42 accounts in order to prevent possible collisions with normal accounts
@@ -493,6 +544,28 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				return reply
 					.code(403)
 					.send({ error: 'Username and display prefix "42_" is reserved for 42 OAuth accounts.' })
+			}
+
+			// Get current user to check totp_secret
+			let currentUser: any;
+			try {
+				currentUser = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(
+						'SELECT id, username, totp_secret, use_2fa FROM users WHERE id = ?',
+						[userId],
+						(err: Error | null, row: any) => {
+							if (err) reject(err);
+							else resolve(row);
+						}
+					);
+				});
+
+				if (!currentUser) {
+					return reply.code(404).send({ error: 'User not found' });
+				}
+			} catch (err: any) {
+				fastify.log.error(err);
+				return reply.code(500).send({ error: 'Failed to retrieve user' });
 			}
 
 			// Build dynamic update query
@@ -515,6 +588,27 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			if (display_name) {
 				updates.push('display_name = ?');
 				values.push(display_name);
+			}
+
+			// Handle 2FA changes
+			let newTotpSecret: string | null = null;
+			let shouldGenerateQR = false;
+
+			if (typeof use_2fa === 'boolean') {
+				updates.push('use_2fa = ?');
+				values.push(use_2fa ? 1 : 0);
+
+				// If enabling 2FA and totp_secret is empty, generate new secret
+				if (use_2fa && !currentUser.totp_secret) {
+					const secret = speakeasy.generateSecret({
+						name: `ft_transcendence (${currentUser.username})`,
+						length: 32
+					});
+					newTotpSecret = secret.base32;
+					updates.push('totp_secret = ?');
+					values.push(newTotpSecret);
+					shouldGenerateQR = true;
+				}
 			}
 
 			if (updates.length === 0) {
@@ -541,6 +635,24 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				// May happen if user doesn't exist anymore.
 				if (result.changes === 0) {
 					return reply.code(404).send({ error: 'User not found' });
+				}
+
+				// If we generated a new TOTP secret, return QR code
+				if (shouldGenerateQR && newTotpSecret) {
+					const otpauthUrl = speakeasy.otpauthURL({
+						secret: newTotpSecret,
+						label: currentUser.username,
+						issuer: 'ft_transcendence',
+						encoding: 'base32'
+					});
+
+					const qrCodeDataURL = await QRCode.toDataURL(otpauthUrl);
+
+					return reply.code(200).send({
+						message: 'User updated successfully',
+						qrCode: qrCodeDataURL,
+						secret: newTotpSecret
+					});
 				}
 
 				return reply.code(200).send({ message: 'User updated successfully' });

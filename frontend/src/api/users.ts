@@ -16,6 +16,7 @@ export type User = {
   	email: 		string;
   	display_name: 	string;
   	created_at?: 	string;
+  	use_2fa?: 	boolean;
 };
 
 export type CreateUserInput = Omit<User, "id" | "created_at"> & { password: string };
@@ -209,10 +210,10 @@ export async function getCurrentUser(): Promise<User> {
  * @brief Updates current user.
  * @route PUT /api/users/me
  * @param payload Partial user fields to update
- * @returns { message }
+ * @returns { message, qrCode?, secret? }
  */
-export async function updateUser(payload: UpdateUserInput): Promise<{ message: string }> {
-        return request<{ message: string }>("/api/users/me", {
+export async function updateUser(payload: UpdateUserInput): Promise<{ message: string; qrCode?: string; secret?: string }> {
+        return request<{ message: string; qrCode?: string; secret?: string }>("/api/users/me", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -226,6 +227,15 @@ export async function updateUser(payload: UpdateUserInput): Promise<{ message: s
  */
 export async function deleteUser(): Promise<{ message: string }> {
         return request<{ message: string }>("/api/users/me", { method: "DELETE" });
+}
+
+/**
+ * @brief Fetches current user's 2FA QR code (if 2FA is enabled).
+ * @route GET /api/users/me/2fa/qrcode
+ * @returns { qrCode, secret }
+ */
+export async function get2FAQRCode(): Promise<{ qrCode: string; secret: string }> {
+        return request<{ qrCode: string; secret: string }>("/api/users/me/2fa/qrcode", { method: "GET" });
 }
 
 /**

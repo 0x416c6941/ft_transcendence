@@ -17,7 +17,8 @@ import {
 	updateUser,
 	getUserAvatarURL,
 	uploadUserAvatar,
-	resetUserAvatar
+	resetUserAvatar,
+	get2FAQRCode
 } from "../api/users.js";
 import { auth } from "../auth.js";
 import {getEl} from "../utils/utils.js";
@@ -38,7 +39,8 @@ export default class ProfileView extends AbstractView {
 	private original = {
 		username: "",
 		display_name: "",
-		email: ""
+		email: "",
+		use_2fa: false
 	};
 
 	private refs!: {
@@ -57,6 +59,9 @@ export default class ProfileView extends AbstractView {
     	displayNameEl: HTMLInputElement;
     	emailEl: HTMLInputElement;
     	passwordEl: HTMLInputElement;
+    	use2faEl: HTMLInputElement;
+    	view2faQrBtn: HTMLButtonElement;
+    	view2faQrContainer: HTMLDivElement;
   	};
 
 	constructor(
@@ -182,6 +187,30 @@ export default class ProfileView extends AbstractView {
             </div>
 
             <div class="flex items-center gap-2">
+              <input
+                id="use_2fa"
+                name="use_2fa"
+                type="checkbox"
+                class="h-4 w-4"
+                disabled
+              />
+              <label class="text-sm txt-light-dark-sans" for="use_2fa"
+                >Enable Two-Factor Authentication (2FA)</label
+              >
+            </div>
+
+            <!-- View 2FA QR Code button (only shown if 2FA is enabled and has secret) -->
+            <div id="view-2fa-qr-container" class="hidden">
+              <button
+                id="view-2fa-qr-btn"
+                type="button"
+                class="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                View 2FA QR Code
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2">
               <button
                 id="edit-btn"
                 type="button"
@@ -212,6 +241,22 @@ export default class ProfileView extends AbstractView {
             </button>
           </div>
         </section>
+
+        <!-- 2FA Setup Modal -->
+        <div id="twofa-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div class="bg-white dark:bg-neutral-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h2 class="text-xl font-bold txt-light-dark-sans mb-4">Setup Two-Factor Authentication</h2>
+            <p class="mb-4 txt-light-dark-sans">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.):</p>
+            <div class="flex justify-center mb-4">
+              <img id="qr-code-image" src="" alt="QR Code" class="max-w-full border rounded p-2" />
+            </div>
+            <p class="text-sm txt-light-dark-sans mb-2">Or enter this code manually:</p>
+            <code id="secret-text" class="block bg-neutral-100 dark:bg-neutral-700 txt-light-dark-sans p-2 rounded mb-4 text-center font-mono"></code>
+            <button id="2fa-close-btn" class="button button-login w-full py-2 px-3 rounded">
+              Done
+            </button>
+          </div>
+        </div>
       </main>
 		`;
 	}
@@ -234,6 +279,9 @@ export default class ProfileView extends AbstractView {
       displayNameEl: getEl<HTMLInputElement>("display_name"),
       emailEl: getEl<HTMLInputElement>("email"),
       passwordEl: getEl<HTMLInputElement>("password"),
+      use2faEl: getEl<HTMLInputElement>("use_2fa"),
+      view2faQrBtn: getEl<HTMLButtonElement>("view-2fa-qr-btn"),
+      view2faQrContainer: getEl<HTMLDivElement>("view-2fa-qr-container"),
     };
   }
 
@@ -294,7 +342,8 @@ export default class ProfileView extends AbstractView {
       username !== this.original.username ||
       display_name !== this.original.display_name ||
       email !== this.original.email ||
-      password.length > 0
+      password.length > 0 ||
+      this.refs.use2faEl.checked !== this.original.use_2fa
     );
   }
 
@@ -382,11 +431,11 @@ export default class ProfileView extends AbstractView {
 
   // ---------- editing ----------
   private setEditing(on: boolean) {
-    const { updateBtn, usernameEl, displayNameEl, emailEl, passwordEl, editBtn } = this.refs;
+    const { updateBtn, usernameEl, displayNameEl, emailEl, passwordEl, use2faEl, editBtn } = this.refs;
     this.editing = on;
 
     updateBtn.hidden = !on;
-    [usernameEl, displayNameEl, emailEl, passwordEl, updateBtn].forEach(el => (el.disabled = !on));
+    [usernameEl, displayNameEl, emailEl, passwordEl, use2faEl, updateBtn].forEach(el => (el.disabled = !on));
     editBtn.textContent = on ? "Cancel" : "Edit data";
 
     if (!on) {
@@ -394,6 +443,7 @@ export default class ProfileView extends AbstractView {
       usernameEl.value = this.original.username;
       displayNameEl.value = this.original.display_name;
       emailEl.value = this.original.email;
+      use2faEl.checked = this.original.use_2fa;
 
       [usernameEl, displayNameEl, emailEl, passwordEl].forEach(el => {
         el.classList.remove("border-red-500");
@@ -429,28 +479,56 @@ export default class ProfileView extends AbstractView {
       }
 
       const { username, display_name, email, password } = this.readSanitized();
+      const use_2fa = this.refs.use2faEl.checked;
 
       const payload: UpdateUserInput = {};
       if (username      !== this.original.username)      (payload as any).username = username;
       if (display_name  !== this.original.display_name)  payload.display_name = display_name;
       if (email         !== this.original.email)         payload.email = email;
       if (password && password.length > 0)               payload.password = password;
+      if (use_2fa       !== this.original.use_2fa)       payload.use_2fa = use_2fa;
 
       this.setBtnBusy(this.refs.updateBtn, "Saving…");
       try {
-        await updateUser(payload);
+        const response = await updateUser(payload);
         this.original.username = username;
         this.original.display_name = display_name;
         this.original.email = email;
+        this.original.use_2fa = use_2fa;
         this.refs.passwordEl.value = "";
+
+        // Force refresh auth state to update cached user data
+        await auth.bootstrap(true);
 
         this.showMsg("Profile updated successfully!", false);
         this.setEditing(false);
+
+        // Update visibility of "View 2FA QR Code" button
+        if (use_2fa) {
+          this.refs.view2faQrContainer.classList.remove("hidden");
+        } else {
+          this.refs.view2faQrContainer.classList.add("hidden");
+        }
+
+        // If 2FA was just enabled and we got QR code data, show the modal
+        if (response.qrCode && response.secret) {
+          this.show2FASetupModal(response.qrCode, response.secret);
+        }
       } catch (err) {
         this.showMsg(err instanceof Error ? err.message : "Update failed.", true);
         this.setEditing(true);
       } finally {
         this.clearBtnBusy(this.refs.updateBtn, "Save changes");
+      }
+    });
+
+    // view 2FA QR code
+    this.refs.view2faQrBtn.addEventListener("click", async () => {
+      try {
+        const { qrCode, secret } = await get2FAQRCode();
+        this.show2FASetupModal(qrCode, secret);
+      } catch (err) {
+        this.showMsg(err instanceof Error ? err.message : "Failed to load QR code.", true);
       }
     });
 
@@ -483,6 +561,26 @@ export default class ProfileView extends AbstractView {
     });
   }
 
+  private show2FASetupModal(qrCode: string, secret: string) {
+    const modal = document.getElementById("twofa-modal");
+    const qrImage = document.getElementById("qr-code-image") as HTMLImageElement;
+    const secretText = document.getElementById("secret-text");
+    const closeBtn = document.getElementById("2fa-close-btn");
+
+    if (!modal || !qrImage || !secretText || !closeBtn) {
+      console.error('2FA modal elements not found');
+      return;
+    }
+
+    qrImage.src = qrCode;
+    secretText.textContent = secret;
+    modal.classList.remove("hidden");
+
+    closeBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+    }, { once: true });
+  }
+
   // ---------- lifecycle ----------
   async setup(): Promise<void> {
     await auth.bootstrap();
@@ -504,16 +602,25 @@ export default class ProfileView extends AbstractView {
     let currentUserId = 0;
     try {
       const user = await getCurrentUser();
-      const { username, email, display_name, id } = user;
+      const { username, email, display_name, id, use_2fa } = user;
       currentUserId = id;
 
       this.original.username = nkfc(username ?? "");
       this.original.display_name = nkfc(display_name ?? "");
       this.original.email = emailSan(email);
+      this.original.use_2fa = use_2fa ?? false;
 
       this.refs.usernameEl.value = this.original.username;
       this.refs.displayNameEl.value = this.original.display_name;
       this.refs.emailEl.value = this.original.email;
+      this.refs.use2faEl.checked = this.original.use_2fa;
+
+      // Show "View 2FA QR Code" button only if 2FA is enabled
+      if (this.original.use_2fa) {
+        this.refs.view2faQrContainer.classList.remove("hidden");
+      } else {
+        this.refs.view2faQrContainer.classList.add("hidden");
+      }
 
       this.showMsg(`Logged in as ${username}`, false);
       await this.refreshAvatar(currentUserId);
