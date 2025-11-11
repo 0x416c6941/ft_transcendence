@@ -22,11 +22,15 @@ export default class StatsView extends AbstractView {
 	private leaderboard: LeaderboardEntry[] = [];
 	private filteredLeaderboard: LeaderboardEntry[] = [];
 	private recentGames: RecentGame[] = [];
+	private filteredRecentGames: RecentGame[] = [];
 	private activityData: ActivityData | null = null;
 	private tournaments: Tournament[] = [];
 	private searchQuery: string = '';
 	private caseSensitive: boolean = false;
 	private searchTimeout: number | null = null;
+	private recentGamesSearchQuery: string = '';
+	private recentGamesCaseSensitive: boolean = false;
+	private recentGamesSearchTimeout: number | null = null;
 
 	constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
 		super(router, pathParams, queryParams);
@@ -163,28 +167,63 @@ export default class StatsView extends AbstractView {
 							</div>
 						</div>
 					</div>						<!-- Recent Games Tab -->
-						<div id="content-recent" class="tab-content hidden">
-							<div class="bg-white dark:bg-neutral-800 rounded-lg shadow overflow-hidden">
-								<div class="overflow-x-auto">
-									<table class="w-full">
-										<thead class="bg-neutral-200 dark:bg-neutral-700">
-											<tr>
-												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold">Game</th>
-												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold">Player 1</th>
-												<th class="px-4 py-3 text-center txt-light-dark-sans text-sm font-semibold">VS</th>
-												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold">Player 2</th>
-												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold">Winner</th>
-												<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold">Duration</th>
-												<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold">Date</th>
-											</tr>
-										</thead>
-										<tbody id="recent-games-body" class="divide-y divide-neutral-200 dark:divide-neutral-700">
-											<!-- Dynamic content -->
-										</tbody>
-									</table>
-								</div>
+					<div id="content-recent" class="tab-content hidden">
+						<!-- Search Bar -->
+						<div class="mb-4 flex items-center gap-3">
+							<div class="flex-1 relative">
+								<input 
+									type="text" 
+									id="games-search" 
+									placeholder="Search players in recent games..." 
+									class="w-full px-4 py-2 pl-10 txt-light-dark-sans bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+								/>
+								<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+								</svg>
+							</div>
+							<button 
+								id="games-case-toggle" 
+								class="px-3 py-2 txt-light-dark-sans text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors flex items-center gap-2"
+								title="Toggle case sensitivity"
+							>
+								<span class="font-mono font-bold">Aa</span>
+								<span id="games-case-indicator" class="text-xs opacity-70">insensitive</span>
+							</button>
+						</div>
+
+						<div class="bg-white dark:bg-neutral-800 rounded-lg shadow overflow-hidden">
+							<div class="overflow-x-auto">
+								<table class="w-full">
+									<thead class="bg-neutral-200 dark:bg-neutral-700">
+										<tr>
+											<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort-games="game">
+												Game
+											</th>
+											<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort-games="player1">
+												Player 1
+											</th>
+											<th class="px-4 py-3 text-center txt-light-dark-sans text-sm font-semibold">VS</th>
+											<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort-games="player2">
+												Player 2
+											</th>
+											<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort-games="winner">
+												Winner
+											</th>
+											<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort-games="duration">
+												Duration
+											</th>
+											<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-600" data-sort-games="date">
+												Date
+											</th>
+										</tr>
+									</thead>
+									<tbody id="recent-games-body" class="divide-y divide-neutral-200 dark:divide-neutral-700">
+										<!-- Dynamic content -->
+									</tbody>
+								</table>
 							</div>
 						</div>
+					</div>
 
 						<!-- Activity Tab -->
 						<div id="content-activity" class="tab-content hidden">
@@ -297,6 +336,39 @@ export default class StatsView extends AbstractView {
 			});
 		}
 
+		// Setup recent games search
+		const gamesSearch = document.getElementById('games-search') as HTMLInputElement;
+		if (gamesSearch) {
+			gamesSearch.addEventListener('input', (e) => {
+				const target = e.target as HTMLInputElement;
+				this.recentGamesSearchQuery = target.value;
+				this.debouncedGamesSearch();
+			});
+		}
+
+		// Setup recent games case sensitivity toggle
+		const gamesCaseToggle = document.getElementById('games-case-toggle') as HTMLButtonElement;
+		if (gamesCaseToggle) {
+			gamesCaseToggle.addEventListener('click', () => {
+				this.recentGamesCaseSensitive = !this.recentGamesCaseSensitive;
+				this.updateGamesCaseIndicator();
+				this.filterRecentGames();
+				this.renderRecentGames();
+			});
+		}
+
+		// Setup sorting for recent games
+		const sortGamesHeaders = document.querySelectorAll('[data-sort-games]');
+		sortGamesHeaders.forEach(header => {
+			header.addEventListener('click', (e) => {
+				const target = e.target as HTMLElement;
+				const sortBy = target.getAttribute('data-sort-games');
+				if (sortBy) {
+					this.sortRecentGames(sortBy);
+				}
+			});
+		});
+
 		// Load initial data
 		await this.loadCurrentTabData();
 	}
@@ -343,6 +415,60 @@ export default class StatsView extends AbstractView {
 		
 		if (toggle) {
 			if (this.caseSensitive) {
+				toggle.classList.add('ring-2', 'ring-sky-500');
+				toggle.classList.remove('border-neutral-300', 'dark:border-neutral-700');
+			} else {
+				toggle.classList.remove('ring-2', 'ring-sky-500');
+				toggle.classList.add('border-neutral-300', 'dark:border-neutral-700');
+			}
+		}
+	}
+
+	private debouncedGamesSearch(): void {
+		// Clear existing timeout
+		if (this.recentGamesSearchTimeout !== null) {
+			window.clearTimeout(this.recentGamesSearchTimeout);
+		}
+
+		// Set new timeout (300ms delay)
+		this.recentGamesSearchTimeout = window.setTimeout(() => {
+			this.filterRecentGames();
+			this.renderRecentGames();
+		}, 300);
+	}
+
+	private filterRecentGames(): void {
+		if (!this.recentGamesSearchQuery.trim()) {
+			this.filteredRecentGames = [...this.recentGames];
+			return;
+		}
+
+		const query = this.recentGamesCaseSensitive 
+			? this.recentGamesSearchQuery 
+			: this.recentGamesSearchQuery.toLowerCase();
+
+		this.filteredRecentGames = this.recentGames.filter(game => {
+			const player1 = this.recentGamesCaseSensitive 
+				? game.player1_name 
+				: game.player1_name.toLowerCase();
+			const player2 = this.recentGamesCaseSensitive 
+				? game.player2_name 
+				: game.player2_name.toLowerCase();
+			
+			return player1.includes(query) || player2.includes(query);
+		});
+	}
+
+	private updateGamesCaseIndicator(): void {
+		const indicator = document.getElementById('games-case-indicator');
+		const toggle = document.getElementById('games-case-toggle');
+		
+		if (indicator) {
+			indicator.textContent = this.recentGamesCaseSensitive ? 'sensitive' : 'insensitive';
+		}
+		
+		if (toggle) {
+			if (this.recentGamesCaseSensitive) {
 				toggle.classList.add('ring-2', 'ring-sky-500');
 				toggle.classList.remove('border-neutral-300', 'dark:border-neutral-700');
 			} else {
@@ -545,12 +671,39 @@ export default class StatsView extends AbstractView {
 	private async loadRecentGames(): Promise<void> {
 		const data = await getRecentGames(50, this.selectedGame || undefined);
 		this.recentGames = data.games;
+		this.filterRecentGames();
 		this.renderRecentGames();
+	}
+
+	private sortRecentGames(sortBy: string): void {
+		const sortMap: { [key: string]: (a: RecentGame, b: RecentGame) => number } = {
+			game: (a, b) => a.game_name.localeCompare(b.game_name),
+			player1: (a, b) => a.player1_name.localeCompare(b.player1_name),
+			player2: (a, b) => a.player2_name.localeCompare(b.player2_name),
+			winner: (a, b) => {
+				if (!a.winner && !b.winner) return 0;
+				if (!a.winner) return 1;
+				if (!b.winner) return -1;
+				return a.winner.localeCompare(b.winner);
+			},
+			duration: (a, b) => b.duration_minutes - a.duration_minutes,
+			date: (a, b) => new Date(b.finished_at).getTime() - new Date(a.finished_at).getTime()
+		};
+
+		if (sortMap[sortBy]) {
+			this.recentGames.sort(sortMap[sortBy]);
+			this.filterRecentGames();
+			this.renderRecentGames();
+		}
 	}
 
 	private renderRecentGames(): void {
 		const tbody = document.getElementById('recent-games-body');
 		if (!tbody) return;
+
+		const dataToRender = this.filteredRecentGames.length > 0 || this.recentGamesSearchQuery.trim() 
+			? this.filteredRecentGames 
+			: this.recentGames;
 
 		if (this.recentGames.length === 0) {
 			tbody.innerHTML = `
@@ -563,9 +716,40 @@ export default class StatsView extends AbstractView {
 			return;
 		}
 
-		tbody.innerHTML = this.recentGames.map(game => {
+		if (this.recentGamesSearchQuery.trim() && dataToRender.length === 0) {
+			tbody.innerHTML = `
+				<tr>
+					<td colspan="7" class="px-4 py-8 text-center txt-light-dark-sans opacity-70">
+						No games found matching "${this.recentGamesSearchQuery}"
+					</td>
+				</tr>
+			`;
+			return;
+		}
+
+		tbody.innerHTML = dataToRender.map(game => {
 			const date = new Date(game.finished_at);
 			const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+			
+			// Helper function to highlight matching text
+			const highlightMatch = (text: string): string => {
+				if (!this.recentGamesSearchQuery.trim()) return text;
+				
+				const query = this.recentGamesCaseSensitive ? this.recentGamesSearchQuery : this.recentGamesSearchQuery.toLowerCase();
+				const checkText = this.recentGamesCaseSensitive ? text : text.toLowerCase();
+				const matchIndex = checkText.indexOf(query);
+				
+				if (matchIndex !== -1) {
+					const before = text.substring(0, matchIndex);
+					const match = text.substring(matchIndex, matchIndex + this.recentGamesSearchQuery.length);
+					const after = text.substring(matchIndex + this.recentGamesSearchQuery.length);
+					return `${before}<span class="bg-yellow-200 dark:bg-yellow-700 px-1 rounded">${match}</span>${after}`;
+				}
+				return text;
+			};
+			
+			const player1Display = highlightMatch(game.player1_name);
+			const player2Display = highlightMatch(game.player2_name);
 			
 			return `
 				<tr class="hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors">
@@ -575,11 +759,11 @@ export default class StatsView extends AbstractView {
 						</span>
 					</td>
 					<td class="px-4 py-3 txt-light-dark-sans ${game.winner === game.player1_name ? 'font-bold text-green-600 dark:text-green-400' : ''}">
-						${game.player1_name} ${game.player1_is_user ? '👤' : '🤖'}
+						${player1Display} ${game.player1_is_user ? '👤' : '🤖'}
 					</td>
 					<td class="px-4 py-3 txt-light-dark-sans text-center opacity-50">vs</td>
 					<td class="px-4 py-3 txt-light-dark-sans ${game.winner === game.player2_name ? 'font-bold text-green-600 dark:text-green-400' : ''}">
-						${game.player2_name} ${game.player2_is_user ? '👤' : '🤖'}
+						${player2Display} ${game.player2_is_user ? '👤' : '🤖'}
 					</td>
 					<td class="px-4 py-3 txt-light-dark-sans font-semibold">
 						${game.winner ? '🏆 ' + game.winner : 'Draw'}
@@ -718,10 +902,14 @@ export default class StatsView extends AbstractView {
 	}
 
 	cleanup(): void {
-		// Clear search timeout if it exists
+		// Clear search timeouts if they exist
 		if (this.searchTimeout !== null) {
 			window.clearTimeout(this.searchTimeout);
 			this.searchTimeout = null;
+		}
+		if (this.recentGamesSearchTimeout !== null) {
+			window.clearTimeout(this.recentGamesSearchTimeout);
+			this.recentGamesSearchTimeout = null;
 		}
 	}
 }
