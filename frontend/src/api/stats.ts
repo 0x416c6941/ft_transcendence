@@ -162,3 +162,41 @@ export async function getTournaments(limit: number = 50, game?: string): Promise
 
 	return response.json();
 }
+
+export interface TournamentDetails {
+	id: number;
+	uuid: string;
+	started_at: string;
+	finished_at: string | null;
+	player_count: number;
+	winner: string | null;
+	game_type: string;
+	games: {
+		id: number;
+		game_name: string;
+		started_at: string;
+		finished_at: string;
+		player1_name: string;
+		player1_is_user: number;
+		player2_name: string;
+		player2_is_user: number;
+		winner: string | null;
+		data: string;
+	}[];
+}
+
+export async function getTournamentDetails(uuid: string): Promise<TournamentDetails> {
+	const response = await fetch(`${BASE_URL}/stats/tournament/${encodeURIComponent(uuid)}`, {
+		method: 'GET',
+		credentials: 'include'
+	});
+
+	if (!response.ok) {
+		if (response.status === 404) {
+			throw new Error('Tournament not found');
+		}
+		throw new Error('Failed to fetch tournament details');
+	}
+
+	return response.json();
+}

@@ -389,4 +389,68 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 			return reply.code(500).send({ error: 'Failed to fetch tournaments' });
 		}
 	});
+
+	// Get detailed tournament data with all games
+	fastify.get('/stats/tournament/:uuid', async (request: FastifyRequest<{
+		Params: { uuid: string }
+	}>, reply: FastifyReply) => {
+		try {
+			const { uuid } = request.params;
+
+			// Get tournament details
+			const tournament = await new Promise<any>((resolve, reject) => {
+				fastify.sqlite.get(
+					`SELECT * FROM tournaments WHERE uuid = ?`,
+					[uuid],
+					(err: Error | null, row: any) => {
+						if (err) reject(err);
+						else resolve(row);
+					}
+				);
+			});
+
+			if (!tournament) {
+				return reply.code(404).send({ error: 'Tournament not found' });
+			}
+
+			// Get all games for this tournament in chronological order
+			const games = await new Promise<any[]>((resolve, reject) => {
+				const query = `
+					SELECT g.*
+					FROM tournament_games tg
+					JOIN games g ON tg.game_id = g.id
+					WHERE tg.tournament_id = ?
+					ORDER BY g.started_at ASC
+				`;
+				fastify.sqlite.all(query, [tournament.id], (err: Error | null, rows: any[]) => {
+					if (err) reject(err);
+					else resolve(rows);
+				});
+			});
+
+			// Parse the data field from JSON string to object
+			const gamesWithParsedData = games.map(game => {
+				const gameCopy = { ...game };
+				if (game.data) {
+					try {
+						gameCopy.data = JSON.parse(game.data);
+					} catch (e) {
+						// If parsing fails, leave it as string
+					}
+				}
+				return gameCopy;
+			});
+
+			// Return just the raw database records
+			const tournamentDetails = {
+				...tournament,
+				games: gamesWithParsedData
+			};
+
+			return reply.send(tournamentDetails);
+		} catch (err: any) {
+			fastify.log.error(err);
+			return reply.code(500).send({ error: 'Failed to fetch tournament details' });
+		}
+	});
 }

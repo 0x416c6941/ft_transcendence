@@ -8,6 +8,7 @@ import {
 	getRecentGames,
 	getActivity,
 	getTournaments,
+	getTournamentDetails,
 	type OverviewStats,
 	type LeaderboardEntry,
 	type RecentGame,
@@ -256,6 +257,7 @@ export default class StatsView extends AbstractView {
 												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold">Winner</th>
 												<th class="px-4 py-3 text-left txt-light-dark-sans text-sm font-semibold">Duration</th>
 												<th class="px-4 py-3 text-right txt-light-dark-sans text-sm font-semibold">Date</th>
+												<th class="px-4 py-3 text-center txt-light-dark-sans text-sm font-semibold">Details</th>
 											</tr>
 										</thead>
 										<tbody id="tournaments-body" class="divide-y divide-neutral-200 dark:divide-neutral-700">
@@ -839,7 +841,7 @@ export default class StatsView extends AbstractView {
 		if (this.tournaments.length === 0) {
 			tbody.innerHTML = `
 				<tr>
-					<td colspan="6" class="px-4 py-8 text-center txt-light-dark-sans opacity-70">
+					<td colspan="7" class="px-4 py-8 text-center txt-light-dark-sans opacity-70">
 						No tournaments yet
 					</td>
 				</tr>
@@ -885,9 +887,42 @@ export default class StatsView extends AbstractView {
 					<td class="px-4 py-3 txt-light-dark-sans text-right opacity-70 text-sm">
 						${formattedStart}
 					</td>
+					<td class="px-4 py-3 text-center">
+						<button 
+							data-tournament-uuid="${tournament.uuid}"
+							class="print-json-btn bg-sky-600 hover:bg-sky-700 text-white px-3 py-1 rounded text-sm font-semibold transition-colors"
+						>
+							Print JSON
+						</button>
+					</td>
 				</tr>
 			`;
 		}).join('');
+
+		// Add event listeners to all Print JSON buttons
+		const printButtons = document.querySelectorAll('.print-json-btn');
+		printButtons.forEach(button => {
+			button.addEventListener('click', async (e) => {
+				const target = e.target as HTMLElement;
+				const uuid = target.getAttribute('data-tournament-uuid');
+				if (uuid) {
+					await this.printTournamentJSON(uuid);
+				}
+			});
+		});
+	}
+
+	private async printTournamentJSON(uuid: string): Promise<void> {
+		try {
+			const tournamentDetails = await getTournamentDetails(uuid);
+			
+			// Print as clean JSON string
+			console.log(JSON.stringify({
+				[uuid]: tournamentDetails
+			}, null, 2));
+		} catch (err: any) {
+			this.showError(err.message || 'Failed to fetch tournament details');
+		}
 	}
 
 	private showError(message: string): void {
