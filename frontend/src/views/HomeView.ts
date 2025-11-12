@@ -35,6 +35,10 @@ async getHtml(): Promise<string> {
              class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
             Pong: ${this.isLoggedIn ? 'User' : 'Alias'} vs AI
           </a>
+          <a href="/pong-3d-ai" data-link
+             class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg text-center font-semibold transition-colors">
+            🎮 3D Pong: ${this.isLoggedIn ? 'User' : 'Alias'} vs AI
+          </a>
         </div>
       </div>
 
