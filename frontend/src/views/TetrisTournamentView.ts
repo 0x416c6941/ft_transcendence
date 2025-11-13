@@ -26,6 +26,8 @@ export default class TetrisTournamentView extends AbstractView {
     private isCreator: boolean = false;
     private gameState: any = null;
     private keys = { left: false, right: false, down: false, rotate: false, drop: false };
+    private handleKeyDown: ((e: KeyboardEvent) => void) | null = null;
+    private handleKeyUp: ((e: KeyboardEvent) => void) | null = null;
 
     constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
         super(router, pathParams, queryParams);
@@ -270,7 +272,7 @@ export default class TetrisTournamentView extends AbstractView {
     }
 
     private setupKeyboardControls(): void {
-        const handleKeyDown = (e: KeyboardEvent) => {
+        this.handleKeyDown = (e: KeyboardEvent) => {
             const key = e.key.toLowerCase();
             const keyMap: Record<string, keyof typeof this.keys> = {
                 'arrowleft': 'left', 'a': 'left',
@@ -288,7 +290,7 @@ export default class TetrisTournamentView extends AbstractView {
             }
         };
 
-        const handleKeyUp = (e: KeyboardEvent) => {
+        this.handleKeyUp = (e: KeyboardEvent) => {
             const key = e.key.toLowerCase();
             const keyMap: Record<string, keyof typeof this.keys> = {
                 'arrowleft': 'left', 'a': 'left',
@@ -305,8 +307,8 @@ export default class TetrisTournamentView extends AbstractView {
             }
         };
 
-        document.addEventListener('keydown', handleKeyDown);
-        document.addEventListener('keyup', handleKeyUp);
+        document.addEventListener('keydown', this.handleKeyDown);
+        document.addEventListener('keyup', this.handleKeyUp);
     }
 
     private sendInput(): void {
@@ -460,6 +462,17 @@ export default class TetrisTournamentView extends AbstractView {
     }
 
     cleanup(): void {
+        // Remove keyboard event listeners
+        if (this.handleKeyDown) {
+            document.removeEventListener('keydown', this.handleKeyDown);
+            this.handleKeyDown = null;
+        }
+        if (this.handleKeyUp) {
+            document.removeEventListener('keyup', this.handleKeyUp);
+            this.handleKeyUp = null;
+        }
+
+        // Remove socket listeners
         ['tetris_tournament_room_state', 'tetris_tournament_started', 'tetris_tournament_error',
          'tetris_game_state', 'tetris_match_ended', 'tetris_tournament_finished',
          'tetris_tournament_room_destroyed', 'tetris_match_announced', 'tetris_match_started'

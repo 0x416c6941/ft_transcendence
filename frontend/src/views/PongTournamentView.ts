@@ -30,6 +30,8 @@ export default class PongTournamentView extends AbstractView {
     private inputState = { up: false, down: false };
     private leftAlias: string = '';
     private rightAlias: string = '';
+    private handleKeyDown: ((e: KeyboardEvent) => void) | null = null;
+    private handleKeyUp: ((e: KeyboardEvent) => void) | null = null;
 
     constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
         super(router, pathParams, queryParams);
@@ -278,7 +280,7 @@ export default class PongTournamentView extends AbstractView {
     }
 
     private setupKeyboardControls(): void {
-        const handleKeyDown = (e: KeyboardEvent) => {
+        this.handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
                 this.inputState.up = true;
                 e.preventDefault();
@@ -296,7 +298,7 @@ export default class PongTournamentView extends AbstractView {
             }
         };
 
-        const handleKeyUp = (e: KeyboardEvent) => {
+        this.handleKeyUp = (e: KeyboardEvent) => {
             if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
                 this.inputState.up = false;
             }
@@ -312,8 +314,8 @@ export default class PongTournamentView extends AbstractView {
             }
         };
 
-        document.addEventListener('keydown', handleKeyDown);
-        document.addEventListener('keyup', handleKeyUp);
+        document.addEventListener('keydown', this.handleKeyDown);
+        document.addEventListener('keyup', this.handleKeyUp);
     }
 
     private startGame(room: any): void {
@@ -468,6 +470,17 @@ export default class PongTournamentView extends AbstractView {
     }
 
     cleanup(): void {
+        // Remove keyboard event listeners
+        if (this.handleKeyDown) {
+            document.removeEventListener('keydown', this.handleKeyDown);
+            this.handleKeyDown = null;
+        }
+        if (this.handleKeyUp) {
+            document.removeEventListener('keyup', this.handleKeyUp);
+            this.handleKeyUp = null;
+        }
+
+        // Remove socket listeners
         this.socket.off('tournament_room_state');
         this.socket.off('tournament_started');
         this.socket.off('tournament_error');
