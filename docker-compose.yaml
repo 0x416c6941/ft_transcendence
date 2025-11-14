@@ -29,10 +29,15 @@ services:
       - ${SECRET_NAME_BACKEND_JWT_KEY}
       - ${SECRET_NAME_BACKEND_OAUTH_42_UID}
       - ${SECRET_NAME_BACKEND_OAUTH_42_SECRET}
+      - ${SECRET_NAME_BLOCKCHAIN_PRIVATE_KEY}
     volumes:
       - sqlite-db:${BACKEND_CONTAINER_DB_VOL_PATH}
+      - avalanche-contract-data:/data:ro
     expose:
       - ${BACKEND_FASTIFY_PORT}
+    depends_on:
+      avalanche-fuji:
+        condition: service_healthy
     restart: unless-stopped
   avalanche-fuji:
     container_name: ${SERVICE_NAME_PREFIX}-avalanche-fuji
@@ -41,10 +46,20 @@ services:
       dockerfile: Dockerfile
     networks:
       - network
+    env_file: ./.env
+    secrets:
+      - ${SECRET_NAME_BLOCKCHAIN_PRIVATE_KEY}
     expose:
       - "9650"
     volumes:
-      - avalanche-fuji-data:/data
+      - avalanche-fuji-data:/root/.avalanche-cli
+      - avalanche-contract-data:/root/.avalanche-cli/data
+    healthcheck:
+      test: ["CMD", "test", "-f", "/root/.avalanche-cli/data/contract-address.txt"]
+      interval: 10s
+      timeout: 5s
+      start_period: 90s
+      retries: 20
     restart: unless-stopped
 
 # Explicitly specifying a Docker network for containers to communicate on.
@@ -77,7 +92,11 @@ secrets:
   42_secret.txt:
     name: ${SECRET_NAME_BACKEND_OAUTH_42_SECRET}
     file: ${SECRETS_DIR}/${SECRET_BACKEND_OAUTH_42_SECRET_FILENAME}
+  blockchain_private_key.txt:
+    name: ${SECRET_NAME_BLOCKCHAIN_PRIVATE_KEY}
+    file: ${SECRETS_DIR}/${SECRET_BLOCKCHAIN_PRIVATE_KEY_FILENAME}
 
 volumes:
   sqlite-db:
   avalanche-fuji-data:
+  avalanche-contract-data:

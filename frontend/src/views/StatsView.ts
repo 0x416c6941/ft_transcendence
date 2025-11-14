@@ -15,6 +15,12 @@ import {
 	type ActivityData,
 	type Tournament
 } from "../api/stats.js";
+import {
+	initBlockchain,
+	saveTournamentToBlockchain,
+	getTournamentFromBlockchain,
+	tournamentExistsOnBlockchain
+} from "../blockchain.js";
 
 export default class StatsView extends AbstractView {
 	private currentTab: 'overview' | 'leaderboard' | 'recent' | 'activity' | 'tournaments' = 'overview';
@@ -32,6 +38,8 @@ export default class StatsView extends AbstractView {
 	private recentGamesSearchQuery: string = '';
 	private recentGamesCaseSensitive: boolean = false;
 	private recentGamesSearchTimeout: number | null = null;
+	private blockchainReady: boolean = false;
+	private tournamentBlockchainStatus: Map<string, boolean> = new Map();
 
 	constructor(router: Router, pathParams: Map<string, string>, queryParams: URLSearchParams) {
 		super(router, pathParams, queryParams);
@@ -277,6 +285,14 @@ export default class StatsView extends AbstractView {
 
 	async setup(): Promise<void> {
 		await auth.bootstrap();
+
+		// Initialize blockchain
+		this.blockchainReady = await initBlockchain();
+		if (this.blockchainReady) {
+			console.log('✅ Blockchain initialized');
+		} else {
+			console.warn('⚠️ Blockchain not available');
+		}
 
 		// Setup tab navigation
 		const tabButtons = document.querySelectorAll('.tab-btn');
@@ -831,6 +847,15 @@ export default class StatsView extends AbstractView {
 	private async loadTournaments(): Promise<void> {
 		const data = await getTournaments(100, this.selectedGame || undefined);
 		this.tournaments = data.tournaments;
+		
+		// Check blockchain status for each tournament
+		if (this.blockchainReady) {
+			for (const tournament of this.tournaments) {
+				const exists = await tournamentExistsOnBlockchain(tournament.uuid);
+				this.tournamentBlockchainStatus.set(tournament.uuid, exists);
+			}
+		}
+		
 		this.renderTournaments();
 	}
 
@@ -890,26 +915,111 @@ export default class StatsView extends AbstractView {
 					<td class="px-4 py-3 text-center">
 						<button 
 							data-tournament-uuid="${tournament.uuid}"
-							class="print-json-btn bg-sky-600 hover:bg-sky-700 text-white px-3 py-1 rounded text-sm font-semibold transition-colors"
+							class="blockchain-btn ${this.tournamentBlockchainStatus.get(tournament.uuid) ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-3 py-1 rounded text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+							${!this.blockchainReady ? 'disabled' : ''}
 						>
-							Print JSON
+							${this.tournamentBlockchainStatus.get(tournament.uuid) ? 'Get from Blockchain' : 'Save to Blockchain'}
 						</button>
 					</td>
 				</tr>
 			`;
 		}).join('');
 
-		// Add event listeners to all Print JSON buttons
-		const printButtons = document.querySelectorAll('.print-json-btn');
-		printButtons.forEach(button => {
+		// Add event listeners to all blockchain buttons
+		const blockchainButtons = document.querySelectorAll('.blockchain-btn');
+		blockchainButtons.forEach(button => {
 			button.addEventListener('click', async (e) => {
 				const target = e.target as HTMLElement;
 				const uuid = target.getAttribute('data-tournament-uuid');
 				if (uuid) {
-					await this.printTournamentJSON(uuid);
+					await this.handleBlockchainAction(uuid, target);
 				}
 			});
 		});
+	}
+
+	private async handleBlockchainAction(uuid: string, button: HTMLElement): Promise<void> {
+		const existsOnChain = this.tournamentBlockchainStatus.get(uuid);
+		
+		try {
+			button.setAttribute('disabled', 'true');
+			button.textContent = existsOnChain ? 'Loading...' : 'Saving...';
+			
+			if (existsOnChain) {
+				// Get from blockchain
+				const data = await getTournamentFromBlockchain(uuid);
+				this.showTournamentOverlay(uuid, data);
+				button.textContent = 'Get from Blockchain';
+			} else {
+				// Save to blockchain
+				const tournamentDetails = await getTournamentDetails(uuid);
+				await saveTournamentToBlockchain(uuid, tournamentDetails);
+				
+				// Update status
+				this.tournamentBlockchainStatus.set(uuid, true);
+				button.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+				button.classList.add('bg-green-600', 'hover:bg-green-700');
+				button.textContent = 'Get from Blockchain';
+			}
+		} catch (err: any) {
+			this.showError(err.message || 'Blockchain operation failed');
+			button.textContent = existsOnChain ? 'Get from Blockchain' : 'Save to Blockchain';
+		} finally {
+			button.removeAttribute('disabled');
+		}
+	}
+
+	private showTournamentOverlay(uuid: string, data: any): void {
+		// Create overlay
+		const overlay = document.createElement('div');
+		overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+		overlay.innerHTML = `
+			<div class="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+				<div class="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
+					<h3 class="txt-light-dark-sans text-xl font-bold">🏆 Tournament Data (from Blockchain)</h3>
+					<button class="close-overlay text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+						</svg>
+					</button>
+				</div>
+				<div class="p-4 overflow-auto flex-1">
+					<pre class="txt-light-dark-sans text-sm bg-neutral-100 dark:bg-neutral-900 p-4 rounded overflow-x-auto">${JSON.stringify(data, null, 2)}</pre>
+				</div>
+				<div class="p-4 border-t border-neutral-200 dark:border-neutral-700 flex justify-end gap-2">
+					<button class="copy-json bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded font-semibold transition-colors">
+						Copy JSON
+					</button>
+					<button class="close-overlay bg-neutral-500 hover:bg-neutral-600 text-white px-4 py-2 rounded font-semibold transition-colors">
+						Close
+					</button>
+				</div>
+			</div>
+		`;
+		
+		document.body.appendChild(overlay);
+		
+		// Add event listeners
+		overlay.querySelectorAll('.close-overlay').forEach(btn => {
+			btn.addEventListener('click', () => overlay.remove());
+		});
+		
+		overlay.addEventListener('click', (e) => {
+			if (e.target === overlay) {
+				overlay.remove();
+			}
+		});
+		
+		const copyBtn = overlay.querySelector('.copy-json');
+		if (copyBtn) {
+			copyBtn.addEventListener('click', () => {
+				navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+				copyBtn.textContent = '✓ Copied!';
+				setTimeout(() => {
+					copyBtn.textContent = 'Copy JSON';
+				}, 2000);
+			});
+		}
 	}
 
 	private async printTournamentJSON(uuid: string): Promise<void> {

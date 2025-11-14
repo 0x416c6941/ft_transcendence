@@ -26,6 +26,7 @@ import { verifyToken } from './utils/jwt.js';
 import friendsRoutes from './routes/friends.js';
 import { setupChatSocket } from './chatSocket.js';
 import statsRoutes from './routes/stats.js';
+import blockchainRoutes from './routes/blockchain.js';
 
 // Creating Fastify instance.
 const sslKeyPath = process.env.BACKEND_FASTIFY_SSL_KEY_PATH;
@@ -80,6 +81,9 @@ fastify.register(friendsRoutes, { prefix: '/api' });
 
 // Register stats routes
 fastify.register(statsRoutes, { prefix: '/api' });
+
+// Register blockchain routes
+fastify.register(blockchainRoutes);
 
 const start = async () => {
   const port = Number(process.env.BACKEND_FASTIFY_PORT);

@@ -45,8 +45,7 @@ clean: down
 avalanche-up: ${SECRETS_DIR}
 	@echo "Starting Avalanche Local Development Network..."
 	@$(DC_CMD) up --build -d avalanche-fuji
-	@echo "Avalanche Local Network is starting."
-	@echo "Network will be ready in ~10 seconds (no sync required)."
+	@echo "Avalanche network starting (contract will auto-deploy)"
 	@echo "Check status with: make avalanche-status"
 	@echo "View logs with: make avalanche-logs"
 

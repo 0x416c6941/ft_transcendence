@@ -1,0 +1,12 @@
+{
+  "name": "avalanche-contract-deployment",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "node deploy-contract.js"
+  },
+  "dependencies": {
+    "ethers": "^6.9.0",
+    "solc": "^0.8.21"
+  }
+}
