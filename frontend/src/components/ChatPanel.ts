@@ -154,8 +154,10 @@ export default class ChatPanel {
 		this.socket.on('chat:message_global', (data: ChatMessage) => {
 			this.globalMessages.push(data);
 			if (this.currentTab === 'global' && this.container) {
-				this.renderMessages();
-				this.scrollToBottom();
+				requestAnimationFrame(() => {
+					this.renderMessages();
+					this.scrollToBottom();
+				});
 			}
 		});
 
@@ -178,8 +180,10 @@ export default class ChatPanel {
 				}
 			} else if (this.currentTab === 'dm' && this.activeConversationId === data.conversationId && this.container) {
 				// Just update messages for existing active conversation
-				this.renderMessages();
-				this.scrollToBottom();
+				requestAnimationFrame(() => {
+					this.renderMessages();
+					this.scrollToBottom();
+				});
 			}
 			
 			this.socket.emit('chat:get_conversations');
@@ -200,16 +204,20 @@ export default class ChatPanel {
 			if (this.currentTab === 'global') {
 				this.globalMessages = mappedMessages;
 				if (this.container) {
-					this.renderMessages();
-					setTimeout(() => this.scrollToBottom(), 10);
+					requestAnimationFrame(() => {
+						this.renderMessages();
+						setTimeout(() => this.scrollToBottom(), 10);
+					});
 				}
 			} else if (this.activeConversationId) {
 				// Store messages for this conversation
 				this.dmMessages.set(this.activeConversationId, mappedMessages);
 				// Always re-render messages when DM history arrives
 				if (this.container && this.currentTab === 'dm') {
-					this.renderMessages();
-					setTimeout(() => this.scrollToBottom(), 10);
+					requestAnimationFrame(() => {
+						this.renderMessages();
+						setTimeout(() => this.scrollToBottom(), 10);
+					});
 				}
 			}
 		});
@@ -225,7 +233,7 @@ export default class ChatPanel {
 				isFriend: conv.is_friend
 			}));
 			
-			this.updateUnreadBadge();
+			requestAnimationFrame(() => this.updateUnreadBadge());
 			
 			// Don't render immediately - request fresh online status first
 			// The online_users_updated handler will trigger the render
