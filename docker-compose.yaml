@@ -34,6 +34,18 @@ services:
     expose:
       - ${BACKEND_FASTIFY_PORT}
     restart: unless-stopped
+  avalanche-fuji:
+    container_name: ${SERVICE_NAME_PREFIX}-avalanche-fuji
+    build:
+      context: ./infra/avalanche-fuji
+      dockerfile: Dockerfile
+    networks:
+      - network
+    expose:
+      - "9650"
+    volumes:
+      - avalanche-fuji-data:/data
+    restart: unless-stopped
 
 # Explicitly specifying a Docker network for containers to communicate on.
 networks:
@@ -68,3 +80,4 @@ secrets:
 
 volumes:
   sqlite-db:
+  avalanche-fuji-data:

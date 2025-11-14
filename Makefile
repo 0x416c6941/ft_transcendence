@@ -39,3 +39,51 @@ down:
 .PHONY: clean
 clean: down
 	@./docker_clean.sh
+
+# Avalanche Local Network management
+.PHONY: avalanche-up
+avalanche-up: ${SECRETS_DIR}
+	@echo "Starting Avalanche Local Development Network..."
+	@$(DC_CMD) up --build -d avalanche-fuji
+	@echo "Avalanche Local Network is starting."
+	@echo "Network will be ready in ~10 seconds (no sync required)."
+	@echo "Check status with: make avalanche-status"
+	@echo "View logs with: make avalanche-logs"
+
+.PHONY: avalanche-stop
+avalanche-stop:
+	@echo "Stopping Avalanche Fuji node..."
+	@$(DC_CMD) stop avalanche-fuji
+
+.PHONY: avalanche-start
+avalanche-start:
+	@echo "Starting Avalanche Fuji node..."
+	@$(DC_CMD) start avalanche-fuji
+
+.PHONY: avalanche-restart
+avalanche-restart:
+	@echo "Restarting Avalanche Fuji node..."
+	@$(DC_CMD) restart avalanche-fuji
+
+.PHONY: avalanche-logs
+avalanche-logs:
+	@$(DC_CMD) logs -f avalanche-fuji
+
+.PHONY: avalanche-status
+avalanche-status:
+	@echo "Checking Avalanche Fuji node status..."
+	@docker ps -a --filter "name=${SERVICE_NAME_PREFIX}-avalanche-fuji" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@echo ""
+	@echo "Testing RPC endpoint..."
+	@curl -sf --max-time 5 http://localhost:9650/ext/health && echo "✓ Node is healthy" || echo "✗ Node is not ready yet (may still be syncing)"
+
+.PHONY: avalanche-clean
+avalanche-clean:
+	@echo "Removing Avalanche Fuji node and data..."
+	@$(DC_CMD) rm -sf avalanche-fuji
+	@docker volume rm -f ${SERVICE_NAME_PREFIX}_avalanche-fuji-data 2>/dev/null || true
+	@echo "Avalanche Fuji node removed."
+
+.PHONY: avalanche-shell
+avalanche-shell:
+	@docker exec -it ${SERVICE_NAME_PREFIX}-avalanche-fuji /bin/bash
