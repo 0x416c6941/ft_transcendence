@@ -54,6 +54,14 @@ avalanche-stop:
 	@echo "Stopping Avalanche Fuji node..."
 	@$(DC_CMD) stop avalanche-fuji
 
+.PHONY: blockchain-stop
+blockchain-stop:
+	@echo "Saving blockchain snapshot and stopping..."
+	@docker exec ${SERVICE_NAME_PREFIX}-avalanche-fuji sh -c "avalanche network stop --snapshot-name ft-transcendence-blockchain" || echo "⚠️  Could not save snapshot (network may not be running)"
+	@$(DC_CMD) stop avalanche-fuji
+	@echo "✅ Blockchain state saved to snapshot 'ft-transcendence-blockchain'"
+	@echo "   Next time you start, it will restore from this snapshot"
+
 .PHONY: avalanche-start
 avalanche-start:
 	@echo "Starting Avalanche Fuji node..."

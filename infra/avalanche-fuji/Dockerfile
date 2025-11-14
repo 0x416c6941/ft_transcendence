@@ -86,17 +86,21 @@ echo "Pre-funded accounts available for development"\n\
 echo "Ready in ~10 seconds"\n\
 echo ""\n\
 \n\
-# Check if there are stale network directories from previous runs\n\
-EXISTING_NETWORKS=$(ls -1d /root/.avalanche-cli/runs/network_* 2>/dev/null | wc -l)\n\
+# Check if there is a saved snapshot to restore from\n\
+SNAPSHOT_NAME="ft-transcendence-blockchain"\n\
+SNAPSHOT_DIR="/root/.avalanche-cli/snapshots/anr-snapshot-$SNAPSHOT_NAME"\n\
 \n\
-if [ "$EXISTING_NETWORKS" -gt "0" ]; then\n\
-    echo "Found $EXISTING_NETWORKS stale network(s) from previous runs"\n\
-    echo "Cleaning up to start fresh..."\n\
+if [ -d "$SNAPSHOT_DIR" ]; then\n\
+    echo "Found saved snapshot: $SNAPSHOT_NAME"\n\
+    echo "Restoring blockchain state from snapshot..."\n\
+    avalanche network start --snapshot-name "$SNAPSHOT_NAME" --avalanchego-path=/usr/local/bin/avalanchego > /root/.avalanche-cli/data/network.log 2>&1 &\n\
+else\n\
+    echo "No snapshot found - starting fresh blockchain..."\n\
+    echo "Use '\''make blockchain-stop'\'' to save state before stopping"\n\
+    # Clean any stale networks\n\
     avalanche network clean > /dev/null 2>&1 || true\n\
+    avalanche network start --avalanchego-path=/usr/local/bin/avalanchego > /root/.avalanche-cli/data/network.log 2>&1 &\n\
 fi\n\
-\n\
-# Start avalanche network in background\n\
-avalanche network start --avalanchego-path=/usr/local/bin/avalanchego > /root/.avalanche-cli/data/network.log 2>&1 &\n\
 \n\
 # Wait for network to be ready\n\
 sleep 15\n\
