@@ -546,12 +546,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
 					.send({ error: 'Username and display prefix "42_" is reserved for 42 OAuth accounts.' })
 			}
 
-			// Get current user to check totp_secret
+			// Get current user to check totp_secret and password
 			let currentUser: any;
 			try {
 				currentUser = await new Promise<any>((resolve, reject) => {
 					fastify.sqlite.get(
-						'SELECT id, username, totp_secret, use_2fa FROM users WHERE id = ?',
+						'SELECT id, username, password, totp_secret, use_2fa FROM users WHERE id = ?',
 						[userId],
 						(err: Error | null, row: any) => {
 							if (err) reject(err);
@@ -577,9 +577,13 @@ export default async function userRoutes(fastify: FastifyInstance) {
 				values.push(username);
 			}
 			if (typeof password === "string" && password.length > 0) {
-				const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-				updates.push('password = ?');
-				values.push(hashedPassword);
+				// Check if the new password is different from the current one
+				const isSamePassword = await bcrypt.compare(password, currentUser.password);
+				if (!isSamePassword) {
+					const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+					updates.push('password = ?');
+					values.push(hashedPassword);
+				}
 			}
 			if (email) {
 				updates.push('email = ?');
