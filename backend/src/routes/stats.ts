@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { getTournamentsSchema, getTournamentByUuidSchema } from '../schemas/tournament.schemas.js';
 
 export default async function statsRoutes(fastify: FastifyInstance) {
 	// Get overall statistics
@@ -343,7 +344,9 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 	});
 
 	// Get tournaments
-	fastify.get('/stats/tournaments', async (request: FastifyRequest<{
+	fastify.get('/stats/tournaments', {
+		schema: getTournamentsSchema
+	}, async (request: FastifyRequest<{
 		Querystring: { game?: string; limit?: string }
 	}>, reply: FastifyReply) => {
 		try {
@@ -391,7 +394,9 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 	});
 
 	// Get detailed tournament data with all games
-	fastify.get('/stats/tournament/:uuid', async (request: FastifyRequest<{
+	fastify.get('/stats/tournament/:uuid', {
+		schema: getTournamentByUuidSchema
+	}, async (request: FastifyRequest<{
 		Params: { uuid: string }
 	}>, reply: FastifyReply) => {
 		try {

@@ -11,7 +11,8 @@ export const swaggerConfig = {
 		openapi: '3.0.0',
 		info: {
 			title: 'ft_transcendence API',
-			description: 'API documentation for user management and game statistics tracking',
+			description: 'API documentation for user management, game statistics, and tournament tracking. ' +
+				'Note: Real-time tournament gameplay is handled via Socket.IO (not documented here).',
 			version: '0.0.1'
 		},
 		servers: [
@@ -23,7 +24,8 @@ export const swaggerConfig = {
 		tags: [
 			{ name: 'users', description: 'User management endpoints' },
 			{ name: 'auth', description: 'Authentication endpoints' },
-			{ name: 'games', description: 'Game statistics and records endpoints' }
+			{ name: 'games', description: 'Game statistics and records endpoints' },
+			{ name: 'tournaments', description: 'Tournament records and statistics endpoints' }
 		],
 		components: {
 			securitySchemes: {

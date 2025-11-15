@@ -14,7 +14,12 @@ export const gameSchema = {
 		player2_name: { type: 'string', description: 'Name/alias of player 2' },
 		player2_is_user: { type: 'boolean', description: 'Whether player 2 is a registered user' },
 		winner: { type: ['string', 'null'], description: 'Name of the winner' },
-		data: { type: ['string', 'null'], description: 'JSON string with game statistics' }
+		data: { 
+			type: ['string', 'null'], 
+			description: 'JSON string with game statistics and metadata. ' +
+				'For forfeited tournament matches, includes: reason ("player_left"), forfeit_by (player name), and final_score. ' +
+				'For completed matches, includes game-specific stats (e.g., Pong: final score; Tetris: scores, lines cleared, game over status).'
+		}
 	}
 };
 
