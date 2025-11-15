@@ -221,6 +221,21 @@ export default class Pong3DAIView extends AbstractView {
         this.camera.lowerRadiusLimit = 400;
         this.camera.upperRadiusLimit = 1000;
         
+        // Disable keyboard controls for camera - only paddle movement allowed
+        this.camera.inputs.removeByType("ArcRotateCameraKeyboardMoveInput");
+        
+        // Store original camera position for reset
+        const originalAlpha = this.camera.alpha;
+        const originalBeta = this.camera.beta;
+        const originalRadius = this.camera.radius;
+        
+        // Double-click on canvas to reset camera view
+        this.canvas.addEventListener('dblclick', () => {
+            this.camera.alpha = originalAlpha;
+            this.camera.beta = originalBeta;
+            this.camera.radius = originalRadius;
+        });
+        
         // Lights
         const light1 = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), this.scene);
         light1.intensity = 0.6;
