@@ -416,6 +416,180 @@ function removePlayer(socketId: string): { roomId: string; room: Room } | null {
     return null;
 }
 
+async function handlePlayerLeave(socket: Socket, roomId: string, io: Server, fastify: FastifyInstance): Promise<void> {
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    socket.leave(roomId);
+
+    const playerIndex = room.players.findIndex(p => p.socketId === socket.id);
+    if (playerIndex === -1) return;
+
+    const leavingPlayer = room.players[playerIndex];
+    
+    // Mark player as eliminated
+    leavingPlayer.isEliminated = true;
+
+    // Handle creator leaving - reassign to another non-eliminated player
+    if (socket.id === room.creator) {
+        const newCreator = room.players.find(p => p.socketId !== socket.id && !p.isEliminated);
+        if (newCreator) {
+            room.creator = newCreator.socketId;
+        } else {
+            // No non-eliminated players left, find any other player
+            const anyPlayer = room.players.find(p => p.socketId !== socket.id);
+            if (anyPlayer) {
+                room.creator = anyPlayer.socketId;
+            } else {
+                // Last player left - destroy room
+                stopMatch(roomId);
+                io.to(roomId).emit('tournament_room_destroyed', { message: 'All players left' });
+                roomsByName.delete(room.name);
+                rooms.delete(roomId);
+                return;
+            }
+        }
+    }
+
+    // Case A: Player was in an active match
+    if (room.currentPlayer1 === socket.id || room.currentPlayer2 === socket.id) {
+        const gameState = gameStates.get(roomId);
+        
+        // Stop the match immediately
+        stopMatch(roomId);
+
+        // Determine winner and loser
+        const loserSocketId = socket.id;
+        const winnerSocketId = room.currentPlayer1 === socket.id ? room.currentPlayer2 : room.currentPlayer1;
+        
+        const loserPlayer = room.players.find(p => p.socketId === loserSocketId);
+        const winnerPlayer = room.players.find(p => p.socketId === winnerSocketId);
+
+        // Record the match result to database with current score
+        if (room.currentMatchStartedAt && loserPlayer && winnerPlayer && gameState) {
+            const gameRecord: GameRecord = {
+                game_name: 'Pong Tournament',
+                started_at: room.currentMatchStartedAt,
+                finished_at: new Date().toISOString(),
+                player1_name: room.players.find(p => p.socketId === room.currentPlayer1)?.displayName || 'Player 1',
+                player1_is_user: true,
+                player2_name: room.players.find(p => p.socketId === room.currentPlayer2)?.displayName || 'Player 2',
+                player2_is_user: true,
+                winner: winnerPlayer.displayName,
+                data: JSON.stringify({
+                    reason: 'player_left',
+                    forfeit_by: loserPlayer.displayName,
+                    final_score: {
+                        left: gameState.score.left,
+                        right: gameState.score.right
+                    }
+                })
+            };
+
+            saveGameRecord(fastify, gameRecord)
+                .then(async (gameId) => {
+                    if (room.tournamentDbId && gameId) {
+                        await linkGameToTournament(room, gameId, fastify);
+                    }
+                })
+                .catch(error => {
+                    fastify.log.error(error, 'Failed to save tournament match record (forfeit)');
+                });
+        }
+
+        // Reset current match state
+        room.currentPlayer1 = null;
+        room.currentPlayer2 = null;
+        room.currentGameState = null;
+        room.currentMatchStartedAt = null;
+
+        // Emit match ended event
+        io.to(roomId).emit('match_ended', {
+            loser: loserPlayer?.displayName,
+            room: {
+                id: room.id,
+                name: room.name,
+                creator: room.creator,
+                players: room.players,
+                status: room.status,
+            }
+        });
+
+        // Check if tournament should end
+        const activePlayers = room.players.filter(p => !p.isEliminated);
+        if (activePlayers.length === 1) {
+            // Tournament finished
+            room.status = 'finished';
+            const winner = activePlayers[0];
+            
+            // Save tournament end to database
+            await saveTournamentEnd(room, winner.displayName, fastify);
+            
+            io.to(roomId).emit('tournament_finished', {
+                winner: winner.displayName,
+                room: {
+                    id: room.id,
+                    name: room.name,
+                    creator: room.creator,
+                    players: room.players,
+                    status: room.status,
+                }
+            });
+
+            setTimeout(() => destroyRoom(roomId, io), 10000);
+        } else if (activePlayers.length >= 2) {
+            // Schedule next match with same transitions as normal match end
+            announceAndScheduleMatch(roomId, io, fastify, 3000, false);
+        } else {
+            // Less than 2 players left (shouldn't happen but handle gracefully)
+            room.status = 'finished';
+            io.to(roomId).emit('tournament_room_destroyed', { message: 'Not enough players to continue' });
+            setTimeout(() => destroyRoom(roomId, io), 3000);
+        }
+    } else {
+        // Case B: Player was waiting (not in active match)
+        // Just update room state - player is already marked as eliminated
+        io.to(roomId).emit('tournament_room_state', {
+            room: {
+                id: room.id,
+                name: room.name,
+                creator: room.creator,
+                players: room.players,
+                status: room.status,
+            }
+        });
+
+        // Check if we have enough players to continue
+        const activePlayers = room.players.filter(p => !p.isEliminated);
+        if (activePlayers.length < 2 && room.status === 'in_progress') {
+            // Not enough players to continue tournament
+            if (activePlayers.length === 1) {
+                room.status = 'finished';
+                const winner = activePlayers[0];
+                
+                await saveTournamentEnd(room, winner.displayName, fastify);
+                
+                io.to(roomId).emit('tournament_finished', {
+                    winner: winner.displayName,
+                    room: {
+                        id: room.id,
+                        name: room.name,
+                        creator: room.creator,
+                        players: room.players,
+                        status: room.status,
+                    }
+                });
+
+                setTimeout(() => destroyRoom(roomId, io), 10000);
+            } else {
+                room.status = 'finished';
+                io.to(roomId).emit('tournament_room_destroyed', { message: 'Not enough players to continue' });
+                setTimeout(() => destroyRoom(roomId, io), 3000);
+            }
+        }
+    }
+}
+
 function setPlayerInput(roomId: string, socketId: string, up: boolean, down: boolean): void {
     const key = `${roomId}:${socketId}`;
     playerInputs.set(key, { up, down });
@@ -830,23 +1004,9 @@ export function setupTournamentPong(fastify: FastifyInstance, io: Server): void 
             }
         });
 
-        socket.on('leave_tournament_room', (data: { roomId: string }) => {
+        socket.on('leave_tournament_room', async (data: { roomId: string }) => {
             const { roomId } = data;
-            socket.leave(roomId);
-
-            const result = removePlayer(socket.id);
-            if (result) {
-                const { room } = result;
-                io.to(roomId).emit('tournament_room_state', {
-                    room: {
-                        id: room.id,
-                        name: room.name,
-                        creator: room.creator,
-                        players: room.players,
-                        status: room.status,
-                    }
-                });
-            }
+            await handlePlayerLeave(socket, roomId, io, fastify);
         });
 
         socket.on('tournament_player_input', (data: { roomId: string; up: boolean; down: boolean }) => {
@@ -855,19 +1015,12 @@ export function setupTournamentPong(fastify: FastifyInstance, io: Server): void 
         });
 
         socket.on('disconnect', () => {
-            const result = removePlayer(socket.id);
-            if (result) {
-                const { roomId, room } = result;
-                io.to(roomId).emit('tournament_room_state', {
-                    room: {
-                        id: room.id,
-                        name: room.name,
-                        creator: room.creator,
-                        players: room.players,
-                        status: room.status,
-                    }
-                });
-            }
+            // Find which room this socket is in and handle the leave
+            rooms.forEach((room, roomId) => {
+                if (room.players.some(p => p.socketId === socket.id)) {
+                    handlePlayerLeave(socket, roomId, io, fastify);
+                }
+            });
         });
     });
 }

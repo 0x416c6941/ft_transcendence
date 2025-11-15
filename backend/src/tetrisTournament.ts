@@ -319,16 +319,17 @@ export function setupTetrisTournamentHandlers(io: Server, fastify: FastifyInstan
             }
         });
 
-        socket.on('leave_tetris_tournament_room', (data: { roomId: string }) => {
-            handlePlayerLeave(socket, data.roomId, io, fastify);
+        socket.on('leave_tetris_tournament_room', async (data: { roomId: string }) => {
+            await handlePlayerLeave(socket, data.roomId, io, fastify);
         });
 
-        socket.on('disconnect', () => {
-            rooms.forEach((room, roomId) => {
+        socket.on('disconnect', async () => {
+            for (const [roomId, room] of rooms) {
                 if (room.players.some(p => p.socketId === socket.id)) {
-                    handlePlayerLeave(socket, roomId, io, fastify);
+                    await handlePlayerLeave(socket, roomId, io, fastify);
+                    break; // Player can only be in one room
                 }
-            });
+            }
         });
 
         socket.on('get_tetris_tournament_rooms', (callback: (rooms: Array<{ name: string; playerCount: number; maxPlayers: number; hasPassword: boolean; status: string }>) => void) => {
@@ -556,102 +557,176 @@ async function startMatch(room: TournamentRoom, io: Server, fastify: FastifyInst
     }, GAME_UPDATE_RATE);
 }
 
-function handlePlayerLeave(socket: Socket, roomId: string, io: Server, fastify: FastifyInstance): void {
+async function handlePlayerLeave(socket: Socket, roomId: string, io: Server, fastify: FastifyInstance): Promise<void> {
     const room = rooms.get(roomId);
     if (!room) return;
 
     socket.leave(roomId);
 
+    const playerIndex = room.players.findIndex(p => p.socketId === socket.id);
+    if (playerIndex === -1) return;
+
+    const leavingPlayer = room.players[playerIndex];
+    
+    // Mark player as eliminated
+    leavingPlayer.isEliminated = true;
+
+    // Handle creator leaving - reassign to another non-eliminated player
     if (socket.id === room.creator) {
-        // Creator left - destroy room
-        if (room.gameInterval) clearInterval(room.gameInterval);
-        if (room.countdownTimer) clearInterval(room.countdownTimer);
-        
-        io.to(roomId).emit('tetris_tournament_room_destroyed', { message: 'Creator left' });
-        roomsByName.delete(room.name);
-        rooms.delete(roomId);
-        return;
+        const newCreator = room.players.find(p => p.socketId !== socket.id && !p.isEliminated);
+        if (newCreator) {
+            room.creator = newCreator.socketId;
+        } else {
+            // No non-eliminated players left, find any other player
+            const anyPlayer = room.players.find(p => p.socketId !== socket.id);
+            if (anyPlayer) {
+                room.creator = anyPlayer.socketId;
+            } else {
+                // Last player left - destroy room
+                if (room.gameInterval) clearInterval(room.gameInterval);
+                if (room.countdownTimer) clearInterval(room.countdownTimer);
+                io.to(roomId).emit('tetris_tournament_room_destroyed', { message: 'All players left' });
+                roomsByName.delete(room.name);
+                rooms.delete(roomId);
+                return;
+            }
+        }
     }
 
-    // Regular player left
-    const playerIndex = room.players.findIndex(p => p.socketId === socket.id);
-    if (playerIndex !== -1) {
-        room.players[playerIndex].isEliminated = true;
+    // Case A: Player was in an active match
+    if (room.currentMatch && (room.currentMatch.player1 === socket.id || room.currentMatch.player2 === socket.id)) {
+        // Stop game intervals
+        if (room.gameInterval) clearInterval(room.gameInterval);
+        if (room.countdownTimer) clearInterval(room.countdownTimer);
 
-        if (room.currentMatch && (room.currentMatch.player1 === socket.id || room.currentMatch.player2 === socket.id)) {
-            // Player in active match left
-            if (room.gameInterval) clearInterval(room.gameInterval);
-            if (room.countdownTimer) clearInterval(room.countdownTimer);
+        const loserSocketId = socket.id;
+        const winnerSocketId = room.currentMatch.player1 === socket.id ? room.currentMatch.player2 : room.currentMatch.player1;
+        room.currentMatch.winner = winnerSocketId;
 
-            const winner = room.currentMatch.player1 === socket.id ? room.currentMatch.player2 : room.currentMatch.player1;
-            const loser = socket.id;
-            room.currentMatch.winner = winner;
+        const winnerPlayer = room.players.find(p => p.socketId === winnerSocketId);
+        const loserPlayer = room.players.find(p => p.socketId === loserSocketId);
 
-            const winnerPlayer = room.players.find(p => p.socketId === winner);
-            const loserPlayer = room.players.find(p => p.socketId === loser);
+        // Save match result to database with current game state
+        if (room.currentMatchStartedAt && winnerPlayer && loserPlayer) {
+            const player1State = room.gameState?.player1;
+            const player2State = room.gameState?.player2;
+            
+            const gameRecord: GameRecord = {
+                game_name: 'Tetris Tournament',
+                started_at: room.currentMatchStartedAt,
+                finished_at: new Date().toISOString(),
+                player1_name: room.players.find(p => p.socketId === room.currentMatch!.player1)?.displayName || 'Player 1',
+                player1_is_user: true,
+                player2_name: room.players.find(p => p.socketId === room.currentMatch!.player2)?.displayName || 'Player 2',
+                player2_is_user: true,
+                winner: winnerPlayer.displayName,
+                data: JSON.stringify({
+                    reason: 'player_left',
+                    forfeit_by: loserPlayer.displayName,
+                    player1: player1State ? {
+                        alias: room.players.find(p => p.socketId === room.currentMatch!.player1)?.displayName || 'Player 1',
+                        score: player1State.score,
+                        linesCleared: player1State.linesCleared,
+                        gameOver: player1State.gameOver
+                    } : null,
+                    player2: player2State ? {
+                        alias: room.players.find(p => p.socketId === room.currentMatch!.player2)?.displayName || 'Player 2',
+                        score: player2State.score,
+                        linesCleared: player2State.linesCleared,
+                        gameOver: player2State.gameOver
+                    } : null
+                })
+            };
 
-            // Save match result to database (forfeit)
-            if (room.currentMatchStartedAt && winnerPlayer && loserPlayer) {
-                const gameRecord: GameRecord = {
-                    game_name: 'Tetris Tournament',
-                    started_at: room.currentMatchStartedAt,
-                    finished_at: new Date().toISOString(),
-                    player1_name: room.players.find(p => p.socketId === room.currentMatch!.player1)?.displayName || 'Player 1',
-                    player1_is_user: true,
-                    player2_name: room.players.find(p => p.socketId === room.currentMatch!.player2)?.displayName || 'Player 2',
-                    player2_is_user: true,
-                    winner: winnerPlayer.displayName,
-                    data: JSON.stringify({
-                        reason: 'player_left',
-                        winner: winnerPlayer.displayName,
-                        loser: loserPlayer.displayName
-                    })
-                };
+            saveGameRecord(fastify, gameRecord)
+                .then(async (gameId) => {
+                    if (room.tournamentDbId && gameId) {
+                        await linkGameToTournament(room, gameId, fastify);
+                    }
+                })
+                .catch(error => {
+                    fastify.log.error(error, 'Failed to save tetris tournament match record (forfeit)');
+                });
+        }
 
-                saveGameRecord(fastify, gameRecord)
-                    .then(async (gameId) => {
-                        if (room.tournamentDbId && gameId) {
-                            await linkGameToTournament(room, gameId, fastify);
-                        }
-                    })
-                    .catch(error => {
-                        fastify.log.error(error, 'Failed to save tetris tournament match record (forfeit)');
-                    });
-            }
+        // Emit match ended event
+        io.to(roomId).emit('tetris_match_ended', {
+            loser: loserPlayer?.displayName,
+            room: getClientSafeRoom(room)
+        });
 
-            io.to(roomId).emit('tetris_match_ended', {
-                loser: room.players[playerIndex].displayName,
+        // Reset match state
+        room.gameState = null;
+        room.currentMatch = null;
+        room.currentMatchStartedAt = null;
+
+        // Check if tournament should end
+        const activePlayers = room.players.filter(p => !p.isEliminated);
+        if (activePlayers.length === 1) {
+            // Tournament finished
+            room.status = 'finished';
+            const winner = activePlayers[0];
+            
+            await saveTournamentEnd(room, winner.displayName, fastify);
+            
+            io.to(room.id).emit('tetris_tournament_finished', {
+                winner: winner.displayName,
                 room: getClientSafeRoom(room)
             });
 
-            room.gameState = null;
-            room.currentMatch = null;
-            room.currentMatchStartedAt = null;
+            setTimeout(() => {
+                io.to(room.id).emit('tetris_tournament_room_destroyed', { message: 'Tournament ended' });
+                roomsByName.delete(room.name);
+                rooms.delete(room.id);
+            }, 10000);
+        } else if (activePlayers.length >= 2) {
+            // Schedule next match with same transitions as normal match end
+            announceAndScheduleMatch(roomId, io, fastify, 3000, false);
+        } else {
+            // Less than 2 players left
+            room.status = 'finished';
+            io.to(roomId).emit('tetris_tournament_room_destroyed', { message: 'Not enough players to continue' });
+            setTimeout(() => {
+                roomsByName.delete(room.name);
+                rooms.delete(roomId);
+            }, 3000);
+        }
+    } else {
+        // Case B: Player was waiting (not in active match)
+        // Just update room state - player is already marked as eliminated
+        io.to(roomId).emit('tetris_tournament_room_state', {
+            room: getClientSafeRoom(room)
+        });
 
-            // Check if tournament is over
-            const activePlayers = room.players.filter(p => !p.isEliminated);
+        // Check if we have enough players to continue
+        const activePlayers = room.players.filter(p => !p.isEliminated);
+        if (activePlayers.length < 2 && room.status === 'in_progress') {
+            // Not enough players to continue tournament
             if (activePlayers.length === 1) {
-                // Tournament finished
                 room.status = 'finished';
-                io.to(room.id).emit('tetris_tournament_finished', {
-                    winner: activePlayers[0].displayName,
+                const winner = activePlayers[0];
+                
+                await saveTournamentEnd(room, winner.displayName, fastify);
+                
+                io.to(roomId).emit('tetris_tournament_finished', {
+                    winner: winner.displayName,
                     room: getClientSafeRoom(room)
                 });
 
                 setTimeout(() => {
-                    io.to(room.id).emit('tetris_tournament_room_destroyed', { message: 'Tournament ended' });
+                    io.to(roomId).emit('tetris_tournament_room_destroyed', { message: 'Tournament ended' });
                     roomsByName.delete(room.name);
-                    rooms.delete(room.id);
+                    rooms.delete(roomId);
                 }, 10000);
             } else {
-                // Schedule next match
+                room.status = 'finished';
+                io.to(roomId).emit('tetris_tournament_room_destroyed', { message: 'Not enough players to continue' });
                 setTimeout(() => {
-                    announceAndScheduleMatch(roomId, io, fastify, 3000, false);
-                }, 2000);
+                    roomsByName.delete(room.name);
+                    rooms.delete(roomId);
+                }, 3000);
             }
         }
-
-        io.to(roomId).emit('tetris_tournament_room_state', { room: getClientSafeRoom(room) });
     }
 }
 
