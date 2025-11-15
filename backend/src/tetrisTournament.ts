@@ -217,12 +217,20 @@ async function joinRoom(name: string, password: string, playerSocket: Socket, fa
         return { success: false, error: 'Room is full' };
     }
 
+    // Check if player already joined by socketId (reconnection case)
     const existingPlayer = room.players.find(p => p.socketId === playerSocket.id);
     if (existingPlayer) {
         return { success: true, roomId };
     }
 
     const playerUserId = (playerSocket as any).userId;
+    
+    // Check if this user is already in the tournament (prevent duplicate entries from multiple tabs)
+    const duplicateUser = room.players.find(p => p.userId === playerUserId);
+    if (duplicateUser) {
+        return { success: false, error: 'You have already joined this tournament' };
+    }
+
     const playerDisplay = (await getDisplayName(fastify, playerUserId)) || (playerSocket as any).username || 'Player';
 
     const newPlayer: TournamentPlayer = {
