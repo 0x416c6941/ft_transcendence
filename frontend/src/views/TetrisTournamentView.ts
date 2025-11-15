@@ -218,24 +218,54 @@ export default class TetrisTournamentView extends AbstractView {
         const playerListEl = document.getElementById('player-list');
         if (!playerListEl) return;
 
-        playerListEl.innerHTML = players.map(player => {
+        // Clear existing content safely
+        playerListEl.textContent = '';
+
+        players.forEach(player => {
             const isCreator = this.roomData && player.socketId === this.roomData.creator;
             const readyIcon = player.isReady ? '✓' : '○';
             const readyColor = player.isReady ? 'text-green-400' : 'text-gray-500';
-            const eliminatedClass = player.isEliminated ? 'line-through text-red-400' : '';
-            const creatorBadge = isCreator ? '<span class="text-xs bg-yellow-600 px-2 py-1 rounded ml-2">Creator</span>' : '';
 
-            return `
-                <div class="flex items-center justify-between p-2 bg-gray-800 rounded">
-                    <div class="flex items-center gap-2">
-                        <span class="${readyColor} font-bold">${readyIcon}</span>
-                        <span class="text-white ${eliminatedClass}">${player.displayName}</span>
-                        ${creatorBadge}
-                    </div>
-                    ${player.isEliminated ? '<span class="text-red-400 text-sm">✗</span>' : ''}
-                </div>
-            `;
-        }).join('');
+            // Create container div
+            const containerDiv = document.createElement('div');
+            containerDiv.className = 'flex items-center justify-between p-2 bg-gray-800 rounded';
+
+            // Create left side div with player info
+            const leftDiv = document.createElement('div');
+            leftDiv.className = 'flex items-center gap-2';
+
+            // Ready icon
+            const readySpan = document.createElement('span');
+            readySpan.className = `${readyColor} font-bold`;
+            readySpan.textContent = readyIcon;
+            leftDiv.appendChild(readySpan);
+
+            // Player name (SAFE: textContent escapes HTML)
+            const nameSpan = document.createElement('span');
+            nameSpan.className = player.isEliminated ? 'text-white line-through text-red-400' : 'text-white';
+            nameSpan.textContent = player.displayName;
+            leftDiv.appendChild(nameSpan);
+
+            // Creator badge
+            if (isCreator) {
+                const creatorBadge = document.createElement('span');
+                creatorBadge.className = 'text-xs bg-yellow-600 px-2 py-1 rounded ml-2';
+                creatorBadge.textContent = 'Creator';
+                leftDiv.appendChild(creatorBadge);
+            }
+
+            containerDiv.appendChild(leftDiv);
+
+            // Eliminated mark
+            if (player.isEliminated) {
+                const eliminatedSpan = document.createElement('span');
+                eliminatedSpan.className = 'text-red-400 text-sm';
+                eliminatedSpan.textContent = '✗';
+                containerDiv.appendChild(eliminatedSpan);
+            }
+
+            playerListEl.appendChild(containerDiv);
+        });
     }
 
     private toggleReady(): void {

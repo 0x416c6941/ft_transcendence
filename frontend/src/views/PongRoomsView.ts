@@ -170,57 +170,99 @@ export default class PongRoomsView extends AbstractView {
         if (!roomsListEl) return;
 
         if (this.roomsList.length === 0) {
-            roomsListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-8">No rooms available. Create one!</p>';
+            roomsListEl.textContent = '';
+            const emptyMessage = document.createElement('p');
+            emptyMessage.className = 'text-gray-500 dark:text-gray-400 text-center py-8';
+            emptyMessage.textContent = 'No rooms available. Create one!';
+            roomsListEl.appendChild(emptyMessage);
             return;
         }
 
-        roomsListEl.innerHTML = this.roomsList.map(room => {
+        // Clear existing content safely
+        roomsListEl.textContent = '';
+
+        this.roomsList.forEach(room => {
             const statusColor = room.status === 'waiting' ? 'text-green-400' : room.status === 'in_progress' ? 'text-yellow-400' : 'text-gray-400';
             const statusText = room.status === 'waiting' ? 'Waiting' : room.status === 'in_progress' ? 'In Progress' : 'Finished';
             const isFull = room.playerCount >= room.maxPlayers;
             const lockText = room.hasPassword ? 'Locked' : 'Not Locked';
             const lockColor = room.hasPassword ? 'text-yellow-600 dark:text-yellow-500' : 'text-green-600 dark:text-green-500';
 
-            return `
-                <button class="w-full p-4 bg-gray-100 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-left ${isFull ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
-                        data-room-name="${room.name}"
-                        ${isFull ? 'disabled' : ''}>
-                    <div class="flex justify-between items-center">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-3">
-                                <span class="font-semibold text-lg text-gray-800 dark:text-white">${room.name}</span>
-                                <span class="${lockColor} text-sm font-medium">${lockText}</span>
-                            </div>
-                            <div class="flex gap-6 mt-2 text-sm">
-                                <span class="text-gray-600 dark:text-gray-300">
-                                    Players: ${room.playerCount}/${room.maxPlayers}
-                                    ${isFull ? '<span class="text-red-500 ml-1 font-semibold">(Full)</span>' : ''}
-                                </span>
-                                <span class="${statusColor} font-medium">${statusText}</span>
-                            </div>
-                        </div>
-                    </div>
-                </button>
-            `;
-        }).join('');
+            // Create button
+            const button = document.createElement('button');
+            button.className = `w-full p-4 bg-gray-100 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-left ${isFull ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`;
+            button.dataset.roomName = room.name;
+            if (isFull) button.disabled = true;
 
-        document.querySelectorAll('[data-room-name]').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const roomName = (button as HTMLElement).dataset.roomName;
-                if (roomName && !(button as HTMLButtonElement).disabled) {
-                    const room = this.roomsList.find(r => r.name === roomName);
+            // Create outer flex container
+            const flexContainer = document.createElement('div');
+            flexContainer.className = 'flex justify-between items-center';
 
-                    if (room?.hasPassword) {
-                        this.fillRoomName(roomName);
-                        const passwordInput = document.getElementById('room-password') as HTMLInputElement;
-                        if (passwordInput) {
-                            passwordInput.focus();
+            // Create content div
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'flex-1';
+
+            // Create header div with room name and lock status
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'flex items-center gap-3';
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'font-semibold text-lg text-gray-800 dark:text-white';
+            nameSpan.textContent = room.name; // SAFE: textContent escapes HTML
+            headerDiv.appendChild(nameSpan);
+
+            const lockSpan = document.createElement('span');
+            lockSpan.className = `${lockColor} text-sm font-medium`;
+            lockSpan.textContent = lockText;
+            headerDiv.appendChild(lockSpan);
+
+            contentDiv.appendChild(headerDiv);
+
+            // Create info row
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'flex gap-6 mt-2 text-sm';
+
+            const playersSpan = document.createElement('span');
+            playersSpan.className = 'text-gray-600 dark:text-gray-300';
+            playersSpan.textContent = `Players: ${room.playerCount}/${room.maxPlayers}`;
+            if (isFull) {
+                playersSpan.appendChild(document.createTextNode(' '));
+                const fullSpan = document.createElement('span');
+                fullSpan.className = 'text-red-500 ml-1 font-semibold';
+                fullSpan.textContent = '(Full)';
+                playersSpan.appendChild(fullSpan);
+            }
+            infoDiv.appendChild(playersSpan);
+
+            const statusSpan = document.createElement('span');
+            statusSpan.className = `${statusColor} font-medium`;
+            statusSpan.textContent = statusText;
+            infoDiv.appendChild(statusSpan);
+
+            contentDiv.appendChild(infoDiv);
+            flexContainer.appendChild(contentDiv);
+            button.appendChild(flexContainer);
+
+            // Add click handler
+            button.addEventListener('click', () => {
+                if (!button.disabled) {
+                    const roomName = button.dataset.roomName;
+                    if (roomName) {
+                        const selectedRoom = this.roomsList.find(r => r.name === roomName);
+                        if (selectedRoom?.hasPassword) {
+                            this.fillRoomName(roomName);
+                            const passwordInput = document.getElementById('room-password') as HTMLInputElement;
+                            if (passwordInput) {
+                                passwordInput.focus();
+                            }
+                        } else {
+                            this.enterRoom(roomName, '');
                         }
-                    } else {
-                        this.enterRoom(roomName, '');
                     }
                 }
             });
+
+            roomsListEl.appendChild(button);
         });
     }
 
@@ -235,7 +277,11 @@ export default class PongRoomsView extends AbstractView {
     private showRoomsError(message: string): void {
         const roomsListEl = document.getElementById('rooms-list');
         if (roomsListEl) {
-            roomsListEl.innerHTML = `<p class="text-red-500 text-center py-8">${message}</p>`;
+            roomsListEl.textContent = '';
+            const errorMsg = document.createElement('p');
+            errorMsg.className = 'text-red-500 text-center py-8';
+            errorMsg.textContent = message; // SAFE: textContent escapes HTML
+            roomsListEl.appendChild(errorMsg);
         }
     }
 
