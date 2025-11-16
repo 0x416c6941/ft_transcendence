@@ -462,11 +462,15 @@ The application uses `SameSite=lax` cookies, which provides some CSRF protection
 **CORS Configuration:**
 ```typescript
 // backend/src/main.ts
+import { BASE_URL } from './app.config.js';
+
 await fastify.register(cors, {
-    origin: ["https://localhost/", "https://api.intra.42.fr"],
+    origin: [`${BASE_URL}/`, "https://api.intra.42.fr"],
     credentials: true
 });
 ```
+
+**Note:** `BASE_URL` is configured from `NGINX_HTTPS_PORT` environment variable.
 
 **Limitation:**
 - `SameSite=lax` doesn't protect POST requests following navigation

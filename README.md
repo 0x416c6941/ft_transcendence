@@ -1,9 +1,11 @@
 # Users API
 
-Swagger documentation for the API endpoints is at
+Swagger documentation for the API endpoints is at:
 ```
-https://localhost/api/docs
+https://localhost:${NGINX_HTTPS_PORT}/api/docs
 ```
+(Default port is 1488, configurable in `.env`)
+
 If you're unfimiliar with JWT Authentication, spend 10 minutes and read up on it online, e.g.
 ```
 https://www.jwt.io/introduction#what-is-json-web-token

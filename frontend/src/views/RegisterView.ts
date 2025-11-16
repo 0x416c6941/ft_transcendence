@@ -353,9 +353,9 @@ export default class RegisterView extends AbstractView {
   }
 
   private async show2FASetup(username: string): Promise<void> {
+    // Fetch QR code from backend
     try {
-      const response = await fetch(`https://localhost/api/users/2fa/setup?username=${encodeURIComponent(username)}`);
-
+      const response = await fetch(`/api/users/2fa/setup?username=${encodeURIComponent(username)}`);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to fetch 2FA setup');

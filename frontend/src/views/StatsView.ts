@@ -19,7 +19,7 @@ import {
 	initBlockchain,
 	saveTournamentToBlockchain,
 	getTournamentFromBlockchain,
-	tournamentExistsOnBlockchain
+	checkTournamentExistsOnBlockchain
 } from "../blockchain.js";
 
 export default class StatsView extends AbstractView {
@@ -851,8 +851,8 @@ export default class StatsView extends AbstractView {
 		// Check blockchain status for each tournament
 		if (this.blockchainReady) {
 			for (const tournament of this.tournaments) {
-				const exists = await tournamentExistsOnBlockchain(tournament.uuid);
-				this.tournamentBlockchainStatus.set(tournament.uuid, exists);
+				const result = await checkTournamentExistsOnBlockchain(tournament.uuid);
+				this.tournamentBlockchainStatus.set(tournament.uuid, result.exists);
 			}
 		}
 		

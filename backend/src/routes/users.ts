@@ -38,7 +38,8 @@ import {
 import {
 	RESERVED_42_USERNAME_PREFIX,
 	RESERVED_42_DISPLAY_NAME_PREFIX,
-	AVATAR_IMAGE_SIZE_LIMIT
+	AVATAR_IMAGE_SIZE_LIMIT,
+	BASE_URL
 } from '../app.config.js'
 import {
 	validateAndNormalizeRegistrationPayload,
@@ -861,13 +862,13 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			const requestBaseUrl = 'https://api.intra.42.fr/oauth/authorize';
 			let requestParams = new URLSearchParams({
 				client_id: `${fastify.config.oauth42.uid}`,
-				redirect_uri: 'https://localhost/api/users/oauth/42/callback',
+				redirect_uri: `${BASE_URL}/api/users/oauth/42/callback`,
 				scope: 'public',
 				response_type: 'code'
 			});
 
 			// In case we catch any error, we need to redirect user back.
-			const errorBaseUrl = 'https://localhost/error/';
+			const errorBaseUrl = `${BASE_URL}/error/`;
 			let errorParams: URLSearchParams | null = null;
 
 			if (request.cookies?.accessToken) {
@@ -927,10 +928,10 @@ export default async function userRoutes(fastify: FastifyInstance) {
 			schema: oauth42CallbackSchema
 		},
 		async (request: FastifyRequest<{ Querystring: Oauth42CallbackQuerystring }>, reply: FastifyReply) => {
-			const redirectBaseUrl = 'https://localhost';
+			const redirectBaseUrl = BASE_URL;
 
 			// In case we catch any error, we need to redirect user back.
-			const errorBaseUrl = 'https://localhost/error/';
+			const errorBaseUrl = `${BASE_URL}/error/`;
 			let errorParams: URLSearchParams | null = null;
 
 			try {

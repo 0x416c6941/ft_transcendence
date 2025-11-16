@@ -3,6 +3,13 @@
  */
 
 /**
+ * @var {readonly string} BASE_URL
+ * Base URL for the application. Used for OAuth callbacks and redirects.
+ * Defaults to localhost with NGINX_HTTPS_PORT from environment.
+ */
+export const BASE_URL: string = process.env.BASE_URL || `https://localhost:${process.env.NGINX_HTTPS_PORT || 443}`;
+
+/**
  * @var {readonly string} RESERVED_42_USERNAME_PREFIX
  * We need to reserve some username prefix for users created with 42 OAuth
  * in order to prevent possible collisions and try to ensure successful user creation.

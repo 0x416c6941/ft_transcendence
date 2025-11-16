@@ -8,9 +8,9 @@ export async function initBlockchain(): Promise<boolean> {
 
 export async function saveTournamentToBlockchain(uuid: string, data: any): Promise<boolean> {
     try {
-        console.log('💾 Saving tournament to blockchain...');
+        console.log('💾 Saving tournament to blockchain:', uuid);
         
-        const response = await fetch(`https://localhost/api/blockchain/tournament/${uuid}`, {
+        const response = await fetch(`/api/blockchain/tournament/${uuid}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -38,9 +38,9 @@ export async function saveTournamentToBlockchain(uuid: string, data: any): Promi
 
 export async function getTournamentFromBlockchain(uuid: string): Promise<any> {
     try {
-        console.log('📖 Reading tournament from blockchain...');
+        console.log('📖 Reading tournament from blockchain:', uuid);
         
-        const response = await fetch(`https://localhost/api/blockchain/tournament/${uuid}`, {
+        const response = await fetch(`/api/blockchain/tournament/${uuid}`, {
             method: 'GET',
             credentials: 'include'
         });
@@ -59,21 +59,22 @@ export async function getTournamentFromBlockchain(uuid: string): Promise<any> {
     }
 }
 
-export async function tournamentExistsOnBlockchain(uuid: string): Promise<boolean> {
+export async function checkTournamentExistsOnBlockchain(uuid: string): Promise<{exists: boolean, available: boolean}> {
     try {
-        const response = await fetch(`https://localhost/api/blockchain/tournament/${uuid}/exists`, {
+        const response = await fetch(`/api/blockchain/tournament/${uuid}/exists`, {
             method: 'GET',
             credentials: 'include'
         });
         
         if (!response.ok) {
-            return false;
+            return { exists: false, available: false };
         }
         
-        const { exists, available } = await response.json();
-        return available && exists;
+        const data = await response.json();
+        return data;
     } catch (error) {
-        console.error('Failed to check tournament existence:', error);
-        return false;
+        console.error('Failed to check blockchain:', error);
+        return { exists: false, available: false };
     }
 }
+

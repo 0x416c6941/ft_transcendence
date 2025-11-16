@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import validator from 'validator';
 import { randomBytes } from 'node:crypto';
-import { RANDOM_PASSWORD_LENGTH_FOR_42_ACCOUNT } from '../app.config.js';
+import { RANDOM_PASSWORD_LENGTH_FOR_42_ACCOUNT, BASE_URL } from '../app.config.js';
 import path from 'node:path';
 import sharp from 'sharp';
 
@@ -202,7 +202,7 @@ export async function exchange42CodeFor42Token(fastify: FastifyInstance,
 		client_id: `${fastify.config.oauth42.uid}`,
 		client_secret: `${fastify.config.oauth42.secret}`,
 		code: `${request.query.code}`,
-		redirect_uri: 'https://localhost/api/users/oauth/42/callback'
+		redirect_uri: `${BASE_URL}/api/users/oauth/42/callback`
 	};
 
 	try {

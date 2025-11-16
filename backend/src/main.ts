@@ -14,6 +14,9 @@ import { setupRemotePong } from "./pongRemote.js";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import path from 'node:path';
+import { BASE_URL } from './app.config.js';
+
+// Routes.
 import gameRoutes from './routes/games.js';
 import { setupPongGameLocal } from './pongGameLocal.js';
 import { setupPongAI } from './pongAI.js';
@@ -99,7 +102,7 @@ const start = async () => {
 		});
 		await fastify.register(cors, {
 			// Frontend or 42 OAuth origin.
-			origin: ["https://localhost/", "https://api.intra.42.fr"],
+			origin: [`${BASE_URL}/`, "https://api.intra.42.fr"],
 			// Allow sending cookies or Authorization headers.
 			credentials: true
   		});

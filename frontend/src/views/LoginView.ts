@@ -52,12 +52,12 @@ export default class LoginView extends AbstractView {
           <div class="h-px bg-neutral-300 dark:bg-neutral-700 flex-1"></div>
         </div>
 
-        <a id="oauth-42-btn" href="https://localhost/api/users/oauth/42"
-          class="w-64 text-center bg-black/90 hover:bg-black text-white py-2 rounded shadow transition-colors"
-          rel="nofollow"
-        >
-          Sign in with 42
-        </a>
+                <div class="text-center">
+          <div class="relative inline-block">
+            <div class="absolute inset-0 bg-gradient-to-r from-sky-400 to-blue-500 rounded-lg blur opacity-75"></div>
+            <a id="oauth-42-btn" href="/api/users/oauth/42"
+              class="relative block bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white px-6 py-3 rounded-lg font-semibold transition-all hover:scale-105 border-2 border-sky-500">
+              <span class="flex items-center justify-center gap-2">
 
         <div class="mt-6">
           <a href="/" data-link class="txt-light-dark-sans underline">Back to Home</a>

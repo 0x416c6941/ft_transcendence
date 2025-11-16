@@ -5,20 +5,21 @@
 import { FastifyInstance } from 'fastify';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
+import type { SwaggerOptions } from '@fastify/swagger';
+import { BASE_URL } from '../app.config.js';
 
-export const swaggerConfig = {
+export const swaggerConfig: SwaggerOptions = {
 	openapi: {
 		openapi: '3.0.0',
 		info: {
 			title: 'ft_transcendence API',
-			description: 'API documentation for user management, game statistics, and tournament tracking. ' +
-				'Note: Real-time tournament gameplay is handled via Socket.IO (not documented here).',
-			version: '0.0.1'
+			description: 'API documentation for the ft_transcendence web application',
+			version: '1.0.0'
 		},
 		servers: [
 			{
-				url: 'https://localhost',
-				description: 'Development server (via nginx)'
+				url: BASE_URL,
+				description: 'Development server'
 			}
 		],
 		tags: [

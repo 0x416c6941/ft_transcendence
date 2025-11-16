@@ -1,6 +1,6 @@
 // API functions for stats endpoints
 
-const BASE_URL = 'https://localhost/api';
+const BASE_URL = '/api';  // Use relative URL - works on any port
 
 export interface OverviewStats {
 	totalUsers: number;

@@ -11,7 +11,7 @@ services:
       - ${SECRET_NAME_NGINX_CRT}
       - ${SECRET_NAME_NGINX_KEY}
     ports:
-      - "443:443"
+      - "${NGINX_HTTPS_PORT}:${NGINX_HTTPS_PORT}"
     depends_on:
       - backend
     restart: unless-stopped
