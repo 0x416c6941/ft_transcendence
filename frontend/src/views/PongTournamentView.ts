@@ -21,7 +21,7 @@ interface TournamentRoomData {
 
 export default class PongTournamentView extends AbstractView {
     private socket = io;
-    private roomId: string;
+    private roomId: string | null;
     private roomData: TournamentRoomData | null = null;
     private isCreator: boolean = false;
     private canvas: HTMLCanvasElement | null = null;
@@ -295,6 +295,9 @@ export default class PongTournamentView extends AbstractView {
             roomId: this.roomId
         });
 
+        // Clear roomId to prevent double-emission in cleanup()
+        this.roomId = null;
+
         this.router.navigate('/');
     }
 
@@ -500,6 +503,13 @@ export default class PongTournamentView extends AbstractView {
     }
 
     cleanup(): void {
+        // Notify backend if still in a room (user navigated away without clicking Leave button)
+        if (this.roomId) {
+            this.socket.emit('leave_tournament_room', {
+                roomId: this.roomId
+            });
+        }
+
         // Remove keyboard event listeners
         if (this.handleKeyDown) {
             document.removeEventListener('keydown', this.handleKeyDown);

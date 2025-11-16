@@ -21,7 +21,7 @@ interface TournamentRoomData {
 
 export default class TetrisTournamentView extends AbstractView {
     private socket = io;
-    private roomId: string;
+    private roomId: string | null;
     private roomData: TournamentRoomData | null = null;
     private isCreator: boolean = false;
     private gameState: any = null;
@@ -289,6 +289,10 @@ export default class TetrisTournamentView extends AbstractView {
 
     private leaveRoom(): void {
         this.socket.emit('leave_tetris_tournament_room', { roomId: this.roomId });
+
+        // Clear roomId to prevent double-emission in cleanup()
+        this.roomId = null;
+
         this.router.navigate('/');
     }
 
@@ -492,6 +496,11 @@ export default class TetrisTournamentView extends AbstractView {
     }
 
     cleanup(): void {
+        // Notify backend if still in a room (user navigated away without clicking Leave button)
+        if (this.roomId) {
+            this.socket.emit('leave_tetris_tournament_room', { roomId: this.roomId });
+        }
+
         // Remove keyboard event listeners
         if (this.handleKeyDown) {
             document.removeEventListener('keydown', this.handleKeyDown);
