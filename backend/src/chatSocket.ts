@@ -155,9 +155,13 @@ export function setupChatSocket(fastify: FastifyInstance, io: Server): void {
 
 				// Send to recipient if online
 				const onlineUsers = (fastify as any).onlineUsers || new Map();
-				const recipient = onlineUsers.get(data.recipientId);
-				if (recipient) {
-					io.to(recipient.socketId).emit('chat:message_dm', messageData);
+				const userInfoCache = (fastify as any).userInfoCache || new Map();
+				const recipientSockets = onlineUsers.get(data.recipientId);
+				if (recipientSockets && recipientSockets.size > 0) {
+					// Send to all of recipient's active connections
+					for (const socketId of recipientSockets) {
+						io.to(socketId).emit('chat:message_dm', messageData);
+					}
 				}
 
 				// Send confirmation to sender
@@ -275,11 +279,19 @@ export function setupChatSocket(fastify: FastifyInstance, io: Server): void {
 
 					if (conversation) {
 						const onlineUsers = (fastify as any).onlineUsers || new Map();
-						const user1 = onlineUsers.get(conversation.user1_id);
-						const user2 = onlineUsers.get(conversation.user2_id);
+						const user1Sockets = onlineUsers.get(conversation.user1_id);
+						const user2Sockets = onlineUsers.get(conversation.user2_id);
 						
-						if (user1) io.to(user1.socketId).emit('chat:message_edited', editData);
-						if (user2) io.to(user2.socketId).emit('chat:message_edited', editData);
+						if (user1Sockets) {
+							for (const socketId of user1Sockets) {
+								io.to(socketId).emit('chat:message_edited', editData);
+							}
+						}
+						if (user2Sockets) {
+							for (const socketId of user2Sockets) {
+								io.to(socketId).emit('chat:message_edited', editData);
+							}
+						}
 					}
 				}
 
@@ -344,11 +356,19 @@ export function setupChatSocket(fastify: FastifyInstance, io: Server): void {
 
 					if (conversation) {
 						const onlineUsers = (fastify as any).onlineUsers || new Map();
-						const user1 = onlineUsers.get(conversation.user1_id);
-						const user2 = onlineUsers.get(conversation.user2_id);
+						const user1Sockets = onlineUsers.get(conversation.user1_id);
+						const user2Sockets = onlineUsers.get(conversation.user2_id);
 						
-						if (user1) io.to(user1.socketId).emit('chat:message_deleted', deleteData);
-						if (user2) io.to(user2.socketId).emit('chat:message_deleted', deleteData);
+						if (user1Sockets) {
+							for (const socketId of user1Sockets) {
+								io.to(socketId).emit('chat:message_deleted', deleteData);
+							}
+						}
+						if (user2Sockets) {
+							for (const socketId of user2Sockets) {
+								io.to(socketId).emit('chat:message_deleted', deleteData);
+							}
+						}
 					}
 				}
 
@@ -393,12 +413,20 @@ export function setupChatSocket(fastify: FastifyInstance, io: Server): void {
 
 				if (conversation) {
 					const onlineUsers = (fastify as any).onlineUsers || new Map();
-					const user1 = onlineUsers.get(conversation.user1_id);
-					const user2 = onlineUsers.get(conversation.user2_id);
+					const user1Sockets = onlineUsers.get(conversation.user1_id);
+					const user2Sockets = onlineUsers.get(conversation.user2_id);
 					
 					const deleteData = { conversationId: data.conversationId };
-					if (user1) io.to(user1.socketId).emit('chat:conversation_deleted', deleteData);
-					if (user2) io.to(user2.socketId).emit('chat:conversation_deleted', deleteData);
+					if (user1Sockets) {
+						for (const socketId of user1Sockets) {
+							io.to(socketId).emit('chat:conversation_deleted', deleteData);
+						}
+					}
+					if (user2Sockets) {
+						for (const socketId of user2Sockets) {
+							io.to(socketId).emit('chat:conversation_deleted', deleteData);
+						}
+					}
 				}
 
 				fastify.log.info(`Conversation ${data.conversationId} deleted by admin ${username}`);

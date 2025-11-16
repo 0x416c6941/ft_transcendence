@@ -91,18 +91,22 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 
 				// Notify both users about the friend update via socket
 				const io = (fastify as any).io;
-				const onlineUsers = (fastify as any).onlineUsers as Map<number, { socketId: string; username: string; displayName: string }>;
+				const onlineUsers = (fastify as any).onlineUsers as Map<number, Set<string>>;
 				
 				// Notify the user who added the friend
-				const userSocket = onlineUsers.get(user.id);
-				if (userSocket) {
-					io.to(userSocket.socketId).emit('friends_updated');
+				const userSockets = onlineUsers.get(user.id);
+				if (userSockets) {
+					for (const socketId of userSockets) {
+						io.to(socketId).emit('friends_updated');
+					}
 				}
 				
 				// Notify the user who was added
-				const addedUserSocket = onlineUsers.get(toAdd.id);
-				if (addedUserSocket) {
-					io.to(addedUserSocket.socketId).emit('friends_updated');
+				const addedUserSockets = onlineUsers.get(toAdd.id);
+				if (addedUserSockets) {
+					for (const socketId of addedUserSockets) {
+						io.to(socketId).emit('friends_updated');
+					}
 				}
 
 				return reply
@@ -157,18 +161,22 @@ export default async function friendsRoutes(fastify: FastifyInstance) {
 
 				// Notify both users about the friend update via socket
 				const io = (fastify as any).io;
-				const onlineUsers = (fastify as any).onlineUsers as Map<number, { socketId: string; username: string; displayName: string }>;
+				const onlineUsers = (fastify as any).onlineUsers as Map<number, Set<string>>;
 				
 				// Notify the user who removed the friend
-				const userSocket = onlineUsers.get(user.id);
-				if (userSocket) {
-					io.to(userSocket.socketId).emit('friends_updated');
+				const userSockets = onlineUsers.get(user.id);
+				if (userSockets) {
+					for (const socketId of userSockets) {
+						io.to(socketId).emit('friends_updated');
+					}
 				}
 				
 				// Notify the user who was removed
-				const removedUserSocket = onlineUsers.get(toRemove.id);
-				if (removedUserSocket) {
-					io.to(removedUserSocket.socketId).emit('friends_updated');
+				const removedUserSockets = onlineUsers.get(toRemove.id);
+				if (removedUserSockets) {
+					for (const socketId of removedUserSockets) {
+						io.to(socketId).emit('friends_updated');
+					}
 				}
 
 				return reply

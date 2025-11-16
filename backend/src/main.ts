@@ -179,8 +179,10 @@ const start = async () => {
 			path: '/api/socket.io/'
 		});
 
-		// Online users tracking
-		const onlineUsers = new Map<number, { socketId: string; username: string; displayName: string }>();
+		// Online users tracking - Map of userId to Set of socketIds (users can have multiple tabs/connections)
+		const onlineUsers = new Map<number, Set<string>>();
+		// User info cache - Map of userId to user details
+		const userInfoCache = new Map<number, { username: string; displayName: string }>();
 
 		// Socket.IO authentication middleware
 		io.use(async (socket, next) => {
@@ -202,8 +204,9 @@ const start = async () => {
 
 		fastify.decorate('io', io);
 		
-		// Expose onlineUsers for chat functionality
+		// Expose onlineUsers and userInfoCache for chat functionality
 		(fastify as any).onlineUsers = onlineUsers;
+		(fastify as any).userInfoCache = userInfoCache;
 		
 		io.on('connection', (socket) => {
 			const userId = (socket as any).userId;
@@ -222,38 +225,58 @@ const start = async () => {
 			fastify.sqlite.get('SELECT display_name FROM users WHERE id = ?', [userId], (err: Error | null, row: any) => {
 				if (err || !row) return fastify.log.error(`Failed to get display name for user ${userId}`);
 
-			onlineUsers.set(userId, { socketId: socket.id, username, displayName: row.display_name });
+				// Cache user info
+				userInfoCache.set(userId, { username, displayName: row.display_name });
 
-			// Broadcast updated online users list
-			const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
-				userId: id, username: data.username, displayName: data.displayName
-			}));
-			io.emit('online_users_updated', usersList);
-			fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
-		});
+				// Add this socket to the user's connection set
+				if (!onlineUsers.has(userId)) {
+					onlineUsers.set(userId, new Set());
+				}
+				onlineUsers.get(userId)!.add(socket.id);
 
-		// Handle request for current online users list
-		socket.on('request_online_users', () => {
-			const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
-				userId: id, username: data.username, displayName: data.displayName
-			}));
-			socket.emit('online_users_updated', usersList);
-		});
+				// Broadcast updated online users list
+				const usersList = Array.from(onlineUsers.keys()).map(id => {
+					const info = userInfoCache.get(id);
+					return info ? { userId: id, username: info.username, displayName: info.displayName } : null;
+				}).filter(u => u !== null);
+				io.emit('online_users_updated', usersList);
+				fastify.log.info(`Online users: ${usersList.map(u => u!.username).join(', ')} (${Array.from(onlineUsers.values()).reduce((sum, sockets) => sum + sockets.size, 0)} connections)`);
+			});
 
-		socket.on('disconnect', () => {
-			fastify.log.info(`User ${username} (${userId}) disconnected: ${socket.id}`);
-			onlineUsers.delete(userId);
+			// Handle request for current online users list
+			socket.on('request_online_users', () => {
+				const usersList = Array.from(onlineUsers.keys()).map(id => {
+					const info = userInfoCache.get(id);
+					return info ? { userId: id, username: info.username, displayName: info.displayName } : null;
+				}).filter(u => u !== null);
+				socket.emit('online_users_updated', usersList);
+			});
 
-			// Broadcast updated online users list
-			const usersList = Array.from(onlineUsers.entries()).map(([id, data]) => ({
-				userId: id, username: data.username, displayName: data.displayName
-			}));
-			io.emit('online_users_updated', usersList);
-			fastify.log.info(`Online users: ${usersList.map(u => u.username).join(', ')}`);
-		});
-		});
+			socket.on('disconnect', () => {
+				fastify.log.info(`User ${username} (${userId}) disconnected: ${socket.id}`);
+				
+				// Remove this socket from the user's connection set
+				const userSockets = onlineUsers.get(userId);
+				if (userSockets) {
+					userSockets.delete(socket.id);
+					// Only mark user as offline if they have no more active connections
+					if (userSockets.size === 0) {
+						onlineUsers.delete(userId);
+						fastify.log.info(`User ${username} (${userId}) is now offline (all connections closed)`);
+					} else {
+						fastify.log.info(`User ${username} (${userId}) still has ${userSockets.size} connection(s) open`);
+					}
+				}
 
-		// Wait for all plugins to be registered (including SQLite)
+				// Broadcast updated online users list
+				const usersList = Array.from(onlineUsers.keys()).map(id => {
+					const info = userInfoCache.get(id);
+					return info ? { userId: id, username: info.username, displayName: info.displayName } : null;
+				}).filter(u => u !== null);
+				io.emit('online_users_updated', usersList);
+				fastify.log.info(`Online users: ${usersList.map(u => u!.username).join(', ')} (${Array.from(onlineUsers.values()).reduce((sum, sockets) => sum + sockets.size, 0)} connections)`);
+			});
+		});		// Wait for all plugins to be registered (including SQLite)
 		await fastify.ready();
 
 		// Seed database with default users (if empty)
