@@ -953,7 +953,28 @@ export default class StatsView extends AbstractView {
 			} else {
 				// Save to blockchain
 				const tournamentDetails = await getTournamentDetails(uuid);
-				await saveTournamentToBlockchain(uuid, tournamentDetails);
+				
+				// Sanitize data for blockchain: remove internal IDs and redundant fields
+				// In tournaments, all players are authenticated users, so player_is_user fields are redundant
+				const sanitizedData = {
+					uuid: tournamentDetails.uuid,
+					game_type: tournamentDetails.game_type,
+					started_at: tournamentDetails.started_at,
+					finished_at: tournamentDetails.finished_at,
+					player_count: tournamentDetails.player_count,
+					winner: tournamentDetails.winner,
+					games: tournamentDetails.games.map(game => ({
+						game_name: game.game_name,
+						started_at: game.started_at,
+						finished_at: game.finished_at,
+						player1_name: game.player1_name,
+						player2_name: game.player2_name,
+						winner: game.winner,
+						data: game.data
+					}))
+				};
+				
+				await saveTournamentToBlockchain(uuid, sanitizedData);
 				
 				// Update status
 				this.tournamentBlockchainStatus.set(uuid, true);
