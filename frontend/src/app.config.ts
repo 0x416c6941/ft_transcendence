@@ -53,7 +53,7 @@ export const PATHS_TO_ROUTE: PathToRegister[] = [
 	{ path: '/tetris-tournament/:roomId', constructor: TetrisTournamentView, guard: 'auth' },
 	{ path: '/error/', constructor: ErrorView },
 	{ path: '/friends', constructor: FriendsView, guard: 'auth' },
-	{ path: '/stats', constructor: StatsView },
+	{ path: '/stats', constructor: StatsView, guard: 'auth' },
 ] as const;
 
 /**

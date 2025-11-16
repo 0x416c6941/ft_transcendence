@@ -1,9 +1,14 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getTournamentsSchema, getTournamentByUuidSchema } from '../schemas/tournament.schemas.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 export default async function statsRoutes(fastify: FastifyInstance) {
 	// Get overall statistics
-	fastify.get('/stats/overview', async (request: FastifyRequest<{
+	fastify.get<{
+		Querystring: { game?: string }
+	}>('/stats/overview', {
+		preHandler: authenticateToken
+	}, async (request: FastifyRequest<{
 		Querystring: { game?: string }
 	}>, reply: FastifyReply) => {
 		try {
@@ -100,7 +105,11 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 	});
 
 	// Get leaderboard
-	fastify.get('/stats/leaderboard', async (request: FastifyRequest<{
+	fastify.get<{
+		Querystring: { game?: string; limit?: string }
+	}>('/stats/leaderboard', {
+		preHandler: authenticateToken
+	}, async (request: FastifyRequest<{
 		Querystring: { game?: string; limit?: string }
 	}>, reply: FastifyReply) => {
 		try {
@@ -168,7 +177,11 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 	});
 
 	// Get recent games
-	fastify.get('/stats/recent-games', async (request: FastifyRequest<{
+	fastify.get<{
+		Querystring: { limit?: string; game?: string }
+	}>('/stats/recent-games', {
+		preHandler: authenticateToken
+	}, async (request: FastifyRequest<{
 		Querystring: { limit?: string; game?: string }
 	}>, reply: FastifyReply) => {
 		try {
@@ -216,7 +229,11 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 	});
 
 	// Get player statistics
-	fastify.get('/stats/player/:username', async (request: FastifyRequest<{
+	fastify.get<{
+		Params: { username: string }
+	}>('/stats/player/:username', {
+		preHandler: authenticateToken
+	}, async (request: FastifyRequest<{
 		Params: { username: string }
 	}>, reply: FastifyReply) => {
 		try {
@@ -304,7 +321,11 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 	});
 
 	// Get activity timeline (games over time)
-	fastify.get('/stats/activity', async (request: FastifyRequest<{
+	fastify.get<{
+		Querystring: { days?: string; game?: string }
+	}>('/stats/activity', {
+		preHandler: authenticateToken
+	}, async (request: FastifyRequest<{
 		Querystring: { days?: string; game?: string }
 	}>, reply: FastifyReply) => {
 		try {
@@ -344,7 +365,10 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 	});
 
 	// Get tournaments
-	fastify.get('/stats/tournaments', {
+	fastify.get<{
+		Querystring: { game?: string; limit?: string }
+	}>('/stats/tournaments', {
+		preHandler: authenticateToken,
 		schema: getTournamentsSchema
 	}, async (request: FastifyRequest<{
 		Querystring: { game?: string; limit?: string }
@@ -394,7 +418,10 @@ export default async function statsRoutes(fastify: FastifyInstance) {
 	});
 
 	// Get detailed tournament data with all games
-	fastify.get('/stats/tournament/:uuid', {
+	fastify.get<{
+		Params: { uuid: string }
+	}>('/stats/tournament/:uuid', {
+		preHandler: authenticateToken,
 		schema: getTournamentByUuidSchema
 	}, async (request: FastifyRequest<{
 		Params: { uuid: string }

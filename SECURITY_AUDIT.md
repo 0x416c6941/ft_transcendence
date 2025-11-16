@@ -44,6 +44,8 @@ The application implements multiple layers of access control to ensure users can
 - Refresh token mechanism with 7-day expiration
 - Middleware enforcement on protected routes
 - Admin role-based access control for sensitive operations
+- **✅ All `/api/stats/*` endpoints protected with authentication**
+- **✅ All `/api/blockchain/*` endpoints protected with authentication**
 
 **Evidence:**
 ```typescript
@@ -74,6 +76,8 @@ if (!isAdmin) {
 - ✅ User context attached to requests
 - ✅ Role-based authorization for admin functions
 - ✅ Socket.IO authentication required for real-time features
+- ✅ **Stats endpoints (overview, leaderboard, tournaments, recent games, activity, player stats) protected**
+- ✅ **Blockchain endpoints (save/get tournament, check existence) protected**
 
 ---
 
@@ -604,16 +608,19 @@ io.use(async (socket, next) => {
 8. Role-based access control
 9. OAuth2 integration
 10. 2FA support
+11. **✅ XSS protection via safe DOM methods**
+12. **✅ Authentication guards on all stats and blockchain endpoints**
 
 ### ⚠️ **Missing/Incomplete:**
 1. Rate limiting
 2. CSRF tokens
 3. Security headers (CSP, X-Frame-Options, etc.)
 4. ~~Comprehensive XSS protection~~ ✅ **IMPLEMENTED**
-5. Account lockout mechanism
-6. Centralized logging/monitoring
-7. File upload validation
-8. Production configuration hardening
+5. ~~Public stats endpoints~~ ✅ **PROTECTED**
+6. Account lockout mechanism
+7. Centralized logging/monitoring
+8. File upload validation
+9. Production configuration hardening
 
 ---
 
@@ -689,14 +696,16 @@ The ft_transcendence application demonstrates **solid security fundamentals** wi
 - HTTPS enforcement
 - Input validation
 - **✅ XSS vulnerabilities mitigated through safe DOM methods**
+- **✅ All sensitive endpoints protected with authentication**
 
 **Critical Next Steps:**
 1. ~~Improve XSS protection on frontend~~ ✅ **COMPLETED**
-2. Add security headers to prevent common attacks
-3. Implement rate limiting to prevent brute-force
-4. Add CSRF token mechanism
+2. ~~Protect stats and blockchain endpoints~~ ✅ **COMPLETED**
+3. Add security headers to prevent common attacks
+4. Implement rate limiting to prevent brute-force
+5. Add CSRF token mechanism
 
-**Overall Assessment:** The application follows security best practices and has addressed XSS vulnerabilities. Addressing the remaining high-priority recommendations (security headers and rate limiting) would elevate the security posture to excellent.
+**Overall Assessment:** The application follows security best practices and has addressed XSS vulnerabilities and unauthorized access to sensitive endpoints. Addressing the remaining high-priority recommendations (security headers and rate limiting) would elevate the security posture to excellent.
 
 ---
 
