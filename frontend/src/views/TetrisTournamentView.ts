@@ -440,9 +440,15 @@ export default class TetrisTournamentView extends AbstractView {
         const overlay = document.createElement('div');
         overlay.id = 'overlay';
         overlay.className = 'absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-10';
-        overlay.innerHTML = `<div class="text-white text-2xl font-bold text-center p-8 bg-gray-800 rounded-lg border-2 border-neutral-700">
-            <p>${message}</p>
-        </div>`;
+        
+        const innerDiv = document.createElement('div');
+        innerDiv.className = 'text-white text-2xl font-bold text-center p-8 bg-gray-800 rounded-lg border-2 border-neutral-700';
+        
+        const messagePara = document.createElement('p');
+        messagePara.textContent = message; // SAFE: textContent escapes HTML
+        innerDiv.appendChild(messagePara);
+        
+        overlay.appendChild(innerDiv);
         container.appendChild(overlay);
 
         setTimeout(() => {
@@ -454,10 +460,17 @@ export default class TetrisTournamentView extends AbstractView {
                 const waitingMsg = document.getElementById('waiting-message');
                 if (waitingMsg) {
                     waitingMsg.classList.remove('hidden');
-                    waitingMsg.innerHTML = `
-                        <p class="text-green-400 text-2xl">🏆 Tournament Complete! 🏆</p>
-                        <p class="text-xl mt-2 text-white">Winner: ${playerName}</p>
-                    `;
+                    waitingMsg.textContent = '';
+                    
+                    const titlePara = document.createElement('p');
+                    titlePara.className = 'text-green-400 text-2xl';
+                    titlePara.textContent = '🏆 Tournament Complete! 🏆';
+                    waitingMsg.appendChild(titlePara);
+                    
+                    const winnerPara = document.createElement('p');
+                    winnerPara.className = 'text-xl mt-2 text-white';
+                    winnerPara.textContent = `Winner: ${playerName}`; // SAFE: textContent escapes HTML
+                    waitingMsg.appendChild(winnerPara);
                 }
             }
         }, isWinner ? 5000 : 3000);
@@ -471,10 +484,22 @@ export default class TetrisTournamentView extends AbstractView {
         const overlay = document.createElement('div');
         overlay.id = 'overlay';
         overlay.className = 'absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-75 z-10';
-        overlay.innerHTML = `<div class="text-center p-6 bg-gray-800 rounded-lg border-2 border-neutral-700">
-            <div class="text-white text-2xl font-bold mb-3">${matchTitle}</div>
-            <div id="countdown-num" class="text-6xl font-extrabold text-blue-400">${seconds}</div>
-        </div>`;
+        
+        const innerDiv = document.createElement('div');
+        innerDiv.className = 'text-center p-6 bg-gray-800 rounded-lg border-2 border-neutral-700';
+        
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'text-white text-2xl font-bold mb-3';
+        titleDiv.textContent = matchTitle; // SAFE: textContent escapes HTML
+        innerDiv.appendChild(titleDiv);
+        
+        const countdownDiv = document.createElement('div');
+        countdownDiv.id = 'countdown-num';
+        countdownDiv.className = 'text-6xl font-extrabold text-blue-400';
+        countdownDiv.textContent = seconds.toString();
+        innerDiv.appendChild(countdownDiv);
+        
+        overlay.appendChild(innerDiv);
         container.appendChild(overlay);
 
         let remaining = seconds;
