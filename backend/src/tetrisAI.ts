@@ -486,26 +486,7 @@ export function setupTetrisAI(fastify: FastifyInstance, io: Server): void {
             const room = rooms.get(roomId);
             if (!room) return;
             
-            if (room.state.started && room.currentGameRecord) {
-                room.currentGameRecord.finished_at = new Date().toISOString();
-                room.currentGameRecord.winner = undefined;
-                room.currentGameRecord.data = JSON.stringify({
-                    reason: 'player_disconnected',
-                    player: {
-                        alias: room.state.player.alias,
-                        score: room.state.player.score,
-                        linesCleared: room.state.player.linesCleared
-                    },
-                    ai: {
-                        alias: room.state.ai.alias,
-                        score: room.state.ai.score,
-                        linesCleared: room.state.ai.linesCleared
-                    }
-                });
-                
-                await saveGameRecord(fastify, room.currentGameRecord as GameRecord);
-                room.currentGameRecord = null;
-            }
+            // Don't save game on disconnect - only completed games are saved
             
             leaveAIRoom(roomId);
         });

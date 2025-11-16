@@ -400,16 +400,7 @@ export function setupPongAI(fastify: FastifyInstance, io: Server): void {
                 if (room.player === socket.id) {
                     socket.leave(room.id);
                     
-                    // Save game record if game was active
-                    if (room.gameActive && room.currentGameRecord) {
-                        room.currentGameRecord.finished_at = new Date().toISOString();
-                        room.currentGameRecord.winner = 'N/A';
-                        room.currentGameRecord.data = JSON.stringify({
-                            finalScore: room.gameState.score,
-                            reason: 'Player disconnected',
-                        });
-                        await saveGameRecord(fastify, room.currentGameRecord);
-                    }
+                    // Don't save game on disconnect - only completed games are saved
                     
                     stopGame(room, ns);
                     leaveAIRoom(room.id, socket.id);
