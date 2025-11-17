@@ -599,13 +599,19 @@ export default class ChatPanel {
 			<div class="px-4 py-4 space-y-2">
 				${allItems.map(item => `
 					<button 
-						class="w-full p-4 ${!item.hasMessages ? 'bg-gray-750 border border-gray-600 border-dashed' : 'bg-gray-700'} hover:bg-gray-600 rounded-lg text-left transition-colors flex items-center gap-3"
+						class="w-full p-3 ${!item.hasMessages ? 'bg-gray-750 border border-gray-600 border-dashed' : 'bg-gray-700'} hover:bg-gray-600 rounded-lg text-left transition-colors flex items-center gap-3"
 						data-conversation-id="${item.id || ''}"
 						data-other-user-id="${item.otherUserId}">
-						<div class="flex-1">
+						<img 
+							src="/api/users/${item.otherUserId}/avatar" 
+							alt="${this.escapeHtml(item.otherUserDisplayName)}"
+							class="w-10 h-10 rounded-full object-cover flex-shrink-0 bg-gray-600"
+							onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%23666%22%3E%3Cpath d=%22M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z%22/%3E%3C/svg%3E'"
+						/>
+						<div class="flex-1 min-w-0">
 							<div class="flex items-center gap-2">
-								<span class="font-semibold text-white">${item.otherUserDisplayName}</span>
-								<span class="text-xs ${item.isOnline ? 'text-green-400' : 'text-gray-500'}">
+								<span class="font-semibold text-white truncate">${item.otherUserDisplayName}</span>
+								<span class="text-xs ${item.isOnline ? 'text-green-400' : 'text-gray-500'} flex-shrink-0">
 									${item.isOnline ? '● Online' : '○ Offline'}
 								</span>
 							</div>
@@ -615,7 +621,7 @@ export default class ChatPanel {
 							}
 						</div>
 						${item.unreadCount > 0 ? 
-							`<span class="bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">${item.unreadCount}</span>` : 
+							`<span class="bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">${item.unreadCount}</span>` : 
 							''
 						}
 					</button>
@@ -661,24 +667,32 @@ export default class ChatPanel {
 							const winRate = this.winRates.get(user.username.toLowerCase());
 							const winRateText = winRate !== undefined ? `${winRate.toFixed(1)}%` : '—';
 							return `
-							<div class="flex items-center justify-between bg-gray-700 rounded-lg p-3">
-								<div class="flex items-center gap-3">
-									<div class="w-2 h-2 bg-green-500 rounded-full"></div>
-									<div class="flex flex-col">
-										<span class="text-sm text-white">${this.escapeHtml(user.displayName)}</span>
-										<span class="text-xs text-gray-400">${winRateText}</span>
+							<div class="flex items-center justify-between bg-gray-700 rounded-lg p-2.5">
+								<div class="flex items-center gap-2.5 min-w-0 flex-1">
+									<img 
+										src="/api/users/${user.userId}/avatar" 
+										alt="${this.escapeHtml(user.displayName)}"
+										class="w-9 h-9 rounded-full object-cover flex-shrink-0 bg-gray-600"
+										onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%23666%22%3E%3Cpath d=%22M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z%22/%3E%3C/svg%3E'"
+									/>
+									<div class="flex items-center gap-2 min-w-0 flex-1">
+										<div class="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+										<div class="flex flex-col min-w-0">
+											<span class="text-sm text-white truncate">${this.escapeHtml(user.displayName)}</span>
+											<span class="text-xs text-gray-400">${winRateText}</span>
+										</div>
 									</div>
 								</div>
-								<div class="flex gap-2">
+								<div class="flex gap-1.5 flex-shrink-0">
 									<button 
-										class="send-game-invite px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+										class="send-game-invite px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
 										data-friend-id="${user.userId}"
 										data-game-type="tetris"
 										title="Invite to Tetris">
 										🎮 Tetris
 									</button>
 									<button 
-										class="send-game-invite px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+										class="send-game-invite px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
 										data-friend-id="${user.userId}"
 										data-game-type="pong"
 										title="Invite to Pong">
