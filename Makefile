@@ -9,13 +9,15 @@ DC_CMD := docker compose -f ./docker-compose.yaml --env-file $(ENV_FILE)
 .PHONY: all
 all: up
 
-${SECRETS_DIR}:
-	# XXX: You still need to manully provide credentials for 42 OAuth.
+${SECRETS_DIR}/.generated:
+	@mkdir -p ${SECRETS_DIR}
+	# Generate secrets/certs. You still need to manually provide credentials for 42 OAuth.
 	# Backend server won't start without them.
 	@./prep_keys.sh
+	@touch ${SECRETS_DIR}/.generated
 
 .PHONY: up
-up: ${SECRETS_DIR}
+up: ${SECRETS_DIR}/.generated
 	@$(DC_CMD) up --build -d
 
 .PHONY: build
@@ -42,7 +44,7 @@ clean: down
 
 # Avalanche Local Network management
 .PHONY: avalanche-up
-avalanche-up: ${SECRETS_DIR}
+avalanche-up: ${SECRETS_DIR}/.generated
 	@echo "Starting Avalanche Local Development Network..."
 	@$(DC_CMD) up --build -d avalanche-fuji
 	@echo "Avalanche network starting (contract will auto-deploy)"
