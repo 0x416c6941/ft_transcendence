@@ -37,7 +37,7 @@ export default class PongLocalView extends AbstractView {
               <div class="space-y-4">
                 <div>
                   <label for="left-alias" class="block text-sm font-semibold text-gray-300 mb-2">
-                    Left Player (Arrow Keys)
+                    Left Player (W/S)
                   </label>
                   <input 
                     id="left-alias" 
@@ -51,7 +51,7 @@ export default class PongLocalView extends AbstractView {
                 
                 <div>
                   <label for="right-alias" class="block text-sm font-semibold text-gray-300 mb-2">
-                    Right Player (W/S)
+                    Right Player (Arrow Keys)
                   </label>
                   <input 
                     id="right-alias" 
@@ -95,16 +95,13 @@ export default class PongLocalView extends AbstractView {
             </button>
           </div>
 
-          <div class="text-white text-sm">
-            <p>Left Player: Arrow Up/Down</p>
-            <p>Right Player: W/S</p>
+          <div class="text-white text-sm text-center">
+            <p>Left Player: W/S | Right Player: Arrow Up/Down</p>
           </div>
         </div>
       </main>
     `;
-    }
-
-    setDocumentTitle(): void {
+  }    setDocumentTitle(): void {
         document.title = `${APP_NAME} - Local Pong`;
     }
 
