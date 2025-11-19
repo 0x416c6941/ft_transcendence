@@ -251,7 +251,9 @@ export default class ProfileView extends AbstractView {
               <img id="qr-code-image" src="" alt="QR Code" class="max-w-full border rounded p-2" />
             </div>
             <p class="text-sm txt-light-dark-sans mb-2">Or enter this code manually:</p>
-            <code id="secret-text" class="block bg-neutral-100 dark:bg-neutral-700 txt-light-dark-sans p-2 rounded mb-4 text-center font-mono"></code>
+            <div class="bg-neutral-100 dark:bg-neutral-700 p-2 rounded mb-4">
+              <code id="secret-text" class="txt-light-dark-sans text-sm break-all"></code>
+            </div>
             <button id="2fa-close-btn" class="button button-login w-full py-2 px-3 rounded">
               Done
             </button>
