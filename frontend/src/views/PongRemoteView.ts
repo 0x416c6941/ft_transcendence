@@ -2,6 +2,8 @@ import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 import { io } from '../socket.js';
+import { gameStateManager } from '../gameStateManager.js';
+import { isUIInputFocused } from '../utils/gameInputHelpers.js';
 
 interface RemotePlayer {
     socketId: string;
@@ -156,7 +158,8 @@ export default class PongRemoteView extends AbstractView {
 
         const waitingMsg = document.getElementById('waiting-message');
         if (waitingMsg) waitingMsg.classList.add('hidden');
-
+        
+        gameStateManager.setInGame('pong-remote');
         this.removeOverlay();
     }
 
@@ -222,6 +225,7 @@ export default class PongRemoteView extends AbstractView {
     }
 
     private handleKeyDown = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         const key = e.key.toLowerCase();
         if (key === 'arrowup' || key === 'w') {
             this.inputState.up = true;
@@ -235,6 +239,7 @@ export default class PongRemoteView extends AbstractView {
     };
 
     private handleKeyUp = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         const key = e.key.toLowerCase();
         if (key === 'arrowup' || key === 'w') {
             this.inputState.up = false;
@@ -356,5 +361,8 @@ export default class PongRemoteView extends AbstractView {
         if (this.roomId) {
             this.socket.emit('remote_pong_leave', { roomId: this.roomId });
         }
+        
+        // Clear game state
+        gameStateManager.setOutOfGame();
     }
 }

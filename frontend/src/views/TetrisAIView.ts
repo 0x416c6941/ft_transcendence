@@ -2,6 +2,8 @@ import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 import { validateNickname } from '../utils/validators.js';
+import { gameStateManager } from '../gameStateManager.js';
+import { isUIInputFocused } from '../utils/gameInputHelpers.js';
 
 /**
  * @class TetrisAIView
@@ -175,6 +177,7 @@ export default class TetrisAIView extends AbstractView {
         this.socket.on('game_started', (data: { playerAlias: string; aiAlias: string }) => {
             document.getElementById('player-name')!.textContent = data.playerAlias;
             document.getElementById('ai-name')!.textContent = data.aiAlias;
+            gameStateManager.setInGame('tetris-ai');
         });
 
         this.socket.on('game_state', (snapshot: GameSnapshot) => {
@@ -189,6 +192,7 @@ export default class TetrisAIView extends AbstractView {
                     : 'Game disconnected';
             }
             document.getElementById('game-over')?.classList.remove('hidden');
+            gameStateManager.setOutOfGame();
         });
     }
 
@@ -259,11 +263,13 @@ export default class TetrisAIView extends AbstractView {
         if (this.animationFrameId !== null) {
             cancelAnimationFrame(this.animationFrameId);
         }
-
-
+        
+        // Clear game state
+        gameStateManager.setOutOfGame();
     }
 
     private handleKeyDown = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         const keyMap: Record<string, keyof typeof this.keys> = {
             'arrowleft': 'left', 'arrowright': 'right', 'arrowdown': 'down',
             'arrowup': 'rotate', ' ': 'drop'
@@ -278,6 +284,7 @@ export default class TetrisAIView extends AbstractView {
     };
 
     private handleKeyUp = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         const keyMap: Record<string, keyof typeof this.keys> = {
             'arrowleft': 'left', 'arrowright': 'right', 'arrowdown': 'down',
             'arrowup': 'rotate', ' ': 'drop'

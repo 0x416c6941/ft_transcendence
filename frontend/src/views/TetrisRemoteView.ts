@@ -2,6 +2,8 @@ import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 import { io } from '../socket.js';
+import { gameStateManager } from '../gameStateManager.js';
+import { isUIInputFocused } from '../utils/gameInputHelpers.js';
 
 /**
  * @class TetrisRemoteView
@@ -150,6 +152,7 @@ export default class TetrisRemoteView extends AbstractView {
         document.getElementById('match-info')?.classList.remove('hidden');
         document.getElementById('canvas-wrapper')?.classList.remove('hidden');
         document.getElementById('waiting-message')?.classList.add('hidden');
+        gameStateManager.setInGame('tetris-remote');
         this.removeOverlay();
     }
 
@@ -224,9 +227,13 @@ export default class TetrisRemoteView extends AbstractView {
 
         if (this.roomId) this.socket.emit('remote_tetris_leave', { roomId: this.roomId });
         if (this.animationFrameId !== null) cancelAnimationFrame(this.animationFrameId);
+        
+        // Clear game state
+        gameStateManager.setOutOfGame();
     }
 
     private handleKeyDown = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         const key = e.key.toLowerCase();
         const keyMap: Record<string, keyof typeof this.keys> = {
             'arrowleft': 'left', 'arrowright': 'right', 'arrowdown': 'down',
@@ -241,6 +248,7 @@ export default class TetrisRemoteView extends AbstractView {
     };
 
     private handleKeyUp = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         const key = e.key.toLowerCase();
         const keyMap: Record<string, keyof typeof this.keys> = {
             'arrowleft': 'left', 'arrowright': 'right', 'arrowdown': 'down',

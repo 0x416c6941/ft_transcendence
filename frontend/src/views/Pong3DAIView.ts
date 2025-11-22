@@ -2,6 +2,8 @@ import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 import { validateNickname } from '../utils/validators.js';
+import { gameStateManager } from '../gameStateManager.js';
+import { isUIInputFocused } from '../utils/gameInputHelpers.js';
 
 export default class Pong3DAIView extends AbstractView {
     private canvas: HTMLCanvasElement | null = null;
@@ -120,6 +122,7 @@ export default class Pong3DAIView extends AbstractView {
     };
 
     private handleKeyDown = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault();
         let changed = false;
         if (e.key === 'ArrowUp' && !this.input.up) { this.input.up = true; changed = true; }
@@ -128,6 +131,7 @@ export default class Pong3DAIView extends AbstractView {
     };
 
     private handleKeyUp = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault();
         let changed = false;
         if (e.key === 'ArrowUp' && this.input.up) { this.input.up = false; changed = true; }
@@ -471,6 +475,7 @@ export default class Pong3DAIView extends AbstractView {
             this.winner = winner;
             this.gameActive = false;
             this.gameEnded = true;
+            gameStateManager.setOutOfGame();
             this.updateStartButton();
             this.showWinnerOverlay();
         });
@@ -482,6 +487,7 @@ export default class Pong3DAIView extends AbstractView {
                 this.gameEnded = false;
                 this.winner = null;
             }
+            gameStateManager.setInGame('pong-3d-ai');
             this.updateStartButton();
         });
 
@@ -524,6 +530,9 @@ export default class Pong3DAIView extends AbstractView {
             this.socket.disconnect();
             this.socket = null;
         }
+        
+        // Clear game state
+        gameStateManager.setOutOfGame();
 
         // Babylon.js cleanup
         if (this.scene) {

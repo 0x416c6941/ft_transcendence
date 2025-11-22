@@ -2,6 +2,8 @@ import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 import { io } from '../socket.js';
+import { gameStateManager } from '../gameStateManager.js';
+import { isUIInputFocused } from '../utils/gameInputHelpers.js';
 
 interface TournamentPlayer {
     socketId: string;
@@ -314,6 +316,7 @@ export default class PongTournamentView extends AbstractView {
 
     private setupKeyboardControls(): void {
         this.handleKeyDown = (e: KeyboardEvent) => {
+            if (isUIInputFocused()) return;
             if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
                 this.inputState.up = true;
                 e.preventDefault();
@@ -332,6 +335,7 @@ export default class PongTournamentView extends AbstractView {
         };
 
         this.handleKeyUp = (e: KeyboardEvent) => {
+            if (isUIInputFocused()) return;
             if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
                 this.inputState.up = false;
             }
@@ -364,6 +368,7 @@ export default class PongTournamentView extends AbstractView {
             this.leftAlias = player1?.displayName || 'Player 1';
             this.rightAlias = player2?.displayName || 'Player 2';
         }
+        gameStateManager.setInGame('pong-tournament');
         this.renderLoop();
     }
 
@@ -551,5 +556,8 @@ export default class PongTournamentView extends AbstractView {
         this.socket.off('tournament_room_destroyed');
         this.socket.off('match_announced');
         this.socket.off('match_started');
+        
+        // Clear game state
+        gameStateManager.setOutOfGame();
     }
 }

@@ -2,6 +2,8 @@ import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 import { validateNickname } from '../utils/validators.js';
+import { gameStateManager } from '../gameStateManager.js';
+import { isUIInputFocused } from '../utils/gameInputHelpers.js';
 
 export default class PongAIView extends AbstractView {
     private canvas: HTMLCanvasElement | null = null;
@@ -109,6 +111,7 @@ export default class PongAIView extends AbstractView {
     };
 
     private handleKeyDown = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault();
         let changed = false;
         if (e.key === 'ArrowUp' && !this.input.up) { this.input.up = true; changed = true; }
@@ -117,6 +120,7 @@ export default class PongAIView extends AbstractView {
     };
 
     private handleKeyUp = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault();
         let changed = false;
         if (e.key === 'ArrowUp' && this.input.up) { this.input.up = false; changed = true; }
@@ -198,6 +202,7 @@ export default class PongAIView extends AbstractView {
             this.winner = winner;
             this.gameActive = false;
             this.gameEnded = true;
+            gameStateManager.setOutOfGame();
             this.updateStartButton();
         });
 
@@ -208,6 +213,7 @@ export default class PongAIView extends AbstractView {
                 this.gameEnded = false;
                 this.winner = null;
             }
+            gameStateManager.setInGame('pong-ai');
             this.updateStartButton();
         });
 
@@ -256,6 +262,9 @@ export default class PongAIView extends AbstractView {
 
         // stop loop
         if (this.animationFrameId !== null) cancelAnimationFrame(this.animationFrameId);
+        
+        // Clear game state
+        gameStateManager.setOutOfGame();
     }
 
     // Send input to server

@@ -2,6 +2,8 @@ import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 import { io } from '../socket.js';
+import { gameStateManager } from '../gameStateManager.js';
+import { isUIInputFocused } from '../utils/gameInputHelpers.js';
 
 interface TournamentPlayer {
     socketId: string;
@@ -307,6 +309,7 @@ export default class TetrisTournamentView extends AbstractView {
 
     private setupKeyboardControls(): void {
         this.handleKeyDown = (e: KeyboardEvent) => {
+            if (isUIInputFocused()) return;
             const key = e.key.toLowerCase();
             const keyMap: Record<string, keyof typeof this.keys> = {
                 'arrowleft': 'left', 'a': 'left',
@@ -325,6 +328,7 @@ export default class TetrisTournamentView extends AbstractView {
         };
 
         this.handleKeyUp = (e: KeyboardEvent) => {
+            if (isUIInputFocused()) return;
             const key = e.key.toLowerCase();
             const keyMap: Record<string, keyof typeof this.keys> = {
                 'arrowleft': 'left', 'a': 'left',
@@ -369,6 +373,7 @@ export default class TetrisTournamentView extends AbstractView {
             document.getElementById('player1-label')!.textContent = player1?.displayName || 'Player 1';
             document.getElementById('player2-label')!.textContent = player2?.displayName || 'Player 2';
         }
+        gameStateManager.setInGame('tetris-tournament');
     }
 
     private renderLoop = (): void => {
@@ -541,5 +546,8 @@ export default class TetrisTournamentView extends AbstractView {
          'tetris_game_state', 'tetris_match_ended', 'tetris_tournament_finished',
          'tetris_tournament_room_destroyed', 'tetris_match_announced', 'tetris_match_started'
         ].forEach(event => this.socket.off(event));
+        
+        // Clear game state
+        gameStateManager.setOutOfGame();
     }
 }

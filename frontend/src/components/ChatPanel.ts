@@ -6,6 +6,7 @@
 import Router from '../router.js';
 import { io } from '../socket.js';
 import { getLeaderboard } from '../api/stats.js';
+import { gameStateManager } from '../gameStateManager.js';
 
 interface ChatMessage {
 	id: number;
@@ -68,12 +69,13 @@ export default class ChatPanel {
 	private dmUnreadCount: number = 0;
 	private gameInviteCount: number = 0;
 	private winRates: Map<string, number> = new Map(); // username -> win_rate
+	private unsubscribeGameState: (() => void) | null = null;
 
 	constructor(router: Router) {
 		this.router = router;
 		this.socket = io;
 		this.setupSocketListeners();
-		this.checkGameStatus();
+		this.subscribeToGameState();
 		this.socket.emit('chat:get_conversations');
 	}
 
@@ -89,6 +91,34 @@ export default class ChatPanel {
 		updateStatus();
 		window.addEventListener('popstate', () => {
 			updateStatus();
+			if (this.container) this.render();
+		});
+	}
+
+	private subscribeToGameState(): void {
+		this.unsubscribeGameState = gameStateManager.subscribe((isInGame) => {
+			const wasInGame = this.isInGame;
+			this.isInGame = isInGame;
+			
+			// If entering a game
+			if (!wasInGame && isInGame) {
+				// Switch to global tab if on games tab
+				if (this.currentTab === 'games') {
+					this.currentTab = 'global';
+					if (this.container) {
+						this.socket.emit('chat:get_history', { type: 'global', limit: 50 });
+					}
+				}
+				
+				// Close the chat panel to refocus player on the game
+				if (this.isOpen) {
+					this.isOpen = false;
+					if (this.container) {
+						this.container.style.transform = 'translateX(100%)';
+					}
+				}
+			}
+			
 			if (this.container) this.render();
 		});
 	}
@@ -441,15 +471,14 @@ export default class ChatPanel {
 	public unmount(): void {
 		this.container?.remove();
 		this.container = null;
+		if (this.unsubscribeGameState) {
+			this.unsubscribeGameState();
+			this.unsubscribeGameState = null;
+		}
 	}
 
 	public toggle(): void {
 		if (!this.container) return;
-
-		if (this.isInGame) {
-			this.showNotification('Chat is disabled during games', 'info');
-			return;
-		}
 
 		this.isOpen = !this.isOpen;
 		this.container.style.transform = this.isOpen ? 'translateX(0)' : 'translateX(100%)';
@@ -482,25 +511,17 @@ export default class ChatPanel {
 					Direct Messages
 					<span id="tab-dm-badge" class="hidden absolute top-1 right-2 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"></span>
 				</button>
-				<button id="tab-games" class="relative flex-1 py-3 text-sm font-semibold transition-colors ${
-					this.currentTab === 'games' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'
-				}">
-					Games
-					<span id="tab-games-badge" class="hidden absolute top-1 right-2 bg-green-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"></span>
-				</button>
+				${!this.isInGame ? `
+					<button id="tab-games" class="relative flex-1 py-3 text-sm font-semibold transition-colors ${
+						this.currentTab === 'games' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'
+					}">
+						Games
+						<span id="tab-games-badge" class="hidden absolute top-1 right-2 bg-green-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"></span>
+					</button>
+				` : ``}
 			</div>
 
-			${this.isInGame ? `
-				<div class="flex-1 flex items-center justify-center p-6">
-					<div class="text-center text-gray-400">
-						<svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-						</svg>
-						<p class="text-lg font-semibold mb-2">Chat Disabled</p>
-						<p class="text-sm">Chat is not available during games</p>
-					</div>
-				</div>
-			` : `
+			${`
 				<!-- Messages Container -->
 				<div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3">
 					<!-- Messages will be rendered here by renderMessages() -->
@@ -518,15 +539,15 @@ export default class ChatPanel {
 		setTimeout(() => this.updateUnreadBadge(), 0);
 		
 		// Render messages after DOM is ready if we have data
-		if (!this.isInGame && this.currentTab === 'global' && this.globalMessages.length > 0) {
+		if (this.currentTab === 'global' && this.globalMessages.length > 0) {
 			setTimeout(() => {
 				this.renderMessages();
 				this.scrollToBottom();
 			}, 0);
-		} else if (!this.isInGame && this.currentTab === 'dm' && !this.activeConversationId) {
+		} else if (this.currentTab === 'dm' && !this.activeConversationId) {
 			// Show conversation list
 			setTimeout(() => this.renderMessages(), 0);
-		} else if (!this.isInGame && this.currentTab === 'dm' && this.activeConversationId) {
+		} else if (this.currentTab === 'dm' && this.activeConversationId) {
 			// Show active DM conversation messages (if cached)
 			const convId = this.activeConversationId;
 			setTimeout(() => {
@@ -864,27 +885,25 @@ export default class ChatPanel {
 		document.getElementById('tab-dm')?.addEventListener('click', () => this.switchTab('dm'));
 		document.getElementById('tab-games')?.addEventListener('click', () => this.switchTab('games'));
 
-		if (!this.isInGame) {
-			// Send button
-			document.getElementById('chat-send')?.addEventListener('click', () => this.sendMessage());
+		// Send button
+		document.getElementById('chat-send')?.addEventListener('click', () => this.sendMessage());
 
-			// Enter key to send
-			const input = document.getElementById('chat-input') as HTMLInputElement;
-			input?.addEventListener('keypress', (e) => {
-				if (e.key === 'Enter') this.sendMessage();
-			});
+		// Enter key to send
+		const input = document.getElementById('chat-input') as HTMLInputElement;
+		input?.addEventListener('keypress', (e) => {
+			if (e.key === 'Enter') this.sendMessage();
+		});
 
-			// Back button (DMs)
-			document.getElementById('back-to-conversations')?.addEventListener('click', () => {
-				this.activeConversationId = null;
-				delete (this as any).tempRecipientId;
-				this.render();
-			});
+		// Back button (DMs)
+		document.getElementById('back-to-conversations')?.addEventListener('click', () => {
+			this.activeConversationId = null;
+			delete (this as any).tempRecipientId;
+			this.render();
+		});
 
-			// Attach message-specific listeners
-			this.attachDeleteListeners();
-			this.attachConversationListeners();
-		}
+		// Attach message-specific listeners
+		this.attachDeleteListeners();
+		this.attachConversationListeners();
 	}
 
 	private attachDeleteListeners(): void {

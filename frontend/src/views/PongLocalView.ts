@@ -2,6 +2,8 @@ import AbstractView from './AbstractView.js';
 import Router from '../router.js';
 import { APP_NAME } from '../app.config.js';
 import { validateNickname } from '../utils/validators.js';
+import { gameStateManager } from '../gameStateManager.js';
+import { isUIInputFocused } from '../utils/gameInputHelpers.js';
 
 export default class PongLocalView extends AbstractView {
     private canvas: HTMLCanvasElement | null = null;
@@ -118,6 +120,7 @@ export default class PongLocalView extends AbstractView {
     };
 
     private handleKeyDown = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         let changed = false;
         if (e.key === 'ArrowUp' && !this.input.leftUp) { this.input.leftUp = true; changed = true; }
         if (e.key === 'ArrowDown' && !this.input.leftDown) { this.input.leftDown = true; changed = true; }
@@ -127,6 +130,7 @@ export default class PongLocalView extends AbstractView {
     };
 
     private handleKeyUp = (e: KeyboardEvent): void => {
+        if (isUIInputFocused()) return;
         let changed = false;
         if (e.key === 'ArrowUp' && this.input.leftUp) { this.input.leftUp = false; changed = true; }
         if (e.key === 'ArrowDown' && this.input.leftDown) { this.input.leftDown = false; changed = true; }
@@ -221,6 +225,7 @@ export default class PongLocalView extends AbstractView {
             this.winner = winner;
             this.gameActive = false;
             this.gameEnded = true;
+            gameStateManager.setOutOfGame();
             this.updateStartButton();
         });
 
@@ -231,6 +236,7 @@ export default class PongLocalView extends AbstractView {
                 this.gameEnded = false;
                 this.winner = null;
             }
+            gameStateManager.setInGame('pong-local');
             this.updateStartButton();
         });
 
@@ -276,6 +282,9 @@ export default class PongLocalView extends AbstractView {
 
         // stop loop
         if (this.animationFrameId !== null) cancelAnimationFrame(this.animationFrameId);
+        
+        // Clear game state
+        gameStateManager.setOutOfGame();
     }
 
     // Send input to server
