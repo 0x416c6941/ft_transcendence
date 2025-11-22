@@ -184,6 +184,10 @@ async function createRoom(name: string, password: string, creatorSocket: Socket,
 
     rooms.set(roomId, room);
     roomsByName.set(name, roomId);
+    
+    // Track creator in game
+    const playersInGame = (fastify as any).playersInGame as Map<number, { gameType: string; roomId: string }>;
+    playersInGame.set(creatorUserId, { gameType: 'tetris_tournament', roomId });
 
     return { success: true, roomId };
 }
@@ -242,6 +246,10 @@ async function joinRoom(name: string, password: string, playerSocket: Socket, fa
     };
 
     room.players.push(newPlayer);
+    
+    // Track player in game
+    const playersInGame = (fastify as any).playersInGame as Map<number, { gameType: string; roomId: string }>;
+    playersInGame.set(playerUserId, { gameType: 'tetris_tournament', roomId });
 
     return { success: true, roomId };
 }
@@ -559,6 +567,8 @@ async function startMatch(room: TournamentRoom, io: Server, fastify: FastifyInst
 
 async function handlePlayerLeave(socket: Socket, roomId: string, io: Server, fastify: FastifyInstance): Promise<void> {
     const room = rooms.get(roomId);
+    const playersInGame = (fastify as any).playersInGame as Map<number, { gameType: string; roomId: string }>;
+    
     if (!room) return;
 
     socket.leave(roomId);
@@ -567,6 +577,9 @@ async function handlePlayerLeave(socket: Socket, roomId: string, io: Server, fas
     if (playerIndex === -1) return;
 
     const leavingPlayer = room.players[playerIndex];
+    
+    // Remove leaving player from playersInGame map
+    playersInGame.delete(leavingPlayer.userId);
     
     // CASE: Tournament hasn't started yet (waiting state)
     if (room.status === 'waiting') {

@@ -30,6 +30,7 @@ interface RemoteRoom {
     countdownTimer: NodeJS.Timeout | null;
     gameInterval: NodeJS.Timeout | null;
     startedAt: Date | null;
+    gameSaved?: boolean;
 }
 
 type InputState = {
@@ -249,7 +250,7 @@ async function endGame(room: RemoteRoom, io: Server, fastify: FastifyInstance): 
 
     try {
         await saveGameRecord(fastify, gameRecord);
-        fastify.log.info(`Remote pong game saved: ${room.player1.displayName} vs ${room.player2.displayName}, winner: ${winner}`);
+        room.gameSaved = true;
     } catch (error) {
         fastify.log.error({ err: error }, 'Failed to save remote pong game record');
     }
@@ -273,6 +274,7 @@ export function setupRemotePong(fastify: FastifyInstance, io: Server): void {
             }
 
             const displayName = await getDisplayName(fastify, userId);
+            const playersInGame = (fastify as any).playersInGame as Map<number, { gameType: string; roomId: string }>;
 
             let room = rooms.get(data.roomId);
 
@@ -296,6 +298,9 @@ export function setupRemotePong(fastify: FastifyInstance, io: Server): void {
                 rooms.set(data.roomId, room);
                 socket.join(data.roomId);
                 
+                // Track player in game
+                playersInGame.set(userId, { gameType: 'pong_remote', roomId: data.roomId });
+                
                 // Initialize input state for player 1
                 room.inputStates.set(socket.id, { up: false, down: false });
                 
@@ -310,6 +315,9 @@ export function setupRemotePong(fastify: FastifyInstance, io: Server): void {
                     displayName: displayName
                 };
                 socket.join(data.roomId);
+                
+                // Track player in game
+                playersInGame.set(userId, { gameType: 'pong_remote', roomId: data.roomId });
 
                 // Initialize input state for player 2
                 room.inputStates.set(socket.id, { up: false, down: false });
@@ -339,13 +347,19 @@ export function setupRemotePong(fastify: FastifyInstance, io: Server): void {
 
         socket.on('remote_pong_leave', async (data: { roomId: string }) => {
             const room = rooms.get(data.roomId);
+            const playersInGame = (fastify as any).playersInGame as Map<number, { gameType: string; roomId: string }>;
+            
             if (!room) return;
+
+            // Remove both players from playersInGame map
+            if (room.player1) playersInGame.delete(room.player1.userId);
+            if (room.player2) playersInGame.delete(room.player2.userId);
 
             // Mark the socket as having left intentionally
             (socket as any).intentionallyLeft = true;
 
-            // If game is active, save and end it
-            if (room.status === 'playing' && room.gameState && room.player1 && room.player2) {
+            // If game is active and not already finished/saved, save and end it
+            if (room.status === 'playing' && room.gameState && room.player1 && room.player2 && !room.gameSaved) {
                 // Determine winner (the player who didn't leave)
                 let winner = 'Nobody';
                 let winnerPlayer = null;
@@ -362,6 +376,13 @@ export function setupRemotePong(fastify: FastifyInstance, io: Server): void {
                 }
 
                 io.to(room.id).emit('remote_pong_match_ended', { winner });
+                
+                // Stop the game loop immediately to prevent endGame from running
+                if (room.gameInterval) {
+                    clearInterval(room.gameInterval);
+                    room.gameInterval = null;
+                }
+                room.status = 'finished';
                 
                 // Save game record
                 if (winnerPlayer) {
@@ -384,7 +405,7 @@ export function setupRemotePong(fastify: FastifyInstance, io: Server): void {
 
                     try {
                         await saveGameRecord(fastify, gameRecord);
-                        fastify.log.info(`Remote pong game saved on leave: ${room.player1.displayName} vs ${room.player2.displayName}, winner: ${winner}`);
+                        room.gameSaved = true;
                     } catch (error) {
                         fastify.log.error({ err: error }, 'Failed to save remote pong game record on leave');
                     }
@@ -397,10 +418,11 @@ export function setupRemotePong(fastify: FastifyInstance, io: Server): void {
             rooms.delete(data.roomId);
 
             socket.leave(data.roomId);
-            fastify.log.info(`Player left remote pong room: ${data.roomId}`);
         });
 
         socket.on('disconnect', async () => {
+            const playersInGame = (fastify as any).playersInGame as Map<number, { gameType: string; roomId: string }>;
+            
             // If the player already left intentionally, don't process again
             if ((socket as any).intentionallyLeft) {
                 return;
@@ -411,8 +433,12 @@ export function setupRemotePong(fastify: FastifyInstance, io: Server): void {
                 if ((room.player1 && room.player1.socketId === socket.id) ||
                     (room.player2 && room.player2.socketId === socket.id)) {
                     
-                    // If game is active, end it and save the result
-                    if (room.status === 'playing' && room.gameState) {
+                    // Remove both players from playersInGame map
+                    if (room.player1) playersInGame.delete(room.player1.userId);
+                    if (room.player2) playersInGame.delete(room.player2.userId);
+                    
+                    // If game is active and not already finished/saved, end it and save the result
+                    if (room.status === 'playing' && room.gameState && !room.gameSaved) {
                         
                         let winner = 'Nobody';
                         let winnerPlayer = null;

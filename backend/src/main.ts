@@ -183,6 +183,8 @@ const start = async () => {
 		const onlineUsers = new Map<number, Set<string>>();
 		// User info cache - Map of userId to user details
 		const userInfoCache = new Map<number, { username: string; displayName: string }>();
+		// Players in game tracking - Map of userId to game info {gameType, roomId}
+		const playersInGame = new Map<number, { gameType: string; roomId: string }>();
 
 		// Socket.IO authentication middleware
 		io.use(async (socket, next) => {
@@ -207,6 +209,8 @@ const start = async () => {
 		// Expose onlineUsers and userInfoCache for chat functionality
 		(fastify as any).onlineUsers = onlineUsers;
 		(fastify as any).userInfoCache = userInfoCache;
+		// Expose playersInGame for game invitation validation
+		(fastify as any).playersInGame = playersInGame;
 		
 		io.on('connection', (socket) => {
 			const userId = (socket as any).userId;

@@ -31,6 +31,7 @@ interface RemoteRoom {
     countdownTimer: NodeJS.Timeout | null;
     gameInterval: NodeJS.Timeout | null;
     startedAt: Date | null;
+    gameSaved?: boolean;
 }
 
 interface GameState {
@@ -118,6 +119,7 @@ function startGame(room: RemoteRoom, io: Server, fastify: FastifyInstance): void
     room.gameState = createGameState();
     room.gameState.started = true;
     room.startedAt = new Date();
+    room.gameSaved = false;
 
     // Set player aliases
     if (room.player1) room.gameState.player1.alias = room.player1.displayName;
@@ -147,7 +149,8 @@ function startGame(room: RemoteRoom, io: Server, fastify: FastifyInstance): void
         io.to(room.id).emit('remote_tetris_game_state', snapshot);
 
         // Check for winner
-        if (gameEnded) {
+        if (gameEnded && !room.gameSaved) {
+            room.gameSaved = true;
             await endGame(room, io, fastify);
         }
     }, 1000 / TICK_HZ);
@@ -222,6 +225,7 @@ export function setupTetrisRemote(fastify: FastifyInstance, io: Server): void {
             }
 
             const displayName = await getDisplayName(fastify, userId);
+            const playersInGame = (fastify as any).playersInGame as Map<number, { gameType: string; roomId: string }>;
 
             let room = rooms.get(data.roomId);
 
@@ -244,6 +248,9 @@ export function setupTetrisRemote(fastify: FastifyInstance, io: Server): void {
                 rooms.set(data.roomId, room);
                 socket.join(data.roomId);
                 
+                // Track player in game
+                playersInGame.set(userId, { gameType: 'tetris_remote', roomId: data.roomId });
+                
                 io.to(data.roomId).emit('remote_tetris_room_state', { room });
                 
                 fastify.log.info(`Remote tetris room created: ${data.roomId} by ${displayName}`);
@@ -255,6 +262,9 @@ export function setupTetrisRemote(fastify: FastifyInstance, io: Server): void {
                     displayName: displayName
                 };
                 socket.join(data.roomId);
+                
+                // Track player in game
+                playersInGame.set(userId, { gameType: 'tetris_remote', roomId: data.roomId });
 
                 io.to(data.roomId).emit('remote_tetris_room_state', { room });
 
@@ -291,9 +301,15 @@ export function setupTetrisRemote(fastify: FastifyInstance, io: Server): void {
 
         socket.on('remote_tetris_leave', async (data: { roomId: string }) => {
             const room = rooms.get(data.roomId);
+            const playersInGame = (fastify as any).playersInGame as Map<number, { gameType: string; roomId: string }>;
+            
             if (!room) return;
+            
+            // Remove both players from playersInGame map
+            if (room.player1) playersInGame.delete(room.player1.userId);
+            if (room.player2) playersInGame.delete(room.player2.userId);
 
-            // If game is active, end it
+            // If game is active and not already finished/saved, end it
             if (room.status === 'playing' && room.gameState) {
                 // Determine winner (the player who didn't leave)
                 let winner = 'Nobody';
@@ -340,12 +356,18 @@ export function setupTetrisRemote(fastify: FastifyInstance, io: Server): void {
         });
 
         socket.on('disconnect', async () => {
+            const playersInGame = (fastify as any).playersInGame as Map<number, { gameType: string; roomId: string }>;
+            
             // Find and clean up any rooms this socket was in
             for (const [roomId, room] of rooms.entries()) {
                 if ((room.player1 && room.player1.socketId === socket.id) ||
                     (room.player2 && room.player2.socketId === socket.id)) {
                     
-                    // If game is active, end it
+                    // Remove both players from playersInGame map
+                    if (room.player1) playersInGame.delete(room.player1.userId);
+                    if (room.player2) playersInGame.delete(room.player2.userId);
+                    
+                    // If game is active and not already finished/saved, end it
                     if (room.status === 'playing' && room.gameState) {
                         let winner = 'Nobody';
                         if (room.player1 && socket.id !== room.player1.socketId) {

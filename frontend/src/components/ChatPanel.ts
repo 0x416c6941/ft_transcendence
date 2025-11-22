@@ -398,6 +398,14 @@ export default class ChatPanel {
 			this.showNotification(`${data.byDisplayName} declined your invite`, 'info');
 		});
 
+		this.socket.on('game:accept_invite_rejected', (data: { inviteId: number; reason: string }) => {
+			const invite = this.gameInvites.find(inv => inv.id === data.inviteId);
+			if (invite) invite.status = 'pending'; // Reset to pending so they can try again later
+			
+			this.updateBadgeAndRefresh();
+			this.showNotification(data.reason, 'error');
+		});
+
 		this.socket.on('game:invites_list', (data: GameInvite[]) => {
 			this.gameInvites = data;
 			this.gameInviteCount = data.filter(inv => inv.status === 'pending' && inv.toUserId === (this.socket as any).userId).length;

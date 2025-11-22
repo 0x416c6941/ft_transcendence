@@ -574,6 +574,31 @@ export function setupChatSocket(fastify: FastifyInstance, io: Server): void {
 
 		socket.on('game:accept_invite', async (data: { inviteId: number; gameType: string }) => {
 			try {
+				// Get invite details to check if the sender is currently in a game
+				const invite = await new Promise<any>((resolve, reject) => {
+					fastify.sqlite.get(`
+						SELECT gi.*, u.display_name, u.username
+						FROM game_invites gi
+						JOIN users u ON gi.from_user_id = u.id
+						WHERE gi.id = ?
+					`, [data.inviteId], (err: Error | null, row: any) => {
+						if (err) reject(err);
+						else resolve(row);
+					});
+				});
+
+				// Check if the sender (from_user_id) is currently in a game or tournament
+				const playersInGame = (fastify as any).playersInGame as Map<number, { gameType: string; roomId: string }>;
+				if (invite && playersInGame.has(invite.from_user_id)) {
+					const gameInfo = playersInGame.get(invite.from_user_id);
+					socket.emit('game:accept_invite_rejected', {
+						inviteId: data.inviteId,
+						reason: `${invite.display_name} is currently playing a ${gameInfo?.gameType} game and cannot join right now.`
+					});
+					fastify.log.info(`Game invite ${data.inviteId} rejected: ${invite.display_name} is currently in a game`);
+					return;
+				}
+
 				// Update status in database
 				await new Promise<void>((resolve, reject) => {
 					fastify.sqlite.run(`
@@ -583,19 +608,6 @@ export function setupChatSocket(fastify: FastifyInstance, io: Server): void {
 					`, [data.inviteId, userId], (err: Error | null) => {
 						if (err) reject(err);
 						else resolve();
-					});
-				});
-
-				// Get invite details to notify sender
-				const invite = await new Promise<any>((resolve, reject) => {
-					fastify.sqlite.get(`
-						SELECT gi.*, u.display_name, u.username
-						FROM game_invites gi
-						JOIN users u ON gi.to_user_id = u.id
-						WHERE gi.id = ?
-					`, [data.inviteId], (err: Error | null, row: any) => {
-						if (err) reject(err);
-						else resolve(row);
 					});
 				});
 
