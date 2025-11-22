@@ -117,9 +117,17 @@ export default class ChatPanel {
 						this.container.style.transform = 'translateX(100%)';
 					}
 				}
+				
+				// Only render on enter, not on every state change
+				if (this.container) this.render();
 			}
-			
-			if (this.container) this.render();
+			// If leaving a game
+			else if (wasInGame && !isInGame) {
+				// Re-render to show games tab again
+				if (this.container) this.render();
+			}
+			// For any other state changes, just update the flag but don't re-render
+			// This prevents constant re-renders during gameplay that could interfere with event listeners
 		});
 	}
 
