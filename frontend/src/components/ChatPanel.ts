@@ -173,6 +173,7 @@ export default class ChatPanel {
 			
 			if (isOwnMessage && wasNewConversation) {
 				this.activeConversationId = data.conversationId;
+				(this as any).tempRecipientId = undefined; // Clear temp recipient
 				// Do full render to show conversation view with header and input
 				if (this.container) {
 					this.render();
@@ -184,6 +185,18 @@ export default class ChatPanel {
 					this.renderMessages();
 					this.scrollToBottom();
 				});
+			} else if (this.currentTab === 'dm' && (this as any).tempRecipientId && this.container) {
+				// Message arrived in conversation we're waiting for (tempRecipientId set)
+				// This is a message in a new conversation we're typing in
+				this.activeConversationId = data.conversationId;
+				(this as any).tempRecipientId = undefined; // Clear temp recipient
+				requestAnimationFrame(() => {
+					this.renderMessages();
+					this.scrollToBottom();
+				});
+			} else if (this.currentTab === 'dm' && !this.activeConversationId && this.container) {
+				// Viewing conversation list - rerender to show new message in the list and update unread count
+				requestAnimationFrame(() => this.renderMessages());
 			}
 			
 			this.socket.emit('chat:get_conversations');
@@ -210,8 +223,15 @@ export default class ChatPanel {
 					});
 				}
 			} else if (this.activeConversationId) {
-				// Store messages for this conversation
-				this.dmMessages.set(this.activeConversationId, mappedMessages);
+				// Get any messages that might have arrived while we were waiting for history
+				const existingMessages = this.dmMessages.get(this.activeConversationId) || [];
+				// Merge history with newly arrived messages, avoiding duplicates
+				const existingIds = new Set(existingMessages.map(m => m.id));
+				const newMessages = mappedMessages.filter(m => !existingIds.has(m.id));
+				const allMessages = [...mappedMessages, ...newMessages];
+				
+				// Store combined messages for this conversation
+				this.dmMessages.set(this.activeConversationId, allMessages);
 				// Always re-render messages when DM history arrives
 				if (this.container && this.currentTab === 'dm') {
 					requestAnimationFrame(() => {
