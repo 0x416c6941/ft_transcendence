@@ -61,6 +61,8 @@ export default class Router {
 
 	private _bootstrapped = false;
 
+	private _navigationBlocked = false;
+
 	/**
 	 * @method
 	 * @remarks Call the constructor only after the DOM has been loaded.
@@ -100,14 +102,25 @@ export default class Router {
 
 	/**
 	 * @method
-	 * @private
 	 * Open a view and add it to browser's history.
 	 * @remarks `path` may contain URL parameters, such as ":id".
 	 * @param {string} path	Path to a view.
 	 */
 	navigate(path: string): void {
+		if (this._navigationBlocked) {
+			return;
+		}
 		history.pushState({}, '', path);
 		this._render();
+	}
+
+	/**
+	 * @method
+	 * Block/unblock navigation during critical moments (e.g., countdown)
+	 * @param {boolean} blocked	Whether to block navigation
+	 */
+	setNavigationBlocked(blocked: boolean): void {
+		this._navigationBlocked = blocked;
 	}
 
 	/**

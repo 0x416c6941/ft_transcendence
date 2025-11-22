@@ -149,6 +149,7 @@ export default class TetrisTournamentView extends AbstractView {
         this.socket.on('tetris_match_started', (data: { room: any }) => {
             this.updateRoomState(data.room);
             this.removeOverlay();
+            this.enableAllInteractions();
             this.startGame(data.room);
         });
 
@@ -485,13 +486,16 @@ export default class TetrisTournamentView extends AbstractView {
         const container = document.getElementById('game-container');
         if (!container) return;
 
+        // Disable all interactions
+        this.disableAllInteractions();
+
         this.removeOverlay();
         const overlay = document.createElement('div');
         overlay.id = 'overlay';
-        overlay.className = 'absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-75 z-10';
+        overlay.className = 'fixed inset-0 flex flex-col items-center justify-center bg-black bg-opacity-90 z-50';
         
         const innerDiv = document.createElement('div');
-        innerDiv.className = 'text-center p-6 bg-gray-800 rounded-lg border-2 border-neutral-700';
+        innerDiv.className = 'text-center p-6 bg-gray-800 rounded-lg border-2 border-neutral-700 pointer-events-none';
         
         const titleDiv = document.createElement('div');
         titleDiv.className = 'text-white text-2xl font-bold mb-3';
@@ -505,7 +509,7 @@ export default class TetrisTournamentView extends AbstractView {
         innerDiv.appendChild(countdownDiv);
         
         overlay.appendChild(innerDiv);
-        container.appendChild(overlay);
+        document.body.appendChild(overlay);
 
         let remaining = seconds;
         const countdownInterval = setInterval(() => {
@@ -517,15 +521,86 @@ export default class TetrisTournamentView extends AbstractView {
             } else {
                 numEl.textContent = 'GO!';
                 clearInterval(countdownInterval);
+                this.removeOverlay();
+                this.enableAllInteractions();
             }
         }, 1000);
     }
+
+    private disableAllInteractions(): void {
+        // Disable all buttons
+        const buttons = document.querySelectorAll('button');
+        buttons.forEach(btn => {
+            (btn as HTMLButtonElement).disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+            btn.classList.add('pointer-events-none');
+        });
+
+        // Disable leave button specifically
+        const leaveBtn = document.getElementById('leave-btn') as HTMLButtonElement;
+        if (leaveBtn) {
+            leaveBtn.disabled = true;
+            leaveBtn.style.opacity = '0.5';
+            leaveBtn.style.cursor = 'not-allowed';
+        }
+
+        // Disable keyboard input
+        if (this.handleKeyDown) {
+            document.removeEventListener('keydown', this.handleKeyDown);
+        }
+        if (this.handleKeyUp) {
+            document.removeEventListener('keyup', this.handleKeyUp);
+        }
+
+        // Block router navigation
+        this.router.setNavigationBlocked(true);
+
+        // Prevent tab closing
+        window.addEventListener('beforeunload', this.preventUnload);
+    }
+
+    private enableAllInteractions(): void {
+        // Re-enable all buttons
+        const buttons = document.querySelectorAll('button');
+        buttons.forEach(btn => {
+            (btn as HTMLButtonElement).disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+            btn.classList.remove('pointer-events-none');
+        });
+
+        // Re-enable keyboard input
+        if (this.handleKeyDown) {
+            document.addEventListener('keydown', this.handleKeyDown);
+        }
+        if (this.handleKeyUp) {
+            document.addEventListener('keyup', this.handleKeyUp);
+        }
+
+        // Allow router navigation
+        this.router.setNavigationBlocked(false);
+
+        // Allow tab closing
+        window.removeEventListener('beforeunload', this.preventUnload);
+    }
+
+    private preventUnload = (e: BeforeUnloadEvent): void => {
+        e.preventDefault();
+        e.returnValue = '';
+    };
 
     private removeOverlay(): void {
         document.getElementById('overlay')?.remove();
     }
 
     cleanup(): void {
+        // Clean up any pending unload listeners
+        window.removeEventListener('beforeunload', this.preventUnload);
+
+        // Re-enable interactions in case they were disabled
+        this.enableAllInteractions();
+
         // Notify backend if still in a room (user navigated away without clicking Leave button)
         if (this.roomId) {
             this.socket.emit('leave_tetris_tournament_room', { roomId: this.roomId });
