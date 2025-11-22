@@ -427,7 +427,40 @@ async function handlePlayerLeave(socket: Socket, roomId: string, io: Server, fas
 
     const leavingPlayer = room.players[playerIndex];
     
-    // Mark player as eliminated
+    // CASE: Tournament hasn't started yet (waiting state)
+    if (room.status === 'waiting') {
+        // Simply remove the player from the list (allow rejoin later)
+        room.players.splice(playerIndex, 1);
+        
+        // If player was the creator, reassign to another player
+        if (socket.id === room.creator) {
+            if (room.players.length > 0) {
+                room.creator = room.players[0].socketId;
+            } else {
+                // No players left - destroy room
+                roomsByName.delete(room.name);
+                rooms.delete(roomId);
+                io.to(roomId).emit('tournament_room_destroyed', { message: 'All players left' });
+                return;
+            }
+        }
+        
+        // Notify remaining players of state change
+        io.to(roomId).emit('tournament_room_state', {
+            room: {
+                id: room.id,
+                name: room.name,
+                creator: room.creator,
+                players: room.players,
+                status: room.status,
+            }
+        });
+        
+        return; // Exit early for waiting state
+    }
+    
+    // CASE: Tournament is in progress or finished
+    // Mark player as eliminated for tournament logic
     leavingPlayer.isEliminated = true;
 
     // Handle creator leaving - reassign to another non-eliminated player
