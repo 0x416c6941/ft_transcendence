@@ -578,7 +578,7 @@ export default class StatsView extends AbstractView {
 			return `
 				<div>
 					<div class="flex justify-between txt-light-dark-sans text-sm mb-1">
-						<span class="capitalize font-medium">${game.game_name}</span>
+						<span class="capitalize font-medium">${this.escapeHtml(game.game_name)}</span>
 						<span>${game.count} games (${percentage}%)</span>
 					</div>
 					<div class="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-4">
@@ -619,7 +619,7 @@ export default class StatsView extends AbstractView {
 			tbody.innerHTML = `
 				<tr>
 					<td colspan="6" class="px-4 py-8 text-center txt-light-dark-sans opacity-70">
-						No players found matching "${this.searchQuery}"
+						No players found matching "${this.escapeHtml(this.searchQuery)}"
 					</td>
 				</tr>
 			`;
@@ -632,16 +632,16 @@ export default class StatsView extends AbstractView {
 			const rankEmoji = originalIndex === 0 ? '🥇' : originalIndex === 1 ? '🥈' : originalIndex === 2 ? '🥉' : '';
 			
 			// Highlight matching text
-			let displayName = entry.player_name;
+			let displayName = this.escapeHtml(entry.player_name);
 			if (this.searchQuery.trim()) {
 				const query = this.caseSensitive ? this.searchQuery : this.searchQuery.toLowerCase();
 				const name = this.caseSensitive ? entry.player_name : entry.player_name.toLowerCase();
 				const matchIndex = name.indexOf(query);
 				
 				if (matchIndex !== -1) {
-					const before = entry.player_name.substring(0, matchIndex);
-					const match = entry.player_name.substring(matchIndex, matchIndex + this.searchQuery.length);
-					const after = entry.player_name.substring(matchIndex + this.searchQuery.length);
+					const before = this.escapeHtml(entry.player_name.substring(0, matchIndex));
+					const match = this.escapeHtml(entry.player_name.substring(matchIndex, matchIndex + this.searchQuery.length));
+					const after = this.escapeHtml(entry.player_name.substring(matchIndex + this.searchQuery.length));
 					displayName = `${before}<span class="bg-yellow-200 dark:bg-yellow-700 px-1 rounded">${match}</span>${after}`;
 				}
 			}
@@ -738,7 +738,7 @@ export default class StatsView extends AbstractView {
 			tbody.innerHTML = `
 				<tr>
 					<td colspan="7" class="px-4 py-8 text-center txt-light-dark-sans opacity-70">
-						No games found matching "${this.recentGamesSearchQuery}"
+						No games found matching "${this.escapeHtml(this.recentGamesSearchQuery)}"
 					</td>
 				</tr>
 			`;
@@ -751,19 +751,19 @@ export default class StatsView extends AbstractView {
 			
 			// Helper function to highlight matching text
 			const highlightMatch = (text: string): string => {
-				if (!this.recentGamesSearchQuery.trim()) return text;
+				if (!this.recentGamesSearchQuery.trim()) return this.escapeHtml(text);
 				
 				const query = this.recentGamesCaseSensitive ? this.recentGamesSearchQuery : this.recentGamesSearchQuery.toLowerCase();
 				const checkText = this.recentGamesCaseSensitive ? text : text.toLowerCase();
 				const matchIndex = checkText.indexOf(query);
 				
 				if (matchIndex !== -1) {
-					const before = text.substring(0, matchIndex);
-					const match = text.substring(matchIndex, matchIndex + this.recentGamesSearchQuery.length);
-					const after = text.substring(matchIndex + this.recentGamesSearchQuery.length);
+					const before = this.escapeHtml(text.substring(0, matchIndex));
+					const match = this.escapeHtml(text.substring(matchIndex, matchIndex + this.recentGamesSearchQuery.length));
+					const after = this.escapeHtml(text.substring(matchIndex + this.recentGamesSearchQuery.length));
 					return `${before}<span class="bg-yellow-200 dark:bg-yellow-700 px-1 rounded">${match}</span>${after}`;
 				}
-				return text;
+				return this.escapeHtml(text);
 			};
 			
 			const player1Display = highlightMatch(game.player1_name);
@@ -773,7 +773,7 @@ export default class StatsView extends AbstractView {
 				<tr class="hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors">
 					<td class="px-4 py-3 txt-light-dark-sans">
 						<span class="inline-block px-2 py-1 rounded bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200 text-sm capitalize">
-							${game.game_name}
+							${this.escapeHtml(game.game_name)}
 						</span>
 					</td>
 					<td class="px-4 py-3 txt-light-dark-sans ${game.winner === game.player1_name ? 'font-bold text-green-600 dark:text-green-400' : ''}">
@@ -784,7 +784,7 @@ export default class StatsView extends AbstractView {
 						${player2Display} ${game.player2_is_user ? '👤' : '🤖'}
 					</td>
 					<td class="px-4 py-3 txt-light-dark-sans font-semibold">
-						${game.winner ? '🏆 ' + game.winner : 'Draw'}
+						${game.winner ? '🏆 ' + this.escapeHtml(game.winner) : 'Draw'}
 					</td>
 					<td class="px-4 py-3 txt-light-dark-sans text-right opacity-70">
 						${game.duration_minutes} min
@@ -904,7 +904,7 @@ export default class StatsView extends AbstractView {
 						${tournament.match_count} ${tournament.match_count === 1 ? 'match' : 'matches'}
 					</td>
 					<td class="px-4 py-3 txt-light-dark-sans">
-						${tournament.winner ? `<span class="font-bold text-green-600 dark:text-green-400">🏆 ${tournament.winner}</span>` : '<span class="opacity-50">-</span>'}
+						${tournament.winner ? `<span class="font-bold text-green-600 dark:text-green-400">🏆 ${this.escapeHtml(tournament.winner)}</span>` : '<span class="opacity-50">-</span>'}
 					</td>
 					<td class="px-4 py-3 txt-light-dark-sans opacity-70">
 						${duration}
@@ -1065,6 +1065,12 @@ export default class StatsView extends AbstractView {
 				errorMsg.hidden = true;
 			}, 5000);
 		}
+	}
+
+	private escapeHtml(text: string): string {
+		const div = document.createElement('div');
+		div.textContent = text;
+		return div.innerHTML;
 	}
 
 	cleanup(): void {

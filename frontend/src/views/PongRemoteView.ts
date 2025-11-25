@@ -176,7 +176,7 @@ export default class PongRemoteView extends AbstractView {
         }
 
         overlay.innerHTML = `<div class="text-white text-center">
-            <div class="text-3xl font-bold mb-4">${matchText}</div>
+            <div class="text-3xl font-bold mb-4">${this.escapeHtml(matchText)}</div>
             <div class="text-7xl font-bold" id="countdown-number">${countdown}</div>
         </div>`;
 
@@ -208,7 +208,7 @@ export default class PongRemoteView extends AbstractView {
         overlay.innerHTML = `
             <div class="text-white text-center">
                 <div class="text-6xl font-bold mb-4">🏆</div>
-                <div class="text-3xl font-bold mb-2">${winner} Wins!</div>
+                <div class="text-3xl font-bold mb-2">${this.escapeHtml(winner)} Wins!</div>
                 <div class="text-lg text-gray-300 mt-4">Returning to home in 5 seconds...</div>
             </div>
         `;
@@ -217,6 +217,12 @@ export default class PongRemoteView extends AbstractView {
         setTimeout(() => {
             this.router.navigate('/');
         }, 5000);
+    }
+
+    private escapeHtml(text: string): string {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     private setupKeyboardControls(): void {
