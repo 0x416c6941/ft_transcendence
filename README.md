@@ -1,12 +1,8 @@
 # ft\_transcendence
 This is the last project of the Common Core, a webapp running Pong games and tournaments.
-  
 Additionally, users can also play Tetris and chat with other players.
-  
 Game results are persisted in a database, tournaments can also be saved to blockchain.
-  
 A total of 12 major modules (10 major + 4 minor) have been implemented.
-  
 They are listed below.
 
 
