@@ -2,7 +2,7 @@
 #
 # Clean-up script to remove all created Docker images, volumes and networks.
 
-NAME_PREFIX="ft_transcendence-team-repo"
+NAME_PREFIX="ft_transcendence"
 LABEL_PREFIX="ft_transcendence"
 
 IMAGE_IDS=$(docker images --filter label="${LABEL_PREFIX}.stage=run"		\
