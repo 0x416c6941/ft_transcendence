@@ -10,11 +10,7 @@ DC_CMD := docker compose -f ./docker-compose.yaml --env-file $(ENV_FILE)
 all: up
 
 ${SECRETS_DIR}/.generated:
-	@mkdir -p ${SECRETS_DIR}
-	# Generate secrets/certs. You still need to manually provide credentials for 42 OAuth.
-	# Backend server won't start without them.
-	@./prep_keys.sh
-	@touch ${SECRETS_DIR}/.generated
+	$(error Please run "./prep_keys.sh" and follow the instructions)
 
 .PHONY: up
 up: ${SECRETS_DIR}/.generated

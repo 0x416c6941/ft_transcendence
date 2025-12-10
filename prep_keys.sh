@@ -13,6 +13,10 @@ BACKEND_CSR_OUT_FILENAME="${SERVICE_NAME_PREFIX}-${BACKEND_SERVICE_NAME}.csr"
 if [ ! -d "${SECRETS_DIR}" ]; then
 	mkdir -p "${SECRETS_DIR}"
 fi
+
+# Inject required keys.
+./check_secrets.sh
+
 # Keys and certificates for NGINX.
 echo "NGINX SSL:"
 openssl req -newkey rsa:2048 -nodes -new -x509 -sha256 -days 365	\
@@ -40,15 +44,11 @@ openssl x509 -req -in "${SECRETS_DIR}/${BACKEND_CSR_OUT_FILENAME}"		\
 
 # JWT Secret Key for Backend.
 openssl rand -hex "${SECRET_BACKEND_JWT_KEY_LENGTH}" > "${SECRETS_DIR}/${SECRET_BACKEND_JWT_KEY_FILENAME}"
-printf '\n'
 echo "Successfully generated JWT Secret Key for Backend."
-
-# Blockchain Private Key (for reference only - not used by actual deployment which uses pre-funded test account)
-if [ ! -f "${SECRETS_DIR}/blockchain_private_key.txt" ]; then
-	openssl rand -hex 32 > "${SECRETS_DIR}/blockchain_private_key.txt"
-	echo "Generated blockchain private key file."
-fi
-
 printf '\n'
+
+touch "./${SECRETS_DIR}/.generated"
+
 echo "Successfully generated all credentials, however you still need to manually provide credentials for 42 OAuth."
 echo "Backend server won't start without them."
+echo "Just add your UID to ${SECRETS_DIR}/${SECRET_BACKEND_OAUTH_42_UID_FILENAME} and secret to ${SECRETS_DIR}/${SECRET_BACKEND_OAUTH_42_SECRET_FILENAME}"
